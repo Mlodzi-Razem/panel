@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  ~ Copyright (C) 2025 Stowarzyszenie Młodzi Razem
+  ~ Copyright (C) 2026 Stowarzyszenie Młodzi Razem
   ~
   ~ This program is free software: you can redistribute it and/or modify
   ~ it under the terms of the GNU Affero General Public License as published by
@@ -38,13 +38,5 @@
         <module>chart</module>
         <module>chart-schema</module>
     </modules>
-
-    <dependencies>
-        <dependency>
-            <groupId>org.mlodzirazem.panel.cloud</groupId>
-            <artifactId>chart</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-    </dependencies>
 
 </project>
