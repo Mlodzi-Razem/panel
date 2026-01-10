@@ -1,4 +1,6 @@
 @startuml
+!pragma teoz true
+
 actor User as user
 participant Panel as panel
 participant "Google Workspace\n<<Directory Provider>>" as directory

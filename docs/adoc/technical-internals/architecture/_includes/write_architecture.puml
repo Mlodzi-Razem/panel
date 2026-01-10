@@ -1,4 +1,5 @@
 @startuml
+!pragma teoz true
 
 box "Public Network" #eefffa
     actor User as user
