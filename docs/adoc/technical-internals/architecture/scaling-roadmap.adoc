@@ -1,0 +1,20 @@
+[#scalingRoadmap]
+=== Scaling Roadmap
+
+Panel's backend component, `panel-api`, does not support
+horizontal scaling, thus not supporting high availability
+and rolling upgrades.
+Lack of scaling support has not been an issue so far,
+but here is the list of steps that need to be completed
+for horizontal scaling to be possible.
+
+[%autowidth]
+|===
+| Description                     | Rationale                                  | Implemented
+
+| External cache support          | Required to provide consistency            | ❌
+| External message broker support | Required for event-based architecture
+                                    to be able to handle multiple replicas
+                                    without consistency issues and losing
+                                    data.                                      | ❌
+|===

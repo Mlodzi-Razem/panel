@@ -1,0 +1,91 @@
+{{- $defaultImage := print "ghcr.io/mlodzi-razem/panel-api:" .Chart.AppVersion -}}
+{{- $configMountPath := "/mnt/config" -}}
+{{- $cnpgEnabled := dig "cnpg" "install" false .Values.panel.postgres -}}
+{{- $jdbcUrl := (ternary
+  (print "jdbc:postgresql://cnpg-rw." .Release.Namespace ".svc.cluster.local:5432/mrpanel")
+  (tpl (.Values.panel.postgres.jdbcUrl | default "") .)
+  $cnpgEnabled
+)  -}}
+{{- $postgresSecret := ternary "cnpg-user-secret" "panel-api-postgres-credentials" $cnpgEnabled -}}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: panel-api
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "panel-api.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels: {{ include "panel-api.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{ include "panel-api.labels" . | nindent 8 }}
+      namespace: {{ .Release.Namespace }}
+      name: panel-api
+      annotations:
+        instrumentation.opentelemetry.io/inject-java: "panel-otel-instrumentation"
+    spec:
+      volumes:
+        - name: config
+          secret:
+            secretName: panel-api-config
+            optional: false
+            defaultMode: 0444
+      hostname: {{ .Release.Namespace }}-panel-api
+      containers:
+        - name: panel-api
+          ports:
+            - containerPort: 8080
+              name: api
+              protocol: TCP
+            - containerPort: 9080
+              name: metrics
+              protocol: TCP
+          image: {{ tpl (.Values.panel.api.image | default $defaultImage) . }}
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - mountPath: {{ $configMountPath }}
+              name: config
+              readOnly: true
+          resources:
+            limits:
+              memory: {{ tpl (toString .Values.panel.api.replicaResources.maximumMemoryMb) . }}Mi
+            requests:
+              cpu: {{ tpl (toString .Values.panel.api.replicaResources.requestedCpuCores) . }}
+          env:
+            - name: JDBC_URL
+              value: {{ $jdbcUrl | quote }}
+            - name: JDBC_USER
+              valueFrom:
+                secretKeyRef:
+                  key: username
+                  name: {{ $postgresSecret }}
+                  optional: false
+            - name: JDBC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: {{ $postgresSecret }}
+                  optional: false
+            # use the configuration file defined in panel.api.config
+            - name: PANEL_CONFIG_FILE_PATH
+              value: {{ $configMountPath }}/panel-pod-config.yaml
+            - name: management.observations.key-values.environment
+              value: {{ .Release.Namespace }}
+            - name: management.observations.key-values.version
+              value: {{ .Chart.AppVersion }}
+            # enable JSON logging
+            - name: logging.structured.format.console
+              value: "ecs"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+      securityContext:
+        runAsNonRoot: true

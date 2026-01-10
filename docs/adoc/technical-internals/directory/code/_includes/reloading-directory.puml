@@ -1,0 +1,34 @@
+@startuml
+start
+<style>
+element {
+    MinimumWidth: 340;
+}
+</style>
+
+:""ReloadDirectoryEvent"" published;
+
+:""ReloadDirectoryListener"";
+
+:""DirectoryReloader :: reload()"";
+
+:""ReloadableDirectoryImplementtion :: reload()"";
+->acquire <i>write lock\n;
+
+partition "Reloading the directory implementation" {
+    :**New** ""DirectoryImplementation :: initialize()"";
+    :""DirectoryImplementationComplianceValidator"";
+
+    if (validation succeeded?) is (<color:green>true  ) then
+        :**Old** ""DirectoryImplementation :: close()"";
+        :Swap instances <<atomically>>;
+    else (<color:red>  false)
+        :Log error;
+        :Rethrow;
+        stop
+    end if
+}
+->\nrelease <i>write lock;
+
+stop
+@enduml

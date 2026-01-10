@@ -1,0 +1,20 @@
+@startuml
+start
+
+<style>
+    element {
+        MinimumWidth: 320;
+    }
+</style>
+
+:""DirectoryInjectableComponent :: method()"";
+
+:<<Proxy>> - redirect to current implementation;
+
+:""DirectoryImplementation :: injectService()"";
+->returned instance;
+
+:""ServiceImpl :: method()"";
+
+stop
+@enduml

@@ -1,0 +1,75 @@
+{{- $defaultImage := print "ghcr.io/mlodzi-razem/panel-web:" .Chart.AppVersion -}}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: panel-web
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "panel-web.labels" . | nindent 4 }}
+spec:
+{{- if not .Values.panel.web.hpa.enabled }}
+  replicas: {{ tpl .Values.panel.web.replicas . }}
+{{- end }}
+{{- if .Values.panel.web.rollingUpdates.enabled }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: {{ .Values.panel.web.rollingUpdates.maxUnavailable }}
+      maxSurge: {{ .Values.panel.web.rollingUpdates.maxSurge }}
+{{- end }}
+  selector:
+    matchLabels: {{ include "panel-web.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{ include "panel-web.labels" . | nindent 8 }}
+      namespace: {{ .Release.Namespace }}
+      name: panel-web
+      annotations:
+        instrumentation.opentelemetry.io/inject-nodejs: "panel-otel-instrumentation"
+    spec:
+      hostname: {{ .Release.Namespace }}-panel-web
+      affinity: {{ tpl (toYaml .Values.panel.web.affinity) . | nindent 8 }}
+      containers:
+        - name: panel-web
+          image: {{ tpl .Values.panel.web.image . | default $defaultImage }}
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              memory: {{ tpl (toString .Values.panel.web.replicaResources.maximumMemoryMb) . }}Mi
+            requests:
+              cpu: {{ tpl (toString .Values.panel.web.replicaResources.requestedCpuCores) . }}
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+              name: http
+          env:
+            - name: PANEL_APP_NAME
+              value: {{ .Release.Namespace }}-panel-web
+            - name: PANEL_METRICS_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: metrics-auth-token
+                  name: panel-web-secret
+            - name: PANEL_GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  key: panel-web-google-client-id
+                  name: panel-web-secret
+            - name: PANEL_GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: panel-web-google-client-secret
+                  name: panel-web-secret
+            - name: PANEL_API_URL
+              value: http://panel-api.{{ .Release.Namespace }}.svc.cluster.local:8080
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: nextauth-secret
+                  name: panel-web-secret
+            - name: NEXTAUTH_URL
+              value: {{ tpl .Values.panel.web.url . | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+      securityContext:
+        runAsNonRoot: true

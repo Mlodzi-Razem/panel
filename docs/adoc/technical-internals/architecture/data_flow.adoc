@@ -1,0 +1,24 @@
+=== Data Flow
+:includedir: _includes
+
+A simplified CQRS pattern is used to manage data — read operations are separated from write operations.
+Read operations are synchronous, while write operations are almost always hidden behind an asynchronous layer of indirection provided by the event bus.
+
+Shortly speaking, when you want to modify the data, you need to publish an event.
+But when you want just to read the data, you can simply fetch it from the database.
+
+Why?
+Because this way we can store a log of all changes, which is useful for auditing and debugging purposes.
+This technique forces us to think about data as a sequence of immutable events, thus forcing us to write code in a way that is easy to test and maintain.
+
+.Querying data sequence
+[plantuml, , svg]
+----
+include::{includedir}/read_architecture.puml[]
+----
+
+.Modifying data sequence
+[plantuml, , svg]
+----
+include::{includedir}/write_architecture.puml[]
+----

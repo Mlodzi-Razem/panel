@@ -1,0 +1,20 @@
+@startuml
+actor User as user
+participant Panel as panel
+participant "Google Workspace\n<<Directory Provider>>" as directory
+
+autonumber
+
+user -> panel: Makes a change
+
+activate panel
+panel --> user: Informs that the changes\nwill be applied soon
+deactivate panel
+
+panel -> directory: Synchronizes groups, roles\nand users to reflect the changes
+
+activate directory
+directory --> directory
+directory --> panel
+deactivate directory
+@enduml

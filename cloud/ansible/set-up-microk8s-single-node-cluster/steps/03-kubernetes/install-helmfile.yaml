@@ -1,0 +1,37 @@
+- name: Create helmfile directory
+  file:
+    path: "{{ helmfile.downloadDir }}/extracted"
+    state: directory
+- name: Download helmfile
+  get_url:
+    url: "{{ helmfile.archiveUrl }}"
+    dest: "{{ helmfile.downloadDir }}/helmfile.tar.gz"
+    checksum: "{{ helmfile.archiveChecksum }}"
+    timeout: 300
+- name: Extract helmfile
+  unarchive:
+    src: "{{ helmfile.downloadDir }}/helmfile.tar.gz"
+    dest: "{{ helmfile.downloadDir }}/extracted"
+    remote_src: true
+- name: Creating directory for helmfile
+  file:
+    path: "{{ helmfile.executableDirectory }}"
+    state: directory
+    recurse: true
+- name: Copy helmfile executable
+  copy:
+    src: "{{ helmfile.downloadDir }}/extracted/helmfile"
+    dest: "{{ helmfile.executableDirectory }}/helmfile"
+    mode: "755"
+    remote_src: true
+- name: Clean up after helmfile download
+  file:
+    path: "{{ helmfile.downloadDir }}"
+    state: absent
+- name: Init helmfile
+  command: "{{ helmfile.executableDirectory }}/helmfile init --helm-binary {{ helmfile.helmBinary }} --force"
+- name: Set helmfile alias
+  lineinfile:
+    path: /etc/bash.bashrc
+    line: "alias helmfile='{{ helmfile.executableDirectory }}/helmfile --helm-binary {{ helmfile.helmBinary }}'"
+    regexp: "^alias helmfile="

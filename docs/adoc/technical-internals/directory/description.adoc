@@ -1,0 +1,57 @@
+Directory integration is the single most important functionality
+of MR Panel aside from managing the database.
+Directory services are used to perform authentication,
+authorization, to facilitate communication and recruitment.
+
+Panel has been designed to require as little human intervention
+as possible. Therefore, to switch or configure a directory provider,
+you only need to visit the settings page as your organization's administrator.
+
+'''
+Panel contains two implementations of directory services: `Mock` and `Google`.
+
+=== Mock
+The mock implementation is quite straightforward -- when
+the directory implementation is refreshed, a JSON file
+is read from the designated place. This file contains
+the *initial* state of the directory: available users,
+groups, permissions, etc.
+Then, changes are performed in memory.
+
+All modifications are lost when the directory implementation
+is refreshed or when the app is restarted.
+
+`Mock` implementation is great for testing
+algorithms' correctness, but it does not
+guarantee that the code will work flawlessly
+after switching to another provider.
+
+****
+NOTE: To enable `Mock`, make sure that your
+`panel.directory.mock.enabled` property
+is set to `true`. If it is not,
+you have to shut down `panel-api`
+and launch it with the property set.
+Then you should be able  to choose
+the `Mock` provider on the settings page.
+****
+
+=== Google
+Google offers unlimited free Google Workspace
+accounts for non-profit organizations. This
+policy has led Google to become the default
+directory provider for non-commercial entities.
+
+Panel leverages Google Admin API as the default
+(*and only, at the moment*) production-ready
+directory provider.
+
+.Required parameters
+|===
+| Name                 | Description                               | Layer
+
+| Client ID            | Public key used for OAuth authentication  | Frontend
+| Client Secret        | Private key used for OAuth authentication | Frontend
+| Service Account JSON | Authentication data used by `panel-api`
+to authenticate in Workspace              | Backend
+|===

@@ -1,0 +1,51 @@
+{{- if .Values.panel.jaeger.enabled -}}
+{{- $jaegerImageTag := last (regexSplit ":" (tpl .Values.panel.jaeger.image .) -1) -}}
+
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: panel-otel-collector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    "org.mlodzirazem.panel.component": "jaeger-otel-collector"
+    "org.mlodzirazem.panel.layer": "observability"
+spec:
+  mode: {{ .Values.panel.jaeger.mode }}
+  imagePullPolicy: IfNotPresent
+  image: {{ tpl .Values.panel.jaeger.image . | quote }}
+  serviceName: panel-otel-collector
+  ports:
+    - name: jaeger
+      port: 16686
+    - name: http-otlp
+      port: 4318
+    - name: grpc-otlp
+      port: 4317
+  config:
+    service:
+      extensions: [ jaeger_storage, jaeger_query ]
+      pipelines:
+        traces:
+          receivers: [ otlp ]
+          exporters: [ jaeger_storage_exporter ]
+    extensions:
+      jaeger_query:
+        storage:
+          traces: memstore
+      jaeger_storage:
+        backends:
+          memstore:
+            memory:
+              max_traces: 100000
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    exporters:
+      jaeger_storage_exporter:
+        trace_storage: memstore
+
+{{- end -}}

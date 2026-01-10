@@ -1,0 +1,96 @@
+@startuml
+
+box "Public Network" #eefffa
+    actor User as user
+    boundary "Panel Web" as panelWeb
+end box
+
+box "Private Network" #fdfdfd
+    boundary Endpoint as endpoint
+    collections Services as services
+    collections Listeners as listeners
+    control Cache as cache
+    database Database as database
+    database "Event Log <<Database>>" as eventLog
+    queue "Event Bus" as eventBus
+end box
+
+autonumber 1
+
+user -> panelWeb
+activate panelWeb
+panelWeb -> endpoint: Sends a request
+activate endpoint #blue
+activate endpoint
+
+endpoint --> panelWeb: Responds immediately
+note bottom
+    Sometimes it is
+    required that
+    the user wait
+    for the outcome.
+    In such cases,
+    it is advisable
+    to use Panel'
+    RPC functionality.
+end note
+deactivate endpoint
+endpoint -[#blue]>o services: <<async>> Calls a service
+deactivate endpoint
+activate services #blue
+
+services -[#blue]>o eventBus: <<async>> Sends a message
+deactivate services
+
+activate eventBus
+activate eventBus #blue
+
+autonumber stop
+eventBus --> eventBus
+autonumber 6.1
+
+eventBus -[#blue]>o listeners: <<async>> Delivers the message
+deactivate eventBus
+activate listeners
+
+eventBus -> eventLog: Stores the message in the log
+
+deactivate eventBus
+autonumber stop
+activate eventLog
+eventLog <-- eventLog
+listeners <-- listeners
+deactivate eventLog
+autonumber resume
+
+autonumber 7
+
+listeners -> database: Modifies data
+deactivate listeners
+activate database
+
+autonumber stop
+database --> database
+autonumber resume
+
+database --> listeners
+deactivate database
+
+activate listeners
+
+autonumber stop
+listeners <-- listeners
+autonumber resume
+
+listeners -[#blue]>o cache: <<async>> Populates cache
+deactivate listeners
+
+autonumber stop
+activate cache
+cache --> cache
+autonumber resume
+
+panelWeb -> user
+deactivate panelWeb
+
+@enduml

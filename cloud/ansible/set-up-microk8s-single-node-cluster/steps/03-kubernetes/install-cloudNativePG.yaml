@@ -1,0 +1,12 @@
+- name: Add CloudNativePG Helm repository
+  kubernetes.core.helm_repository:
+    name: cnpg
+    repo_url: https://cloudnative-pg.github.io/charts
+- name: Install CloudNativePG via Helm
+  kubernetes.core.helm:
+    name: cloudnative-pg
+    chart_ref: cnpg/cloudnative-pg
+    release_namespace: "cnpg-system"
+    create_namespace: true
+    wait: true
+    version: "0.27.0"

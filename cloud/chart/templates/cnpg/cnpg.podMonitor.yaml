@@ -1,0 +1,14 @@
+{{- if .Values.panel.postgres.cnpg.install -}}
+
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: cnpg
+spec:
+  selector:
+    matchLabels:
+      cnpg.io/cluster: cnpg
+  podMetricsEndpoints:
+    - port: metrics
+
+{{- end -}}

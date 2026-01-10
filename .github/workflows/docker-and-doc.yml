@@ -1,0 +1,82 @@
+name: Build and deploy Docker images
+on:
+  release:
+    types:
+      - released
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TAG_PREFIX: ghcr.io/mlodzi-razem
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: Set Git variables
+        run: |
+          echo "SOURCE_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+      - name: Set project version in pom.xml
+        run: mvn versions:set -DnewVersion=$SOURCE_TAG
+        env:
+          SOURCE_TAG: ${{ env.SOURCE_TAG }}
+      - name: Set project version in remaining files
+        run: grep -rlZ "0.0.0-MRPANEL-SNAPSHOT" . | xargs -0 sed -i "s/0.0.0-MRPANEL-SNAPSHOT/$SOURCE_TAG/g"
+        env:
+          SOURCE_TAG: ${{ env.SOURCE_TAG }}
+      - name: Create source code archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: sources
+          path: '.'
+      - name: Setup Graphviz for PlantUML
+        uses: ts-graphviz/setup-graphviz@v2
+      - name: Build documentation
+        run: |
+          mvn --batch-mode \
+              --update-snapshots \
+              -e \
+              -DskipTests \
+              --projects docs \
+              --also-make \
+              clean package
+      - name: Build `services` images
+        run: |
+          find ./services -maxdepth 1 -type d -exec \
+            docker build --no-cache \
+             --file=services/{}/docker/Dockerfile \
+             -t $TAG_PREFIX/{}:$SOURCE_TAG \
+             -t $TAG_PREFIX/{}:latest \
+              ./ \;
+        env:
+          SOURCE_TAG: ${{ env.SOURCE_TAG }}
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: https://ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push services
+        run: find ./services -maxdepth 1 -type d -exec docker push --all-tags $TAG_PREFIX/{} \;
+      - name: Create documentation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation
+          path: |
+            docs/target/generated-docs/
+            !docs/target/generated-docs/.asciidoctor
+      - name: Create Helm chart artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-chart
+          path: |
+            cloud/chart
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and Push the Helm Charts to GitHub Container Registry
+        uses: JimCronqvist/action-helm-chart-repo@master
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

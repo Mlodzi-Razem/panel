@@ -1,0 +1,90 @@
+@startuml
+
+box "Public Network" #eefffa
+    actor User as user
+    boundary "Panel Web" as panelWeb
+end box
+
+box "Private Network" #fdfdfd
+    boundary Endpoint as endpoint
+    collections Services as services
+    control Cache as cache
+    database Database as database
+end box
+
+note left of cache
+    <b>Note.</b> Not everything should
+    be cached. Sometimes it makes
+    more sense to directly fetch data
+    from the database or call
+    an external service.
+end note
+
+autonumber 1
+
+user -> panelWeb
+activate panelWeb
+
+panelWeb -> endpoint: Sends a request
+activate endpoint
+
+endpoint -> services: Calls a service
+
+activate services
+services -> cache: Tries to fetch the cached value
+
+activate cache #red
+activate cache #green
+
+autonumber stop
+cache --> cache
+
+alt <font color="green">Value found in cache</font>
+    autonumber 5
+    cache -[#green]-> services: Returns the cached value
+    deactivate cache
+else <font color="red">Cache miss</font>
+    autonumber 5.1
+    cache -[#red]-> services: Returns 404
+    deactivate cache
+    activate services #red
+
+    services -> database: Calls the database
+    deactivate services
+    activate database
+
+    autonumber stop
+    database --> database
+    autonumber resume
+
+    database --> services: Returns query result
+
+    deactivate database
+
+    activate services #red
+
+    autonumber stop
+    services <-- services
+    autonumber resume
+
+    services -[#blue]>o cache: <<async>> Caches the new value
+    deactivate services
+    activate cache
+    autonumber stop
+    cache --> cache
+    autonumber resume
+end
+
+autonumber 6
+
+services --> endpoint: Returns data
+deactivate services
+deactivate cache
+
+
+endpoint --> panelWeb: Sends the response
+deactivate endpoint
+
+panelWeb -> user
+deactivate panelWeb
+@enduml

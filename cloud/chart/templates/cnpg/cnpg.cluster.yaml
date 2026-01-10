@@ -1,0 +1,45 @@
+{{- if .Values.panel.postgres.cnpg.install -}}
+
+{{- $pvcTemplate := (ternary
+  (tpl (toYaml (.Values.panel.postgres.cnpg.volumes.data.cnpgPvcTemplate) | default "") .)
+  (tpl (toYaml .Values.panel.postgres.cnpg.volumes.data.cnpgPvcTemplate) .)
+  (kindIs "string" .Values.panel.postgres.cnpg.volumes.data.cnpgPvcTemplate)
+) -}}
+
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cnpg
+  namespace: {{ .Release.Namespace }}
+spec:
+  instances: 1
+  storage:
+    size: {{ tpl (toString .Values.panel.postgres.cnpg.volumes.data.storageLimitGigabytes) . }}Gi
+    pvcTemplate: {{ $pvcTemplate | nindent 6 }}
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.1
+  imagePullPolicy: IfNotPresent
+  superuserSecret:
+    name: cnpg-admin-secret
+  bootstrap:
+    initdb:
+      encoding: UTF8
+      dataChecksums: true
+      locale: en_US.UTF-8
+  managed:
+    roles:
+      - name: mrpanel
+        ensure: present
+        login: true
+        superuser: false
+        createdb: true
+        passwordSecret:
+          name: cnpg-user-secret
+    services:
+      disabledDefaultServices: ['r', 'ro'] # not needed for single-instance clusters
+  postgresql:
+    parameters:
+      shared_buffers: {{ div (tpl (toString .Values.panel.postgres.cnpg.resources.maximumMemoryMb) .) 4 }}MB
+      random_page_cost: '1.1'
+      wal_level: logical
+
+{{- end -}}

@@ -1,0 +1,4 @@
+originCaIssuer:
+  archiveUrl: https://github.com/cloudflare/origin-ca-issuer/archive/refs/tags/v0.13.0.tar.gz
+  downloadDir: /tmp/download/origin-ca-issuer
+  extractedDirectoryName: origin-ca-issuer-0.13.0

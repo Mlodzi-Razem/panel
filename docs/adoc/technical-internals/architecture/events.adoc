@@ -1,0 +1,67 @@
+=== Events
+
+==== RPC Events
+RPC is an abbreviation for *Remote Procedure Call*. The name RPC is often used
+to describe an event-based two-way communication model. MR Panel implements
+in-process RPC using Reactor and Spring Application Events.
+
+===== Using RPC Events
+To use RPC events, you need to create an event class implementing `RpcEvent` interface.
+Below is an example implementation.
+
+.MySpecialRpcEvent.java
+[%linenums,java]
+----
+public record MySpecialRpcEvent(UUID correlationId) implements RpcEvent<String> <1>
+{}
+----
+<1> `RpcEvent` 's type parameter is the expected response type.
+
+.MySpecialRpcEventListener.java
+[%linenums,java]
+----
+@Component
+@RequiredArgsConstructor
+public class MySpecialRpcEventListener {
+    private final RpcResponder rpcResponder; <1>
+
+    @EventListener
+    public void reactToMySpecialEvent(MySpecialRpcEvent event) {
+        rpcResponder.respond(event, "Responded");
+    }
+}
+----
+<1> Using `RpcResponder` is mandatory even for `RpcEvent<Void>`.
+
+If the listener throws an exception, it will be propagated to the original caller.
+
+.EventPublisher.java
+[%linenums,java]
+----
+@Component
+@RequiredArgsConstructor
+public class EventPublisher {
+    private final RpcEventPublisher publisher;
+
+    public void publishEvent() {
+        String result = publisher.publishAndReceive(
+            new MySpecialRpcEvent(UUID.randomUUID()), <1>
+            Duration.ofSeconds(1) <2>
+        );
+
+        assert result.equals("Responded");
+    }
+}
+----
+<1> You must always provide the `correlationId`. The recommended way is to use `UuidGenerator`, but for test purposes we can stick with `UUID.randomUUID()`.
+<2> Timeout must be provided too. There is no default timeout, and it is deliberate.
+
+****
+NOTE: You *must* always use `RpcEventPublisher` to publish RPC events. Otherwise, you will not
+be able to wait for them to finish or fetch theri responses.
+****
+
+****
+CAUTION: Do not publish RPC events within `@TransactionalEventListener` s unless you know
+exactly what you are doing.
+****

@@ -1,0 +1,6 @@
+helmfile:
+  archiveUrl: https://github.com/helmfile/helmfile/releases/download/v1.2.2/helmfile_1.2.2_linux_amd64.tar.gz
+  archiveChecksum: sha256:c0f7f1ec125849156acb89305186a5f27305771331be8e546b250a46da944525
+  downloadDir: /tmp/download/helmfile
+  executableDirectory: /var/lib/helmfile/bin
+  helmBinary: /snap/bin/microk8s.helm

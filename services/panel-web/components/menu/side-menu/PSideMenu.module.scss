@@ -1,0 +1,165 @@
+/*!
+ * Copyright (C) 2026 Stowarzyszenie Młodzi Razem
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+.container {
+    height: 100lvh;
+    width: var(--size-sidemenu-col-icons-width);
+    position: sticky;
+    top: 0;
+
+    display: grid;
+    grid-template-rows: auto auto 1fr auto auto;
+
+    background-color: var(--color-background);
+    box-shadow: var(--shadow-1);
+    border-right: 1px solid var(--color-border);
+
+    overflow-x: hidden;
+    overflow-y: auto;
+
+    transition: var(--transition-width);
+}
+
+.toggleMenuContainer {
+    width: var(--size-sidemenu-col-icons-width);
+    height: calc(var(--size-sidemenu-item-size) + var(--size-sidemenu-padding));
+    padding: var(--size-sidemenu-padding);
+    display: flex;
+    justify-content: center;
+    position: relative;
+    transition: var(--transition-all);
+
+    &:hover {
+        .toggleMenuIcon {
+            transform: scale(0.9);
+        }
+    }
+}
+
+.toggleMenuContainer:has(.toggleMenuCheckbox:checked) .toggleMenuIcon {
+    transform: rotate(90deg);
+    width: var(--size-sidemenu-item-size);
+}
+
+.toggleMenuCheckbox {
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.toggleMenuIcon {
+    position: absolute;
+    top: 0;
+    padding: calc(var(--size-sidemenu-padding) / 2);
+    transition: var(--transition-all);
+}
+
+.menuItem {
+    cursor: pointer;
+    width: var(--size-sidemenu-width);
+    display: grid;
+    grid-template-columns: var(--size-sidemenu-col-icons-width) var(--size-sidemenu-col-labels-width);
+    padding: var(--size-sidemenu-padding);
+
+    transition: var(--transition-all);
+
+    &:hover {
+        padding-left: calc(var(--size-sidemenu-padding) + 0.2rem);
+    }
+
+    &[aria-selected="true"] {
+        box-shadow: inset 0.4rem 0 0 var(--color-primary), var(--shadow-1);
+        border-top: 1px solid var(--color-border);
+        border-bottom: 1px solid var(--color-border);
+    }
+}
+
+.menuItemIconContainer {
+    padding-right: calc(2 * var(--size-sidemenu-padding));
+}
+
+.menuItemLabelContainer {
+    height: var(--size-sidemenu-item-size) + calc(var(--size-sidemenu-padding)/2);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: left;
+}
+
+.logoContainer {
+    width: var(--size-sidemenu-col-icons-width);
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition-all);
+}
+
+.logo {
+    width: 100%;
+    height: auto;
+
+    fill: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.userContainer {
+    display: grid;
+    grid-template-columns: var(--size-sidemenu-col-icons-width) var(--size-sidemenu-col-labels-width);
+}
+
+.userAvatar {
+    width: var(--size-sidemenu-item-size);
+    height: var(--size-sidemenu-item-size);
+    border-radius: 100%;
+    box-shadow: var(--shadow-1);
+    border: 1px solid var(--color-border);
+}
+
+.userAvatarContainer {
+    padding: var(--size-sidemenu-padding);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.userDescriptionContainer {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: start;
+}
+
+.userNameLabel {
+    font-size: 0.8rem;
+}
+
+.logoutLabel {
+    font-size: 0.6rem;
+    color: var(--color-secondary);
+    cursor: pointer;
+
+    &:hover {
+        text-decoration: underline;
+    }
+}

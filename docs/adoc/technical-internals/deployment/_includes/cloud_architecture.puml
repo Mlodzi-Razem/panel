@@ -1,0 +1,113 @@
+@startuml
+skinparam nodesep 10
+skinparam ranksep 10
+
+!include <C4/C4>
+!include <k8s/Common>
+!include <k8s/OSS/all>
+!include <logos/cloudflare>
+!include <awslib/AWSCommon>
+!include <awslib/Storage/all>
+
+left to right direction
+
+actor User as user
+
+Boundary(cloudFlare, "<$cloudflare,color=darkorange>", CloudFlare) {
+    rectangle "DNS" as clDns
+    rectangle "Proxy" as clProxy
+    rectangle "CA Issuer" as caIssuer
+    Rel_L(clDns, clProxy, " ")
+}
+Rel(user, clDns, " ")
+
+Cluster_Boundary(cluster, "Kubernetes Cluster") {
+    KubernetesApi(k8sApi, "k8s-api", "API server")
+
+    Namespace_Boundary(mrpanelGateway, "mrpanel") {
+        Boundary(panelGatewayBoundary, "panel-gateway") {
+            KubernetesIng(panelGateway, panel-gateway, Gateway)
+            KubernetesCm(certManager, cert-manager, Operator)
+
+            KubernetesCrd(panelCaIssuer, panel-ca-issuer, "OriginIssuer")
+            KubernetesCrd(sslCert, panel-ssl-cert, Certificate)
+        }
+
+        Boundary(panelWeb, "panel-web") {
+            KubernetesSvc(panelWebSvc, "panel-web-service", Service)
+            KubernetesCrd(panelWebSm, "panel-web-servicemonitor", ServiceMonitor)
+
+            KubernetesDeploy(panelWebDeploy, "panel-web-deployment", Deployment)
+            KubernetesHpa(panelWebHpa, "panel-web-hpa", HPA)
+
+            rectangle "panel-web" <<Pods>> as panelWebPods {
+                KubernetesPod(panelWebPod1, "panel-web-0", Pod)
+                KubernetesPod(panelWebPod2, "panel-web-1", Pod)
+                KubernetesPod(panelWebPod3, "panel-web-2", Pod)
+                KubernetesPod(panelWebPod4, "panel-web-3", Pod)
+            }
+        }
+
+        Boundary(panelApi, "panel-api") {
+            KubernetesSvc(panelApiSvc, "panel-api-service", Service)
+            KubernetesCrd(panelApiSm, "panel-api-servicemonitor", ServiceMonitor)
+            KubernetesDeploy(panelApiDeploy, "panel-api-deployment", Deployment)
+            KubernetesPod(panelApiPod, "panel-api-0", Pod)
+        }
+    }
+
+    Boundary(postgres, "CloudNativePG", ) {
+        KubernetesPv(postgresDataPv, "postgres-data", PV)
+        KubernetesPv(postgresBackupPv, "postgres-backup", PV)
+        component "cnpg-operator" as cnpgOperator {
+            component "PostgreSQL Instance"
+        }
+        KubernetesSvc(cnpgSvc, "cnpg-rw", Service)
+    }
+
+
+
+    Boundary(kubePrometheusStack, "kube-prometheus-stack") <<Metrics and logs ingestion>> {
+       component "Prometheus Operator" {
+            component "Prometheus"
+       }
+       Rel([Grafana], [Loki], " ")
+       Rel_R([Grafana], [Prometheus Operator], " ")
+    }
+
+
+    Boundary(jaeger, "OpenTelemetry") <<Traces monitoring>> {
+        component "OpenTelemetry Operator" {
+            Rel([OpenTelemetry Collector], [Jaeger], " ")
+            [OpenTelemetry Collector]
+            [Jaeger]
+        }
+    }
+}
+
+Boundary(external, "External") {
+    SimpleStorageServiceGlacier(s3Backup, "Backup storage", "S3")
+}
+
+Rel(panelCaIssuer, caIssuer, " ")
+Rel_Back(sslCert, certManager, " ")
+Rel(panelCaIssuer, certManager, " ")
+Rel(panelGateway, sslCert, " ")
+Rel(panelWebDeploy, panelWebPods, " ")
+Rel(panelWebHpa, panelWebDeploy, " ")
+Rel(panelWebSvc, panelWebPods, " ")
+Rel(panelApiSm, panelApiSvc, " ")
+Rel(panelApiDeploy, panelApiPod, " ")
+Rel(panelApiSvc, panelApiPod, " ")
+Rel(cnpgOperator, s3Backup, " ")
+Rel(clProxy, panelGateway, " ")
+Rel(panelWebPods, panelApiSvc, " ")
+Rel(panelGateway, panelWebSvc, " ")
+Rel(panelWebSm, panelWebSvc, " ")
+Rel(cnpgOperator, postgresDataPv, " ")
+Rel(cnpgOperator, postgresBackupPv, " ")
+Rel(cnpgSvc, cnpgOperator, " ")
+Rel(panelApiPod, cnpgSvc, " ")
+Rel(kubePrometheusStack, k8sApi, "Queries logs\nfrom <b>all pods</b>")
+
+@enduml

@@ -1,0 +1,17 @@
+{{- if .Values.panel.gateway.install -}}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: panel-ssl-cert
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "gateway.labels" . | nindent 4 }}
+spec:
+  issuerRef:
+    name: panel-cert-issuer
+    kind: OriginIssuer
+    group: cert-manager.k8s.cloudflare.com
+  secretName: panel-ssl-cert
+  dnsNames: {{ tpl (.Values.panel.gateway.domains | toJson) . }}
+  duration: 168h
+  renewBefore: 24h
+{{- end -}}

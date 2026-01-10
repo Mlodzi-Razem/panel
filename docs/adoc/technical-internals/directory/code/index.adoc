@@ -1,0 +1,37 @@
+=== Code
+
+Directory-related code is available in the
+`org.mlodzirazem.panel.services.panelapi.directory` package.
+
+To use directory services, just inject any bean implementing
+`DirectoryInjectableComponent`.
+
+==== Reloadability
+Directory implementation is *reloadable*. It means that you
+can change your directory provider without restarting the application.
+
+To achieve reloadability, we implemented the following architecture:
+
+1. All interfaces implementing `DirectoryInjectableComponent` are implemented by
+   `DirectoryBeansCreator`. It uses `ReloadableDirectoryImplementation` to create
+   proxies.
+2. Directory provider exposes an implementation of the `DirectoryImplementation` interface.
+3. `ReloadDirectoryEvent` is published, which leads to calling the `reload()` method on
+   each bean implementing `ReloadableDirectoryService`.
+4. `DirectoryFactory::reload` is called as a consequence of point _3_.
+   `DirectoryFactory` swaps the `DirectoryImplementation` used by the injected beans.
+   See <<reloadDirectroyImplementation>>.
+
+.Calling `method()`
+[#callDirectoryMethod]
+[plantuml,,svg]
+----
+include::_includes/using-directory-service.puml[]
+----
+
+.Reloading the directory implementation
+[#reloadDirectroyImplementation]
+[plantuml,,svg]
+----
+include::_includes/reloading-directory.puml[]
+----

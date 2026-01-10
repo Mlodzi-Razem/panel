@@ -1,0 +1,36 @@
+- name: Configure microk8s
+  hosts: all
+  become: true
+  vars_files: ["03-kubernetes/helmfile.vars.yaml", "03-kubernetes/origin-ca-issuer.vars.yaml"]
+  tasks:
+    - name: Make sure Kubernetes is not installed from apt
+      package:
+        name: kubernetes
+        state: absent
+    - name: Make sure Docker is not installed from apt
+      package:
+        name: docker.io
+        state: absent
+    - name: Install microk8s
+      import_tasks:
+        file: "03-kubernetes/install-microk8s.yaml"
+    - name: Install helmfile
+      import_tasks:
+        file: "03-kubernetes/install-helmfile.yaml"
+    - name: Install origin-ca-issuer
+      import_tasks:
+        file: "03-kubernetes/install-originCaIssuer.yaml"
+    - name: Install OpenTelemetry Operator
+      import_tasks:
+        file: "03-kubernetes/install-openTelemetryOperator.yaml"
+    - name: Install CloudNativePG
+      import_tasks:
+        file: "03-kubernetes/install-cloudNativePG.yaml"
+    - name: Set completions
+      shell: |
+        {{ item.command }} > /etc/bash_completion.d/{{ item.name }}
+        chmod 755 /etc/bash_completion.d/{{ item.name }}
+      loop:
+        - { command: "microk8s kubectl completion bash", name: "kubectl" }
+        - { command: "microk8s helm completion bash", name: "helm" }
+        - { command: "helmfile completion bash", name: "helmfile" }

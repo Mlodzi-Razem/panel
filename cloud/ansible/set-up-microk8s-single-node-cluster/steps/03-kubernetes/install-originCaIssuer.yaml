@@ -1,0 +1,32 @@
+- name: Create origin-ca-issuer directory
+  file:
+    path: "{{ originCaIssuer.downloadDir }}/extracted"
+    state: directory
+- name: Download origin-ca-issuer
+  get_url:
+    url: "{{ originCaIssuer.archiveUrl }}"
+    dest: "{{ originCaIssuer.downloadDir }}/originCaIssuer.tar.gz"
+    timeout: 300
+- name: Extract origin-ca-issuer
+  unarchive:
+    src: "{{ originCaIssuer.downloadDir }}/originCaIssuer.tar.gz"
+    dest: "{{ originCaIssuer.downloadDir }}/extracted"
+    remote_src: true
+- name: Deploy origin-ca-issuer manifests
+  shell:
+    chdir: "{{ originCaIssuer.downloadDir }}/extracted/{{ originCaIssuer.extractedDirectoryName }}"
+    cmd: |
+      kubectl apply -f deploy/crds
+      kubectl apply -f deploy/rbac
+      kubectl apply -f deploy/manifests
+- name: Deploy origin-ca-issuer chart
+  kubernetes.core.helm:
+    name: origin-ca-issuer
+    chart_ref: origin-ca-issuer
+    repo_url: oci://ghcr.io/cloudflare/origin-ca-issuer-charts
+    chart_version: 0.6.2
+    wait: true
+- name: Clean up after origin-ca-issuer download
+  file:
+    path: "{{ originCaIssuer.downloadDir }}"
+    state: absent

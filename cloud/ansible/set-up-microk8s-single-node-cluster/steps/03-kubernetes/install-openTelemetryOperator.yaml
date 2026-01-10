@@ -1,0 +1,11 @@
+- name: Add OpenTelemetry Helm repository
+  kubernetes.core.helm_repository:
+    name: open-telemetry
+    repo_url: https://open-telemetry.github.io/opentelemetry-helm-charts
+    state: present
+- name: Install OpenTelemetry Operator
+  kubernetes.core.helm:
+    name: opentelemetry-operator
+    chart_ref: open-telemetry/opentelemetry-operator
+    version: "0.102.0"
+    state: present

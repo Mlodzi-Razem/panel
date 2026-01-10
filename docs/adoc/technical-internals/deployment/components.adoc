@@ -1,0 +1,93 @@
+=== Components
+
+Panel consists the following components that have to be deployed and integrated:
+
+.Panel components
+[cols="2,4,1,2"]
+|===
+| Component name | Description                                                                                                        | Scaling possible                | Repository path
+
+| `panel-api`    | Monolithic backend. Connects to the database, sends and receives events, communicates with the directory provider. | ❌ -- may change in the future.
+                                                                                                                                        See <<scalingRoadmap>>          | `services/panel-api`
+| `panel-web`    | Next.js-based frontend. Handles authentication and communicates with the backend.                                  | ✅                              | `services/panel-web`
+|===
+
+.Components dependenies
+[cols="2,4,1,2"]
+|===
+| Dependency name          | Description                          | Required   | Used by
+
+| PostgreSQL               | RDBMS used to store data.            | ✅        a| `panel-api`
+| SMTP Server              | Required to send emails to users.    | ✅        a| `panel-api`
+| SSL Proxy                | `panel-web` does not support SSL
+                             encryption. It needs an external
+                             proxy like Nginx or K8S Gateway.     | ✅        a| `panel-web`
+| Private network/firewall | `panel-api` does not perform any
+                             authentication checks, but relies
+                             solely on `panel-web` 's OAuth
+                             and JWT functionality.
+                             Because of that, `panel-api` 's
+                             endpoints must not be accessible
+                             from outside. +
+                             This is safe, because
+                             `panel-web` is built using Next.js,
+                             which uses a client-server
+                             architecture, and acts as
+                             natural a boundary
+                             between the internal backend API
+                             and the outside world.              | ✅        a| `panel-api`, `panel-web`
+| OpenTelemetry Collector  | Collects traces. Since MR Panel is
+                             a Spring-based application,
+                             you can easily configure the
+                             collector to ingest logs
+                             and metrics too.                    | ❌        a| `panel-api`, `panel-web`
+
+|===
+
+.Components interactions
+[plantuml,,svg]
+----
+@startuml
+left to right direction
+
+actor "User" <<Web Browser>> as user
+
+component "SSL Gateway" as sslGateway
+
+package "Private network" {
+    package "Panel services" <<MR Panel>> as panelServices {
+        database "PostgreSQL" <<RDBMS>> as postgres
+        component "panel-api" <<Backend>> as panelApi
+        component "panel-web" <<Frontend>> as panelWeb
+    }
+
+    package "Traces monitoring\n<i>set up automatically in the Helm chart" <<optional>> as tracesMonitoring {
+        component "Jaeger" <<OpenTelemetry Collector>> as otelCollector
+    }
+
+    package "Logs and metrics ingestion\n<i>automatic in Kubernetes" <<optional>> as logsMetricsIngestion {
+        component "Prometheus" <<Metrics aggregation>> as prometheus
+        component "Loki" <<Logs ingestion>> as loki
+        component "Grafana" <<Dashboards>> as grafana
+
+        grafana --> loki
+        grafana --> prometheus
+    }
+
+    note right of tracesMonitoring
+        Note that if you are not using the included Helm chart
+        you will have to set up monitoring and tracing configuration
+        parameters on your own.
+    end note
+}
+
+user --> sslGateway
+sslGateway --> panelWeb
+panelWeb -> panelApi
+panelApi -> postgres
+
+panelServices ..> tracesMonitoring
+panelServices ..> logsMetricsIngestion
+
+@enduml
+----

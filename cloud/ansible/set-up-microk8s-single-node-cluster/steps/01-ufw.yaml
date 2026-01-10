@@ -1,0 +1,34 @@
+- name: Configure ufw
+  hosts: all
+  become: true
+  tasks:
+    - name: Install ufw
+      package:
+        name: ufw
+        state: present
+    - name: Allow all outgoing traffic
+      ufw:
+        to_port: any
+        default: allow
+    - name: Deny all other incoming traffic
+      ufw:
+        from_port: any
+        default: deny
+        state: enabled
+    - name: Allow ssh
+      ufw:
+        name: OpenSSH
+        rule: allow
+        state: enabled
+    - name: Allow https
+      when: host_is_prod
+      ufw:
+        port: 443
+        rule: allow
+        state: enabled
+    - name: Reload ufw
+      ufw:
+        state: reloaded
+    - name: Enable ufw
+      ufw:
+        state: enabled

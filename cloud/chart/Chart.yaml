@@ -1,0 +1,23 @@
+apiVersion: v2
+type: application
+
+name: mrpanel
+version: 0.0.0-MRPANEL-SNAPSHOT
+appVersion: 0.0.0-MRPANEL-SNAPSHOT
+icon: file://../../resources/favicon.svg
+
+home: https://github.com/Mlodzi-Razem/panel
+sources:
+  - https://github.com/Mlodzi-Razem/mrpanel/tree/0.0.0-MRPANEL-SNAPSHOT/cloud/chart
+
+maintainers:
+  - name: Kamil Łapiński
+    email: contact@lapinski.dev
+    url: https://lapinski.dev
+
+keywords:
+  - Młodzi Razem
+  - panel
+  - mrpanel
+
+description: MR Panel Helm chart.

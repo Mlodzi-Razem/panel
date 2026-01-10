@@ -1,0 +1,104 @@
+/*!
+ * Copyright (C) 2026 Stowarzyszenie Młodzi Razem
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+@use './font/font.css';
+
+:root {
+    // Typography
+    --font-normal: 'GeneralSans-Variable';
+    --font-mono: 'SourceCodePro-VariableFont';
+
+    // Colors
+    --color-background: #fefefe;
+    --color-background-deep: #ececec;
+    --color-primary: #720546;
+    --color-primary-light: #9c1366;
+    --color-secondary: #3c13aa;
+    --color-text: #020202;
+    --color-on-text: #fefefe;
+    --color-border: rgba(0, 0, 0, 0.1);
+    --color-shadow: rgba(0, 0, 0, 0.16);
+    --color-hover-layer: black;
+
+    // Sizes
+    --size-font-size: 1rem;
+    --size-spacing: 0.5rem;
+    --size-padding: 0.5rem;
+    --size-border-radius: 1rem;
+    --size-hover-layer-opacity: 5%;
+
+    // Sizes - Side Menu
+    --size-sidemenu-padding: var(--size-spacing);
+    --size-sidemenu-item-size: 2rem;
+    --size-sidemenu-col-icons-width: calc(var(--size-sidemenu-item-size) + 2 * var(--size-sidemenu-padding));
+    --size-sidemenu-col-labels-width: 12rem;
+    --size-sidemenu-width: calc(var(--size-sidemenu-col-icons-width) + var(--size-sidemenu-col-labels-width));
+
+    // Shadows
+    --shadow-1: 0 0 0.2rem var(--color-shadow);
+
+    // Durations
+    --duration-transition: 0.2s;
+
+    // Animations
+    --animation-default: ease-in-out;
+
+    // Transitions
+    --transition-all: all var(--duration-transition) var(--animation-default);
+    --transition-width: width var(--duration-transition) var(--animation-default);
+}
+
+// Begin defaults
+
+* {
+    box-sizing: border-box;
+
+    // Scrollbar
+    scrollbar-color: var(--color-primary) var(--color-background);
+    scrollbar-width: thin;
+
+    // Default spacing
+    margin: 0;
+    padding: 0;
+
+    // Fonts
+    font-family: var(--font-normal), sans-serif;
+    font-size: var(--size-font-size);
+
+    // Text
+    color: var(--color-text);
+}
+
+a {
+    text-decoration: none;
+}
+
+input, input:focus {
+    outline: none;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    background-color: var(--color-background-deep);
+    width: 100lvw;
+    min-height: 100lvh;
+}
+
+// End defaults

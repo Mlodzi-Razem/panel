@@ -1,0 +1,30 @@
+= MR Panel
+Stowarzyszenie Młodzi Razem <it@mlodzirazem.org>
+0.0.0-MRPANEL-SNAPSHOT
+:doctype: book
+:diagram-svg-type: inline
+:icons: font
+:sectnums:
+:toc: left
+:toclevels: 3
+:docinfo: shared
+:source-highlighter: rouge
+:partnums:
+:part-signifier: Part
+
+
+[preface]
+= Introduction
+
+include::technical-internals/index.adoc[]
+
+[index]
+= Index
+
+[colophon]
+= Colophon
+(C) 2026 by Stowarzyszenie Młodzi Razem.
+
+Written by: Kamil Łapiński.
+
+Built with Asciidoctor.

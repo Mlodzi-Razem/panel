@@ -1,0 +1,4 @@
+- import_playbook: steps/00-maintenance.yaml
+- import_playbook: steps/01-ufw.yaml
+- import_playbook: steps/02-users.yaml
+- import_playbook: steps/03-kubernetes.yaml

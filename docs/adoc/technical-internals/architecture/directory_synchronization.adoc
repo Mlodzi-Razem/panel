@@ -1,0 +1,13 @@
+=== Directory synchronization
+:includedir: _includes
+
+MR Panel is intended to work as a single source of truth for all the data related
+to the NGO. Even though Panel is designed to handle authentication via an
+external identity and directory provider, it regularly synchronizes their
+state with its database.
+
+.Directory synchronization sequence
+[plantuml, , svg]
+----
+include::{includedir}/directory_synchronization.puml[]
+----

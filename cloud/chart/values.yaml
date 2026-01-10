@@ -1,0 +1,127 @@
+panel:
+  k8s:
+    prometheus:
+      release: kube-prometheus-stack #make sure that it matches the release name used during installation
+  # ----------------------------------
+  # version: 1.35.0
+  # ----------------------------------
+  jaeger:
+    enabled: true
+    image: jaegertracing/jaeger:2.13.0
+    mode: deployment
+    gateway:
+      enabled: true
+      port: 8081
+  postgres:
+    cnpg:
+      install: true
+      volumes:
+        data:
+          storageLimitGigabytes: 10
+          cnpgPvcTemplate:
+            volumeName: mrpanel-postgres-pv
+            storageClassName: manual
+      resources:
+        requestedCpuCores: 2
+        maximumMemoryMb: 2048
+      users:
+        mrpanel:
+          username: mrpanel
+          password: TEST_PASSWORD
+        superuser:
+          username: superuser
+          password: TEST_SUPERUSER_PASSWORD
+
+  # ----------------------------------
+  # jdbcUrl: jdbc:postgresql://postgres.mrpanel-database.svc.cluster.local:5432/mrpanel
+  # ----------------------------------
+  api:
+    affinity: { }
+    replicaResources:
+      maximumMemoryMb: 2048
+      requestedCpuCores: 2
+    image: ghcr.io/mlodzi-razem/panel-api:0.0.0-MRPANEL-SNAPSHOT
+    service:
+      type: ClusterIP
+    hpa:
+      enabled: false #multiple replicas are not supported at the moment because of the lack of external cache support
+    cache:
+      externalized: false #cache externalization is not supported at the moment
+    config:
+      #-- application.yaml format. Can be string or map. --
+      # See `services/panel-api/src/main/resources/panel.yaml` for reference
+      panel: {}
+      #------------------------------
+  web:
+    url: https://panel.mlodzirazem.org
+    auth:
+      google:
+        clientId: '{{ fail "Missing panel.web.auth.google.clientId" }}'
+        clientSecret: '{{ fail "Missing panel.web.auth.google.clientSecret" }}'
+    affinity: { }
+    replicaResources:
+      maximumMemoryMb: 768
+      requestedCpuCores: 0.5
+    image: ghcr.io/mlodzi-razem/panel-web:0.0.0-MRPANEL-SNAPSHOT
+    service:
+      type: ClusterIP
+    hpa:
+      enabled: true
+      targetCpuPercentage: 75
+      targetMemoryPercentage: 75
+      minReplicas: 2
+      maxReplicas: 4
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 300
+        scaleUp:
+          stabilizationWindowSeconds: 5
+    # ----------------------------------
+    # hpa:
+    #   enabled: false
+    # replicas: 2
+    # ----------------------------------
+    rollingUpdates:
+      enabled: true #requires `replicas` or `minReplicas` > 1
+      maxSurge: 1
+      maxUnavailable: 1
+    # ----------------------------------
+    # rollingUpdates:
+    #   enabled: false
+    # ----------------------------------
+  gateway:
+    install: true
+    # ----------------------------------
+    # install: false
+    # ----------------------------------
+    gatewayClass: traefik
+    domains:
+      - panel.mlodzirazem.org
+
+  #For autocompletion and linting purposes only. Define your secrets in a separate file.
+  secrets:
+    panel:
+      web:
+        metricsToken: '{{ fail "Missing panel.secrets.panel.web.metricsToken" }}'
+        nextauthToken: '{{ fail "Missing panel.secrets.panel.web.nextauthToken" }}'
+    postgres:
+      database: '{{ fail "Missing panel.secrets.postgres.database" }}'
+      admin:
+        username: '{{ fail "Missing panel.secrets.postgres.admin.username" }}'
+        password: '{{ fail "Missing panel.secrets.postgres.admin.password" }}'
+      panel:
+        username: '{{ fail "Missing panel.secrets.postgres.panel.username" }}'
+        password: '{{ fail "Missing panel.secrets.postgres.panel.password" }}'
+    google:
+      oauth:
+        clientId: '{{ fail "Missing panel.secrets.google.oauth.clientId" }}'
+        clientSecret: '{{ fail "Missing panel.secrets.google.oauth.clientSecret" }}'
+      workspace:
+        accountToken: '{{ fail "Missing panel.secrets.google.workspace.accountToken" }}'
+    smtp:
+      host: '{{ fail "Missing panel.secrets.smtp.host" }}'
+      port: 587
+      username: '{{ fail "Missing panel.secrets.smtp.username" }}'
+      password: '{{ fail "Missing panel.secrets.smtp.password" }}'
+    cloudflare:
+      apiKey: '{{ fail "Missing panel.secrets.cloudflare.apiKey" }}'

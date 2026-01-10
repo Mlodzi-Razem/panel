@@ -1,0 +1,13 @@
+- name: Basic maintenance before any other steps
+  hosts: all
+  become: true
+  tasks:
+    - name: Update package caches and upgrade
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: true
+    - name: Make sure basic packages are installed
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: present
+      loop: ["net-tools", "git"]

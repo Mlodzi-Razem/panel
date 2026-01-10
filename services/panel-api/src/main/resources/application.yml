@@ -1,0 +1,71 @@
+spring:
+  config:
+    import:
+      - classpath:panel.yml
+      - optional:file:${PANEL_CONFIG_FILE_PATH:}
+  application:
+    admin:
+      enabled: true
+    name: panel-api
+    group: mrpanel
+  threads:
+    virtual:
+      enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: "classpath:db/migration"
+  modulith:
+    events:
+      jdbc:
+        schema-initialization:
+          enabled: true
+        schema: "events"
+      completion-mode: update
+      staleness:
+        processing: 1h
+        published: 2h
+        resubmission: 1h
+        check-intervall: 15m
+server:
+  port: 8080
+  shutdown: graceful
+  http2:
+    enabled: true
+  ssl:
+    enabled: false
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+  server:
+    port: 9080
+  metrics:
+    tags:
+      system: mrpanel
+      service: ${spring.application.name}
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  otlp:
+    metrics:
+      export:
+        enabled: true
+  tracing:
+    export:
+      enabled: true
+      otlp:
+        enabled: true
+    sampling:
+      probability: 1
+    baggage:
+      enabled: true
+      correlation:
+        enabled: true

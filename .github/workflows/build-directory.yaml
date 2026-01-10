@@ -1,0 +1,22 @@
+name: Build directory
+on:
+  workflow_call:
+    inputs:
+      directory:
+        required: true
+        type: string
+jobs:
+  compileAndTest:
+    name: Build ${{ inputs.directory }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: temurin
+          architecture: x64
+          cache: maven
+      - name: Run the Maven verify phase
+        run: mvn --batch-mode --update-snapshots --also-make --also-make-dependents --projects ${{ inputs.directory }} clean install

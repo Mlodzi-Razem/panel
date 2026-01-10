@@ -1,0 +1,31 @@
+{{- if .Values.panel.web.hpa.enabled -}}
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: panel-web
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "panel-web.labels" . | nindent 4 }}
+spec:
+  minReplicas: {{ .Values.panel.web.hpa.minReplicas }}
+  maxReplicas: {{ .Values.panel.web.hpa.maxReplicas }}
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: panel-web
+  behavior: {{ tpl (toYaml .Values.panel.web.hpa.behavior) . | nindent 4 }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ tpl (toString .Values.panel.web.hpa.targetCpuPercentage) . }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ tpl (toString .Values.panel.web.hpa.targetMemoryPercentage) . }}
+
+{{- end -}}

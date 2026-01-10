@@ -1,0 +1,47 @@
+- name: Configure users
+  hosts: all
+  vars_files: ["02-users/users.vars.yaml"]
+  become: true
+  tasks:
+    - name: Make sure microk8s group exists
+      group:
+        name: microk8s
+        state: present
+    - name: Create users
+      user:
+        password: '*'
+        name: "{{ item.name }}"
+        state: present
+        create_home: true
+        home: "/home/{{ item.name }}"
+        groups: "{{ item.groups | default('users') }}"
+        shell: /bin/bash
+      loop: "{{ users }}"
+      when: "item.prod or not host_is_prod"
+    - name: Update authorized_keys
+      authorized_key:
+        user: "{{ item.name }}"
+        key: "{{ item.public_key }}"
+        state: present
+        exclusive: true
+      loop: "{{ users }}"
+    - name: Add .kube directory for microk8s user
+      file:
+        path: "/home/{{ item.name }}/.kube"
+        owner: "{{ item.name }}"
+        mode: 0700
+        state: directory
+      loop: "{{ users }}"
+      when: "item.microk8s"
+    - name: Add microk8s users to microk8s group
+      user:
+        name: "{{ item.name }}"
+        groups: [ microk8s ]
+        append: true
+      loop: "{{ users }}"
+    - name: Enable passwordless sudo
+      community.general.sudoers:
+        name: PASSWORDLESS_SUDO
+        group: sudo
+        nopassword: yes
+        commands: ALL

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: panel-api
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "panel-api.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.panel.api.service.type }}
+{{- if .Values.panel.api.service.loadBalancerClass }}
+  loadBalancerClass: {{ tpl .Values.panel.api.service.loadBalancerClass . }}
+{{- end }}
+  ports:
+    - port: 8080
+      name: api
+      protocol: TCP
+    - port: 9080
+      name: metrics
+      protocol: TCP
+  selector:
+    {{- include "panel-api.labels" . | nindent 4 }}

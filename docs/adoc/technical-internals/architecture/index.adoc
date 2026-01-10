@@ -1,0 +1,9 @@
+== Architecture
+
+include::directory_synchronization.adoc[]
+
+include::data_flow.adoc[]
+
+include::events.adoc[]
+
+include::scaling-roadmap.adoc[]

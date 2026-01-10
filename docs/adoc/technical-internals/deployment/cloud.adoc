@@ -1,0 +1,61 @@
+=== Cloud
+:includedir: _includes
+
+MR Panel has been designed with containerization and cloud in mind.
+The "default" deployment platform is a single-node Kubernetes cluster,
+but it should be very easy to adapt it to other platforms like AWS ECS.
+
+SSL is not implemented directly in the components but is handled by a reverse proxy.
+You need to set up a gateway to be able to serve content over HTTPS.
+
+==== Kubernetes
+Panel comes with a customizable Helm chart. When default values are not overwritten,
+all services and a fully configured PostgreSQL (using link:https://cloudnative-pg.io[CloudNativePG]) database are deployed.
+
+Almost all values are templated, which means you can include
+non-constant strings in `values.yaml`:
+[%linenums,yaml]
+----
+panel:
+  postgres:
+    cnpg:
+      volumes:
+        data:
+          hostPath: /var/mrpanel/{{ .Release.Namespace }}/postgres/data
+----
+
+You can find the chart in `cloud/chart`. To generate a JSON schema for `values.yaml`, run `mvn package --also-make`.
+
+****
+NOTE: You do not have to install PostgreSQL or the gateway when deploying the chart.
+Nothing stops you from using CloudNativePG or any kind other of PostgreSQL instance,
+as long as you are able to provide a valid JDBC URL.
+
+See `values.yaml` for reference.
+****
+
+===== Prerequisites
+- Working Kubernetes cluster with link:https://artifacthub.io/packages/helm/cert-manager/cert-manager[`cert-manager`]
+and link:https://artifacthub.io/packages/helm/metrics-server/metrics-server[`metrics-server`] installed and configured.
+- link:https://artifacthub.io/packages/helm/cloudnative-pg/cloudnative-pg[CloudNativePG Operator] installed _(optional)_.
+- A Gateway API controller - link:https://artifacthub.io/packages/helm/traefik/traefik[Traefik] is recommended (_optional_).
+- link:https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack[`kube-prometheus-stack`]
+Helm chart deployed (_optional_).
+- link:https://artifacthub.io/packages/helm/opentelemetry-helm/opentelemetry-operator[OpenTelemetry Operator] (_optional_)
+- link:https://github.com/cloudflare/origin-ca-issuer[Origin CA Issuer] for SSL certificate issuing
+(_only if using CloudFlare as the SSL proxy_)
+
+Below you can see the target cluster's structure with `Secret` s and `ConfigMap` s omitted.
+
+.Kubernetes cluster state after deploying the included Helm chart
+[plantuml, , svg]
+----
+include::{includedir}/cloud_architecture.puml[]
+----
+
+=== Ansible
+MR Panel comes with an Ansible playbook which can be used
+to automatically configure a single-node Microk8s cluster.
+Do not use the playbook if you are unable to tell what is
+does by just reading its source code, or you may end up
+with a misconfigured and inaccessible server.

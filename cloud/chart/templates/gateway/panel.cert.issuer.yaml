@@ -1,0 +1,12 @@
+apiVersion: cert-manager.k8s.cloudflare.com/v1
+kind: OriginIssuer
+metadata:
+  name: panel-cert-issuer
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "gateway.labels" . | nindent 4 }}
+spec:
+  requestType: OriginECC
+  auth:
+    tokenRef:
+      key: token
+      name: panel-cloudflare-api-token

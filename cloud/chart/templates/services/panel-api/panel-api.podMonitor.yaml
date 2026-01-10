@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: panel-api
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "panel-api.labels" . | nindent 4 }}
+spec:
+  podMetricsEndpoints:
+    - portNumber: 9080
+      interval: 60s
+      scrapeTimeout: 15s
+      path: /actuator/prometheus
+      enableHttp2: true
+  selector:
+    matchLabels: {{ include "panel-api.labels" . | nindent 6 }}

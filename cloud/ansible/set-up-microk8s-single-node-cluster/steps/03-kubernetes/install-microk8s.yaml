@@ -1,0 +1,32 @@
+- name: Install Kubernetes
+  snap:
+    name: microk8s
+    classic: true
+    channel: 1.35/stable
+    state: present
+- name: Wait for microk8s to be ready
+  command: microk8s status --wait-ready
+- name: Install microk8s addons
+  raw: microk8s enable {{ item }}
+  register: enable_addon
+  failed_when: "(enable_addon is failed) and ('already enabled' not in enable_addon.stdout)"
+  changed_when: "enable_addon.rc == 0 and ('already enabled' not in enable_addon.stdout)"
+  loop: [
+    "dns",
+    "rbac",
+    "helm",
+    "metrics-server",
+    "cert-manager",
+    "observability",
+    "metallb:10.64.100.1-10.64.255.255",
+    "community",
+    "traefik"
+  ]
+- name: Set microk8s aliases
+  lineinfile:
+    path: /etc/bash.bashrc
+    line: "alias {{ item }}='microk8s {{ item }}'"
+    regexp: "^alias {{ item }}="
+  loop: ["kubectl", "helm"]
+- name: Reload bashrc
+  shell: source /etc/bash.bashrc

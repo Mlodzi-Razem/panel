@@ -1,0 +1,15 @@
+panel:
+  db:
+    url: ${JDBC_URL}
+    user: ${JDBC_USER}
+    password: ${JDBC_PASSWORD}
+    pool:
+      min-size: 1
+      max-size: 8
+      idleTimeout: 30s
+      keep-alive: 30s
+      connection-timeout: 8s
+      query-test: "SELECT 1"
+  directory:
+    mock:
+      enabled: true

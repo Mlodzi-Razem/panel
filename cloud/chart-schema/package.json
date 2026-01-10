@@ -1,0 +1,17 @@
+{
+  "name": "mrpanel-chart",
+  "version": "0.0.0-MRPANEL-SNAPSHOT",
+  "private": true,
+  "devDependencies": {
+    "zod": "^4.2.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "build": "npm run build-schema && npm run copy-schema",
+    "build-schema": "ts-node src/build.schema.ts",
+    "copy-schema": "cp out/values.schema.json ../chart/values.schema.json",
+    "postinstall": "npm run build",
+    "test": ""
+  }
+}
