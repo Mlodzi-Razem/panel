@@ -70,13 +70,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: helm-chart
-          path: |
-            cloud/chart
-      - name: Install Helm
-        uses: azure/setup-helm@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and Push the Helm Charts to GitHub Container Registry
-        uses: JimCronqvist/action-helm-chart-repo@master
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          path: cloud/chart
