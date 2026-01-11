@@ -28,7 +28,7 @@ jobs:
       - name: Create source code artifact with versions updated
         run: |
           zip -r "code_${{ github.event.release.tag_name }}.zip" "${{github.workspace}}"
-          gh release upload ${{github.event.release.tag_name}} ć
+          gh release upload ${{github.event.release.tag_name}} "code_${{ github.event.release.tag_name }}.zip"
           rm "code_${{ github.event.release.tag_name }}.zip"
         env:
           GITHUB_TOKEN: ${{ github.token }}
