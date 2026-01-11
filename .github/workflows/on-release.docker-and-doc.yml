@@ -73,6 +73,7 @@ jobs:
       - name: Create Helm chart artifact
         run: |
           cd "${{github.workspace}}/cloud/chart"
+          rm pom.xml*
           zip -r chart.zip .
           gh release upload ${{github.event.release.tag_name}} chart.zip
           rm chart.zip
