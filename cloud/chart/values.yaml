@@ -94,7 +94,7 @@ panel:
     # ----------------------------------
     # install: false
     # ----------------------------------
-    gatewayClass: traefik
+    gatewayClass: istio
     domains:
       - panel.mlodzirazem.org
 

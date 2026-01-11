@@ -16,16 +16,9 @@
   shell:
     chdir: "{{ originCaIssuer.downloadDir }}/extracted/{{ originCaIssuer.extractedDirectoryName }}"
     cmd: |
-      kubectl apply -f deploy/crds
-      kubectl apply -f deploy/rbac
-      kubectl apply -f deploy/manifests
-- name: Deploy origin-ca-issuer chart
-  kubernetes.core.helm:
-    name: origin-ca-issuer
-    chart_ref: origin-ca-issuer
-    repo_url: oci://ghcr.io/cloudflare/origin-ca-issuer-charts
-    chart_version: 0.6.2
-    wait: true
+      microk8s kubectl apply -f deploy/crds
+      microk8s kubectl apply -f deploy/rbac
+      microk8s kubectl apply -f deploy/manifests
 - name: Clean up after origin-ca-issuer download
   file:
     path: "{{ originCaIssuer.downloadDir }}"

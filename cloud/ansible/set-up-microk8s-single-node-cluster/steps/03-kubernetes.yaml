@@ -2,6 +2,12 @@
   hosts: all
   become: true
   vars_files: ["03-kubernetes/helmfile.vars.yaml", "03-kubernetes/origin-ca-issuer.vars.yaml"]
+  module_defaults:
+    kubernetes.core.helm:
+      binary_path: /snap/bin/microk8s.helm3
+      atomic: true
+    kubernetes.core.helm_repository:
+      binary_path: /snap/bin/microk8s.helm3
   tasks:
     - name: Make sure Kubernetes is not installed from apt
       package:

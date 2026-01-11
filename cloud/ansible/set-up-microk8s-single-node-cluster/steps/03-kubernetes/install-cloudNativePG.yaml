@@ -9,4 +9,4 @@
     release_namespace: "cnpg-system"
     create_namespace: true
     wait: true
-    version: "0.27.0"
+    chart_version: "0.27.0"

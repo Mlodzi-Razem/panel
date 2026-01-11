@@ -38,7 +38,7 @@ See `values.yaml` for reference.
 - Working Kubernetes cluster with link:https://artifacthub.io/packages/helm/cert-manager/cert-manager[`cert-manager`]
 and link:https://artifacthub.io/packages/helm/metrics-server/metrics-server[`metrics-server`] installed and configured.
 - link:https://artifacthub.io/packages/helm/cloudnative-pg/cloudnative-pg[CloudNativePG Operator] installed _(optional)_.
-- A Gateway API controller - link:https://artifacthub.io/packages/helm/traefik/traefik[Traefik] is recommended (_optional_).
+- A Gateway API controller - Istio is used by default as it is easy to install using Microk8s. (_optional_).
 - link:https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack[`kube-prometheus-stack`]
 Helm chart deployed (_optional_).
 - link:https://artifacthub.io/packages/helm/opentelemetry-helm/opentelemetry-operator[OpenTelemetry Operator] (_optional_)
