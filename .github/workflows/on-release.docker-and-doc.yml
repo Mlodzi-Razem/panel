@@ -7,7 +7,7 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     permissions:
-      contents: read
+      contents: write
       packages: write
     env:
       TAG_PREFIX: ghcr.io/mlodzi-razem
