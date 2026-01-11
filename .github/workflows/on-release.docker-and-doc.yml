@@ -27,7 +27,7 @@ jobs:
           SOURCE_TAG: ${{ env.SOURCE_TAG }}
       - name: Create source code artifact with versions updated
         run: |
-          zip -r "code_${{ github.event.release.tag_name }}.zip" "${{github.workspace}}" -j
+          zip -r "code_${{ github.event.release.tag_name }}.zip" "${{github.workspace}}"
           gh release upload ${{github.event.release.tag_name}} ć
           rm "code_${{ github.event.release.tag_name }}.zip"
         env:
@@ -63,13 +63,13 @@ jobs:
         run: find ./services -maxdepth 1 -type d -exec docker push --all-tags $TAG_PREFIX/{} \;
       - name: Create documentation artifact
         run: |
-          zip -r docs.zip "${{github.workspace}}/docs/target/generated-docs" -j
+          zip -r docs.zip "${{github.workspace}}/docs/target/generated-docs"
           gh release upload ${{github.event.release.tag_name}} docs.zip
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Create Helm chart artifact
         run: |
-          zip -r chart.zip "${{github.workspace}}/cloud/chart" -j
+          zip -r chart.zip "${{github.workspace}}/cloud/chart"
           gh release upload ${{github.event.release.tag_name}} chart.zip
         env:
           GITHUB_TOKEN: ${{ github.token }}
