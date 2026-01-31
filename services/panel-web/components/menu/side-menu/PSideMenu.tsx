@@ -89,7 +89,7 @@ function PMenuRoutes(props: PSideMenuProps) {
 
 function PLogoMenuItem() {
     return <div className={css(styles.logoContainer, 'panel-side-menu-logo-container')}>
-        <Image src={mrLogo} alt={'logo'} unoptimized={true} className={styles.logo} loading="eager"/>
+        <Image src={mrLogo} alt={'logo'} unoptimized={true} className={css(styles.logo, 'panel-side-menu-logo')} loading="eager"/>
     </div>
 }
 

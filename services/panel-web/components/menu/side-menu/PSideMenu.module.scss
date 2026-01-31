@@ -34,25 +34,34 @@
     transition: var(--transition-width);
 }
 
+
 .toggleMenuContainer {
     width: var(--size-sidemenu-col-icons-width);
     height: calc(var(--size-sidemenu-item-size) + var(--size-sidemenu-padding));
-    padding: var(--size-sidemenu-padding);
     display: flex;
     justify-content: center;
+    align-items: center;
     position: relative;
     transition: var(--transition-all);
 
     &:hover {
         .toggleMenuIcon {
-            transform: scale(0.9);
+            transform: scale(0.8);
         }
     }
-}
 
-.toggleMenuContainer:has(.toggleMenuCheckbox:checked) .toggleMenuIcon {
-    transform: rotate(90deg);
-    width: var(--size-sidemenu-item-size);
+    &:has(.toggleMenuCheckbox:checked) {
+        &:hover {
+            .toggleMenuIcon {
+                transform: rotate(90deg) scale(0.8);
+            }
+        }
+
+        .toggleMenuIcon {
+            transform: rotate(90deg);
+            width: var(--size-sidemenu-item-size);
+        }
+    }
 }
 
 .toggleMenuCheckbox {
@@ -64,9 +73,9 @@
 }
 
 .toggleMenuIcon {
+    width: var(--size-sidemenu-item-size);
+    height: var(--size-sidemenu-item-size);
     position: absolute;
-    top: 0;
-    padding: calc(var(--size-sidemenu-padding) / 2);
     transition: var(--transition-all);
 }
 
@@ -112,7 +121,8 @@
 }
 
 .logo {
-    width: 100%;
+    transition: var(--transition-all);
+    width: var(--size-sidemenu-col-icons-width);
     height: auto;
 
     fill: var(--color-primary);
