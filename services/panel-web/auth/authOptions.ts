@@ -47,10 +47,29 @@ const authOptions = {
             },
         }),
     ],
+    session: {
+        strategy: 'jwt',
+        maxAge: 12 * 60 * 60,
+        updateAge: 60 * 60,
+    },
     callbacks: {
         async signIn({account, profile}) {
             return account?.provider === 'google'
                 && isWorkspaceAccount(profile as Partial<GoogleProfile> | undefined);
+        },
+        jwt({ token, user, profile }) {
+            if (user) {
+                token.sub = profile?.sub ?? user.id ?? token.sub;
+                token.email = user.email ?? token.email;
+                token.name = user.name ?? token.name;
+            }
+            return token;
+        },
+        session({ session, token }) {
+            if (session.user && token.sub) {
+                session.user.id = token.sub;
+            }
+            return session;
         },
     },
     pages: {
