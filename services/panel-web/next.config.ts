@@ -20,10 +20,7 @@ import createNextIntlPlugin from 'next-intl/plugin';
 
 const nextConfig: NextConfig = {
     reactCompiler: true,
-    i18n: {
-        locales: ['en', 'pl'],
-        defaultLocale: 'en'
-    },
+    output: 'standalone',
     transpilePackages: ['next-intl'],
     experimental: {
         optimizePackageImports: ["@phosphor-icons/react"],

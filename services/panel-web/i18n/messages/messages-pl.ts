@@ -29,6 +29,7 @@ const plMessages: typeof enMessages = {
         user: "Użytkownik",
         members: "Członkowie",
         fees: "Składki",
+        logout: "Wyloguj się",
     },
 };
 export default plMessages;

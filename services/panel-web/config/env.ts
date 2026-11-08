@@ -20,6 +20,7 @@ const REQUIRED_ENV_VARS = {
     PANEL_METRICS_AUTH_TOKEN: 'The authentication token for metrics collection',
     PANEL_GOOGLE_CLIENT_ID: 'The client ID of the Google OAuth2 application',
     PANEL_GOOGLE_CLIENT_SECRET: 'The client secret of the Google OAuth2 application',
+    PANEL_GOOGLE_WORKSPACE_DOMAIN: 'The Google Workspace primary domain whose accounts are allowed to sign in (e.g. example.org)',
     PANEL_API_URL: 'The URL of the panel-api component',
     NEXTAUTH_SECRET: 'The secret used for NextAuth.js',
     NEXTAUTH_URL: 'The URL of the server',
@@ -27,9 +28,12 @@ const REQUIRED_ENV_VARS = {
 export type PanelEnvKeyName = keyof typeof REQUIRED_ENV_VARS;
 export const REQUIRED_ENV_VARS_NAMES = Object.keys(REQUIRED_ENV_VARS) as ReadonlyArray<PanelEnvKeyName>;
 
+const IS_NEXT_BUILD_PHASE = process.env.NEXT_PHASE === 'phase-production-build';
+const BUILD_PHASE_PLACEHOLDER = '__panel_build_phase_placeholder__';
+
 const PanelEnv: Record<PanelEnvKeyName, string> = REQUIRED_ENV_VARS_NAMES
     .map(envVarName => {
-        const envValue = process.env[envVarName];
+        const envValue = process.env[envVarName] || (IS_NEXT_BUILD_PHASE ? BUILD_PHASE_PLACEHOLDER : undefined);
 
         if (!envValue) {
             const purpose = REQUIRED_ENV_VARS[envVarName];
