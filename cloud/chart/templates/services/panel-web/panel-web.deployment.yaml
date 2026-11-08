@@ -62,6 +62,11 @@ spec:
                   name: panel-web-secret
             - name: PANEL_API_URL
               value: http://panel-api.{{ .Release.Namespace }}.svc.cluster.local:8080
+            - name: PANEL_API_AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: panel-api-auth-secret
+                  name: panel-web-secret
             - name: NEXTAUTH_SECRET
               valueFrom:
                 secretKeyRef:

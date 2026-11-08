@@ -70,6 +70,12 @@ spec:
             # use the configuration file defined in panel.api.config
             - name: PANEL_CONFIG_FILE_PATH
               value: {{ $configMountPath }}/panel-pod-config.yaml
+            - name: PANEL_API_AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: auth-secret
+                  name: panel-api-auth
+                  optional: false
             - name: management.observations.key-values.environment
               value: {{ .Release.Namespace }}
             - name: management.observations.key-values.version
@@ -80,11 +86,11 @@ spec:
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
-              port: 8080
+              port: 9080
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
-              port: 8080
+              port: 9080
           securityContext:
             allowPrivilegeEscalation: false
       securityContext:

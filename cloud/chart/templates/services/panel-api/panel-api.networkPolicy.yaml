@@ -1,0 +1,29 @@
+{{- if .Values.panel.api.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: panel-api
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "panel-api.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      "org.mlodzirazem.panel.component": "panel-api"
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              "org.mlodzirazem.panel.component": "panel-web"
+      ports:
+        - protocol: TCP
+          port: 8080
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              "kubernetes.io/metadata.name": {{ .Values.panel.api.networkPolicy.monitoringNamespace | quote }}
+      ports:
+        - protocol: TCP
+          port: 9080
+{{- end }}

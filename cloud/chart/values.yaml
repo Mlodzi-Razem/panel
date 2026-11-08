@@ -47,6 +47,9 @@ panel:
       enabled: false #multiple replicas are not supported at the moment because of the lack of external cache support
     cache:
       externalized: false #cache externalization is not supported at the moment
+    networkPolicy:
+      enabled: true
+      monitoringNamespace: monitoring #namespace from which the management port (9080) may be scraped
     config:
       #-- application.yaml format. Can be string or map. --
       # See `services/panel-api/src/main/resources/panel.yaml` for reference
@@ -105,6 +108,7 @@ panel:
       web:
         metricsToken: '{{ fail "Missing panel.secrets.panel.web.metricsToken" }}'
         nextauthToken: '{{ fail "Missing panel.secrets.panel.web.nextauthToken" }}'
+      apiAuthSecret: '{{ fail "Missing panel.secrets.panel.apiAuthSecret" }}' #at least 32 bytes, e.g. `openssl rand -base64 48`
     postgres:
       database: '{{ fail "Missing panel.secrets.postgres.database" }}'
       admin:

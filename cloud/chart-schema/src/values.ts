@@ -127,6 +127,10 @@ const PanelApi = z.object({
         externalized: False,
     }),
     config: z.union([z.json(), z.string()]),
+    networkPolicy: z.object({
+        enabled: z.boolean(),
+        monitoringNamespace: z.string(),
+    }),
 })
 
 const PanelWeb = z.object({
@@ -198,7 +202,8 @@ const Secrets = z.object({
         web: z.object({
             metricsToken: z.string(),
             nextauthToken: z.string().optional(),
-        })
+        }),
+        apiAuthSecret: z.string().min(32),
     })
 });
 
