@@ -20,11 +20,10 @@ package org.mlodzirazem.panel.services.panelapi.directory.mock.state;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Comparator;
-import java.util.UUID;
 
 public record MockDirectoryGroupMember(
-    UUID id,
-    UUID userId
+    String id,
+    String userId
 ) implements Comparable<MockDirectoryGroupMember> {
     @Override
     public int compareTo(@NonNull MockDirectoryGroupMember o) {

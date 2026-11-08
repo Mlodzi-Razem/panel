@@ -18,6 +18,7 @@
 package org.mlodzirazem.panel.services.panelapi.directory.beans.event;
 
 import lombok.RequiredArgsConstructor;
+import org.mlodzirazem.panel.services.panelapi.core.event.RpcResponder;
 import org.mlodzirazem.panel.services.panelapi.directory.beans.ReloadDirectoryEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -26,10 +27,12 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ReloadDirectoryListener {
     private final DirectoryReloader directoryReloader;
+    private final RpcResponder rpcResponder;
 
     @EventListener
     void onReloadDirectoryEvent(ReloadDirectoryEvent event) {
         directoryReloader.reload();
+        rpcResponder.respond(event);
     }
 
 }

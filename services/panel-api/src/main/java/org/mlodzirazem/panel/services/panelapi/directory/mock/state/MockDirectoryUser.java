@@ -21,10 +21,9 @@ import org.jspecify.annotations.NonNull;
 import org.mlodzirazem.panel.services.panelapi.directory.api.model.DirectoryUserProfile;
 
 import java.util.Comparator;
-import java.util.UUID;
 
 public record MockDirectoryUser(
-    UUID id,
+    String id,
     String email,
     String preferredName
 ) implements Comparable<MockDirectoryUser> {
@@ -34,6 +33,6 @@ public record MockDirectoryUser(
     }
 
     public DirectoryUserProfile toUserProfile() {
-        return new DirectoryUserProfile(id.toString(), preferredName, email);
+        return new DirectoryUserProfile(id, preferredName, email);
     }
 }

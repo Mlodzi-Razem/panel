@@ -13,3 +13,4 @@ panel:
   directory:
     mock:
       enabled: true
+      state-file: classpath:directory/mock-state.json

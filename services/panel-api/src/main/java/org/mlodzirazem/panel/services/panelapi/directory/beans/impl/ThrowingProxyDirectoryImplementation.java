@@ -27,7 +27,7 @@ public class ThrowingProxyDirectoryImplementation implements DirectoryImplementa
     @SuppressWarnings("unchecked")
     @Override
     public <T extends DirectoryInjectableComponent> T injectService(Class<T> serviceClass) {
-        return (T) Proxy.newProxyInstance(serviceClass.getClassLoader(), serviceClass.getInterfaces(), (proxy, method, args) -> {
+        return (T) Proxy.newProxyInstance(serviceClass.getClassLoader(), new Class<?>[] {serviceClass},(proxy, method, args) -> {
             throw new DirectoryImplementationNotProvidedException();
         });
     }

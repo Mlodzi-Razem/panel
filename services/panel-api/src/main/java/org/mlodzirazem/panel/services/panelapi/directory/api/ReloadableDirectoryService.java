@@ -25,4 +25,8 @@ import org.mlodzirazem.panel.services.panelapi.directory.beans.ReloadDirectoryEv
  */
 public interface ReloadableDirectoryService {
     void reload();
+
+    default String currentProviderName() {
+        return "none";
+    }
 }

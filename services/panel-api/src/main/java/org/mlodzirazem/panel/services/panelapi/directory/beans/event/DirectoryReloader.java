@@ -27,6 +27,7 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -38,16 +39,23 @@ public class DirectoryReloader {
 
     public synchronized void reload() {
         Instant startInstant = clock.instant();
+        String previousProviders = currentProviders();
 
         meterRegistry.timer("directory.reload").record(() ->
             reloadableDirectoryServices.forEach(ReloadableDirectoryService::reload)
         );
 
-        //TODO: Add providers info
         events.publishEvent(new DirectoryReloadedEvent(
             startInstant,
-            "",
-            ""
+            previousProviders,
+            currentProviders()
         ));
+    }
+
+    private String currentProviders() {
+        return reloadableDirectoryServices.stream()
+                                          .map(ReloadableDirectoryService::currentProviderName)
+                                          .distinct()
+                                          .collect(Collectors.joining(", "));
     }
 }

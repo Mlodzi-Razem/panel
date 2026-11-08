@@ -21,10 +21,9 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.Comparator;
 import java.util.Set;
-import java.util.UUID;
 
 public record MockDirectoryGroup(
-    UUID id,
+    String id,
     String email,
     String name,
     Set<MockDirectoryGroupMember> members

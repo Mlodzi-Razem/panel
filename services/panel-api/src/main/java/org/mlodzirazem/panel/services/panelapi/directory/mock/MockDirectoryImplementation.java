@@ -23,13 +23,15 @@ import org.mlodzirazem.panel.services.panelapi.directory.api.components.Director
 import org.mlodzirazem.panel.services.panelapi.directory.api.components.DirectoryUserProfileFetcher;
 import org.mlodzirazem.panel.services.panelapi.directory.mock.state.MockDirectoryState;
 import org.mlodzirazem.panel.services.panelapi.directory.mock.user.MockDirectoryUserProfileFetcher;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.util.concurrent.atomic.AtomicReference;
 
-@ConditionalOnProperty(prefix = "panel.directory.mock", name = "enabled", havingValue = "true")
 public class MockDirectoryImplementation implements DirectoryImplementation {
-    private AtomicReference<@Nullable MockDirectoryState> directoryState = new AtomicReference<>(null);
+    private final AtomicReference<@Nullable MockDirectoryState> directoryState;
+
+    public MockDirectoryImplementation(MockDirectoryState initialState) {
+        this.directoryState = new AtomicReference<>(initialState);
+    }
 
     @SuppressWarnings("unchecked")
     @Override

@@ -25,10 +25,12 @@ import org.mlodzirazem.panel.services.panelapi.directory.api.ReloadableDirectory
 import org.mlodzirazem.panel.services.panelapi.directory.api.components.DirectoryInjectableComponent;
 import org.springframework.stereotype.Component;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 @Component
 @RequiredArgsConstructor
@@ -38,6 +40,7 @@ public class ReloadableDirectoryImplementation implements DirectoryImplementatio
     private final DirectoryImplementationProvider implementationProvider;
 
     private final AtomicReference<@Nullable DirectoryImplementation> delegate = new AtomicReference<>(null);
+    private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     private final Map<Class<? extends DirectoryInjectableComponent>, DirectoryInjectableComponent> cachedServices = new ConcurrentHashMap<>();
 
     /**
@@ -53,47 +56,88 @@ public class ReloadableDirectoryImplementation implements DirectoryImplementatio
     @SuppressWarnings("unchecked")
     private <T extends DirectoryInjectableComponent> T createProxy(Class<T> serviceClass) {
         return (T) Proxy.newProxyInstance(
-            getClass().getClassLoader(),
+            serviceClass.getClassLoader(),
             new Class<?>[] {serviceClass},
-            (_, method, args) -> method.invoke(current(), args)
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return switch (method.getName()) {
+                        case "equals" -> proxy == args[0];
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "toString" -> "DirectoryProxy[" + serviceClass.getSimpleName() + "]";
+                        default -> throw new UnsupportedOperationException(method.getName());
+                    };
+                }
+
+                lock.readLock().lock();
+                try {
+                    T service = current().injectService(serviceClass);
+                    return method.invoke(service, args);
+                } catch (InvocationTargetException ex) {
+                    throw ex.getCause();
+                } finally {
+                    lock.readLock().unlock();
+                }
+            }
         );
     }
 
     @Override
     public void close() throws Exception {
-        closeCurrent();
+        lock.writeLock().lock();
+        try {
+            closeCurrent();
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
 
     @Override
     public void reload() {
+        lock.writeLock().lock();
         try {
             DirectoryImplementation newImpl = getNew();
-            setNew(newImpl);
-            closeCurrent();
+            DirectoryImplementation oldImpl = delegate.getAndSet(newImpl);
+            closeQuietly(oldImpl);
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to close or initialize directory implementation", ex);
+            log.error("Failed to reload directory implementation; keeping the previous one", ex);
+            throw new IllegalStateException("Failed to initialize directory implementation", ex);
+        } finally {
+            lock.writeLock().unlock();
         }
+    }
+
+    @Override
+    public String currentProviderName() {
+        DirectoryImplementation current = delegate.get();
+        return current == null ? "none" : current.getClass().getSimpleName();
     }
 
     private DirectoryImplementation getNew() throws DirectoryComplianceException {
         DirectoryImplementation newImpl = implementationProvider.createImplementation();
-        complianceValidator.validate(newImpl);
+        try {
+            complianceValidator.validate(newImpl);
+        } catch (DirectoryComplianceException | RuntimeException ex) {
+            closeQuietly(newImpl);
+            throw ex;
+        }
         return newImpl;
     }
 
-    private void setNew(DirectoryImplementation newImpl) {
-        delegate.set(newImpl);
+    private void closeQuietly(@Nullable DirectoryImplementation impl) {
+        if (impl == null) {
+            return;
+        }
+        try {
+            impl.close();
+        } catch (Exception ex) {
+            log.warn("Failed to close directory implementation {}", impl.getClass().getName(), ex);
+        }
     }
 
     private void closeCurrent() throws Exception {
-        try {
-            DirectoryImplementation currentDirImpl = delegate.get();
-            if (currentDirImpl != null) {
-                currentDirImpl.close();
-            }
-        } finally {
-            delegate.set(null);
-            cachedServices.clear();
+        DirectoryImplementation currentDirImpl = delegate.getAndSet(null);
+        if (currentDirImpl != null) {
+            currentDirImpl.close();
         }
     }
 

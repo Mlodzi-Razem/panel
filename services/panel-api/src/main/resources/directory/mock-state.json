@@ -1,0 +1,18 @@
+{
+  "users": [
+    {"id": "100000000000000000001", "email": "anna.kowalska@example.org", "preferredName": "Anna Kowalska"},
+    {"id": "100000000000000000002", "email": "jan.nowak@example.org", "preferredName": "Jan Nowak"},
+    {"id": "100000000000000000003", "email": "ewa.wisniewska@example.org", "preferredName": "Ewa Wisniewska"}
+  ],
+  "groups": [
+    {
+      "id": "group-board",
+      "email": "board@example.org",
+      "name": "Board",
+      "members": [
+        {"id": "member-1", "userId": "100000000000000000001"},
+        {"id": "member-2", "userId": "100000000000000000002"}
+      ]
+    }
+  ]
+}

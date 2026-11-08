@@ -24,7 +24,6 @@ import org.mlodzirazem.panel.services.panelapi.directory.mock.state.MockDirector
 import org.mlodzirazem.panel.services.panelapi.directory.mock.state.MockDirectoryUser;
 
 import java.util.Optional;
-import java.util.UUID;
 
 @RequiredArgsConstructor
 public class MockDirectoryUserProfileFetcher implements DirectoryUserProfileFetcher {
@@ -34,7 +33,7 @@ public class MockDirectoryUserProfileFetcher implements DirectoryUserProfileFetc
     public Optional<DirectoryUserProfile> fetchUserProfileById(String id) {
         return mockDirectoryState.users()
                                  .stream()
-                                 .filter(u -> u.id().equals(UUID.fromString(id)))
+                                 .filter(u -> u.id().equals(id))
                                  .map(MockDirectoryUser::toUserProfile)
                                  .findFirst();
     }
