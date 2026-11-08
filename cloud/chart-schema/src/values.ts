@@ -132,6 +132,11 @@ const PanelApi = z.object({
 const PanelWeb = z.object({
     url: z.url(),
     metricsToken: z.string().optional(),
+    auth: z.object({
+        google: z.object({
+            workspaceDomain: z.string(),
+        }),
+    }),
     affinity: z.json(),
     replicaResources: ReplicaResources(512, 0.5),
     image: z.string(),

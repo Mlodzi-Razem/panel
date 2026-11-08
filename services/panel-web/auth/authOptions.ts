@@ -15,25 +15,44 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import GoogleProvider from "next-auth/providers/google";
+import GoogleProvider, { GoogleProfile } from "next-auth/providers/google";
 import { getServerSession, NextAuthOptions, Session } from "next-auth";
 import env from "@/config/env";
 
 const googleClientId = env.PANEL_GOOGLE_CLIENT_ID;
 const googleClientSecret = env.PANEL_GOOGLE_CLIENT_SECRET;
+const workspaceDomain = env.PANEL_GOOGLE_WORKSPACE_DOMAIN.trim().toLowerCase();
 
-if (!googleClientId || !googleClientSecret) {
-    throw new Error("PANEL_GOOGLE_CLIENT_ID and PANEL_GOOGLE_CLIENT_SECRET environment variables must be set")
+if (!googleClientId || !googleClientSecret || !workspaceDomain) {
+    throw new Error("PANEL_GOOGLE_CLIENT_ID, PANEL_GOOGLE_CLIENT_SECRET and PANEL_GOOGLE_WORKSPACE_DOMAIN environment variables must be set")
 }
 
+export function isWorkspaceAccount(profile: Partial<GoogleProfile> | undefined): boolean {
+    return !!profile
+        && profile.email_verified === true
+        && typeof profile.hd === 'string'
+        && profile.hd.toLowerCase() === workspaceDomain;
+}
 
 const authOptions = {
     providers: [
         GoogleProvider({
             clientId: googleClientId,
             clientSecret: googleClientSecret,
+            authorization: {
+                params: {
+                    hd: workspaceDomain,
+                    prompt: 'select_account',
+                },
+            },
         }),
     ],
+    callbacks: {
+        async signIn({account, profile}) {
+            return account?.provider === 'google'
+                && isWorkspaceAccount(profile as Partial<GoogleProfile> | undefined);
+        },
+    },
     pages: {
         signIn: '/login',
         signOut: '/'

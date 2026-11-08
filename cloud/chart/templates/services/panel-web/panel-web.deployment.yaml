@@ -67,6 +67,8 @@ spec:
                 secretKeyRef:
                   key: nextauth-secret
                   name: panel-web-secret
+            - name: PANEL_GOOGLE_WORKSPACE_DOMAIN
+              value: {{ tpl .Values.panel.web.auth.google.workspaceDomain . | quote }}
             - name: NEXTAUTH_URL
               value: {{ tpl .Values.panel.web.url . | quote }}
           securityContext:

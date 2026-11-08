@@ -15,13 +15,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import { getPanelServerSession } from "@/auth/authOptions";
 import PanelAppRoot from "@/app/PanelAppRoot";
 import React from "react";
 
 export default async function AuthorizedLayout({children}: React.PropsWithChildren<object>) {
-    const session = await getServerSession();
+    const session = await getPanelServerSession();
 
     if (!session || !session.user) {
         redirect('/login');

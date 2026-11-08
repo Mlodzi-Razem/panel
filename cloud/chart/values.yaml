@@ -58,6 +58,7 @@ panel:
       google:
         clientId: '{{ fail "Missing panel.web.auth.google.clientId" }}'
         clientSecret: '{{ fail "Missing panel.web.auth.google.clientSecret" }}'
+        workspaceDomain: '{{ fail "Missing panel.web.auth.google.workspaceDomain" }}'
     affinity: { }
     replicaResources:
       maximumMemoryMb: 768
