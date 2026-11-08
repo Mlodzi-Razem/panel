@@ -26,8 +26,9 @@ declare const globalThis: {
 
 function panelWebPrefixFromEnv() {
     return (env.PANEL_APP_NAME + '_')
-        .replace(' ', '')
-        .replace('-', '_');
+        .replace(/[\s()]+/g, '')
+        .replace(/[^a-zA-Z0-9_:]/g, '_')
+        .replace(/^([^a-zA-Z_:])/, '_$1');
 }
 
 if (!globalThis.metricsRegistered) {
