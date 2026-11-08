@@ -32,7 +32,7 @@ import java.util.TimeZone;
 @EnableAsync
 @EnableResilientMethods
 public class PanelApiApplication {
-    void main(String[] args) {
+    public static void main(String[] args) {
         setTimezoneToUtc();
 
         SpringApplication.run(PanelApiApplication.class, args);
