@@ -22,13 +22,16 @@ Panel consists the following components that have to be deployed and integrated:
 | SSL Proxy                | `panel-web` does not support SSL
                              encryption. It needs an external
                              proxy like Nginx or K8S Gateway.     | ✅        a| `panel-web`
-| Private network/firewall | `panel-api` does not perform any
-                             authentication checks, but relies
-                             solely on `panel-web` 's OAuth
-                             and JWT functionality.
-                             Because of that, `panel-api` 's
-                             endpoints must not be accessible
-                             from outside. +
+| Private network/firewall | `panel-api` accepts only requests
+                             carrying a short-lived HS256 JWT
+                             signed by `panel-web` with the shared
+                             `PANEL_API_AUTH_SECRET` (at least 32 bytes).
+                             Still, `panel-api` 's
+                             endpoints should not be accessible
+                             from outside. The Helm chart ships a
+                             `NetworkPolicy` allowing only `panel-web`
+                             (API port) and the monitoring namespace
+                             (management port). +
                              This is safe, because
                              `panel-web` is built using Next.js,
                              which uses a client-server
