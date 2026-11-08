@@ -17,88 +17,59 @@
 
 package org.mlodzirazem.panel.services.panelapi.api.filter;
 
-import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
+import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.Test;
 import org.mlodzirazem.panel.services.panelapi.core.user.UserAuthInfo;
-import org.mlodzirazem.panel.services.panelapi.core.user.UserAuthInfoResolver;
-import org.mlodzirazem.panel.services.panelapi.core.user.impl.ScopedValueUserAuthInfoResolver;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.cache.CacheManager;
-import org.springframework.cache.support.SimpleCacheManager;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.assertj.MockMvcTester;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.mlodzirazem.panel.services.panelapi.core.user.UserScopedValues;
+import org.slf4j.MDC;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 
-import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-@WebMvcTest(controllers = ResolveUserRequestFilterTestController.class)
-@Import(
-    {
-        ResolveUserRequestFilter.class,
-        ScopedValueUserAuthInfoResolver.class,
-        ResolveUserRequestFilterTest.Configuration.class
-    }
-)
 class ResolveUserRequestFilterTest {
-    @MockitoBean
-    RequestUserInfoProvider userInfoProvider;
-
-    @Autowired
-    MockMvcTester mockMvc;
+    private final RequestUserInfoProvider provider = mock(RequestUserInfoProvider.class);
+    private final ResolveUserRequestFilter filter = new ResolveUserRequestFilter(provider);
 
     @Test
-    @SneakyThrows
-    void resolvesUserWhenProvided() {
-        UserAuthInfo userAuthInfo = new UserAuthInfo("ID", "EMAIL", "NAME");
-        when(userInfoProvider.resolve(any())).thenReturn(Optional.of(userAuthInfo));
+    void bindsUserAndOnlyUserIdInMdcWhenAuthenticated() throws Exception {
+        UserAuthInfo info = new UserAuthInfo("ID", "EMAIL", "NAME");
+        when(provider.resolve()).thenReturn(Optional.of(info));
 
-        mockMvc.get()
-               .uri("/test")
-               .assertThat()
-               .hasStatus2xxSuccessful()
-               .bodyText()
-               .isEqualTo(userAuthInfo.toString());
+        AtomicReference<UserAuthInfo> bound = new AtomicReference<>();
+        AtomicReference<String> mdcUserId = new AtomicReference<>();
+        AtomicReference<String> mdcName = new AtomicReference<>();
+        AtomicReference<String> mdcEmail = new AtomicReference<>();
+        FilterChain chain = (req, res) -> {
+            bound.set(UserScopedValues.USER_AUTH_INFO.get());
+            mdcUserId.set(MDC.get("userId"));
+            mdcName.set(MDC.get("userName"));
+            mdcEmail.set(MDC.get("userEmail"));
+        };
+
+        filter.doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(), chain);
+
+        assertThat(bound.get()).isEqualTo(info);
+        assertThat(mdcUserId.get()).isEqualTo("ID");
+        assertThat(mdcName.get()).isNull();
+        assertThat(mdcEmail.get()).isNull();
+        assertThat(MDC.get("userId")).isNull();
     }
 
     @Test
-    @SneakyThrows
-    void doesNotResolvesUserWhenUserIsNotPresent() {
-        when(userInfoProvider.resolve(any())).thenReturn(Optional.empty());
+    void doesNotBindUserWhenNotAuthenticated() throws Exception {
+        when(provider.resolve()).thenReturn(Optional.empty());
 
-        mockMvc.get()
-               .uri("/test")
-               .assertThat()
-               .hasStatus2xxSuccessful()
-               .bodyText()
-               .isEmpty();
-    }
+        AtomicReference<Boolean> bound = new AtomicReference<>();
+        FilterChain chain = (req, res) -> bound.set(UserScopedValues.USER_AUTH_INFO.isBound());
 
-    static class Configuration {
-        @Bean
-        CacheManager cacheManager() {
-            return new SimpleCacheManager();
-        }
-    }
-}
+        filter.doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(), chain);
 
-@RestController
-@RequiredArgsConstructor
-class ResolveUserRequestFilterTestController {
-    private final UserAuthInfoResolver authInfoResolver;
-
-    @GetMapping("/test")
-    public String test() {
-        return authInfoResolver.resolve()
-                               .map(Objects::toString)
-                               .orElse("");
+        assertThat(bound.get()).isFalse();
     }
 }

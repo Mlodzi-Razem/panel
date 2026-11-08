@@ -4,3 +4,7 @@ spring:
   jpa:
     show-sql: true
 debug: true
+panel:
+  api:
+    auth:
+      secret: test-secret-test-secret-test-secret-0123456789

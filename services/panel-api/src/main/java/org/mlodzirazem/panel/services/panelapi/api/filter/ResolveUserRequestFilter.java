@@ -26,6 +26,7 @@ import lombok.SneakyThrows;
 import org.mlodzirazem.panel.services.panelapi.core.user.UserAuthInfo;
 import org.mlodzirazem.panel.services.panelapi.core.user.UserScopedValues;
 import org.slf4j.MDC;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -33,8 +34,11 @@ import java.io.IOException;
 import java.util.Optional;
 
 @Component
+@Order(ResolveUserRequestFilter.ORDER)
 @RequiredArgsConstructor
 public class ResolveUserRequestFilter extends OncePerRequestFilter {
+    public static final int ORDER = -100 + 1;
+
     private final RequestUserInfoProvider requestUserInfoProvider;
 
     @Override
@@ -43,7 +47,7 @@ public class ResolveUserRequestFilter extends OncePerRequestFilter {
         HttpServletResponse response,
         FilterChain filterChain
     ) throws ServletException, IOException {
-        Optional<UserAuthInfo> authInfo = requestUserInfoProvider.resolve(request);
+        Optional<UserAuthInfo> authInfo = requestUserInfoProvider.resolve();
 
         if (authInfo.isEmpty()) {
             filterChain.doFilter(request, response);
@@ -57,14 +61,10 @@ public class ResolveUserRequestFilter extends OncePerRequestFilter {
             .run(() -> {
                 try {
                     MDC.put("userId", resolvedAuthInfo.userId());
-                    MDC.put("userName", resolvedAuthInfo.name());
-                    MDC.put("userEmail", resolvedAuthInfo.email());
 
                     chainAndThrowUnchecked(request, response, filterChain);
                 } finally {
                     MDC.remove("userId");
-                    MDC.remove("userName");
-                    MDC.remove("userEmail");
                 }
             });
     }

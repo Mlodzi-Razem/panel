@@ -17,53 +17,36 @@
 
 package org.mlodzirazem.panel.services.panelapi.api.filter;
 
-import jakarta.servlet.http.HttpServletRequest;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.mlodzirazem.panel.services.panelapi.core.user.UserAuthInfo;
-import org.mlodzirazem.panel.services.panelapi.directory.api.components.DirectoryUserProfileFetcher;
-import org.mlodzirazem.panel.services.panelapi.directory.api.model.DirectoryUserProfile;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
 @Component
-@RequiredArgsConstructor
-@Slf4j
 public class RequestUserInfoProvider {
-    private final DirectoryUserProfileFetcher userProfileFetcher;
+    public Optional<UserAuthInfo> resolve() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-    public Optional<UserAuthInfo> resolve(HttpServletRequest req) {
-        String userId = req.getHeader("X-Auth-User-Id");
-        String userName = req.getHeader("X-Auth-User-Name");
-        String userEmail = req.getHeader("X-Auth-User-Email");
-
-        if (userId == null) {
+        if (authentication == null || !authentication.isAuthenticated()) {
             return Optional.empty();
         }
 
-        if (userName == null || userEmail == null) {
-            return fetchFromDirectory(userId);
+        if (!(authentication.getPrincipal() instanceof Jwt jwt)) {
+            return Optional.empty();
         }
 
-        return Optional.of(new UserAuthInfo(userId, userEmail, userName));
-    }
-
-    private Optional<UserAuthInfo> fetchFromDirectory(String userId) {
-        Optional<DirectoryUserProfile> directoryProfile = userProfileFetcher.fetchUserProfileById(userId);
-        if (directoryProfile.isEmpty()) {
-            // Such a case is possible, but it is highly unlikely.
-            // Since the user has already been authenticated,
-            // their profile should be available in the directory.
-            // Consistency issues are a thing, though.
-            log.atWarn()
-               .addKeyValue("userId", userId)
-               .log("Missing directory user profile: " + userId);
+        String userId = jwt.getSubject();
+        if (userId == null || userId.isBlank()) {
+            return Optional.empty();
         }
 
-        String fetchedPreferredName = directoryProfile.map(DirectoryUserProfile::preferredName).orElse(null);
-        String fetchedEmail = directoryProfile.map(DirectoryUserProfile::email).orElse(null);
-
-        return Optional.of(new UserAuthInfo(userId, fetchedEmail, fetchedPreferredName));
+        return Optional.of(new UserAuthInfo(
+            userId,
+            jwt.getClaimAsString("email"),
+            jwt.getClaimAsString("name")
+        ));
     }
 }

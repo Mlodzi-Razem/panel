@@ -17,95 +17,63 @@
 
 package org.mlodzirazem.panel.services.panelapi.api.filter;
 
-import jakarta.servlet.http.HttpServletRequest;
-import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mlodzirazem.panel.services.panelapi.core.user.UserAuthInfo;
-import org.mlodzirazem.panel.services.panelapi.directory.api.components.DirectoryUserProfileFetcher;
-import org.mlodzirazem.panel.services.panelapi.directory.api.model.DirectoryUserProfile;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
+import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
 class RequestUserInfoProviderTest {
-    @Mock
-    DirectoryUserProfileFetcher directoryUserProfileFetcher;
+    private final RequestUserInfoProvider provider = new RequestUserInfoProvider();
 
-    @InjectMocks
-    RequestUserInfoProvider provider;
-
-    @Test
-    void resolvesExclusivelyUsingHeadersWhenCompleteDataProvided() {
-        var userInfo = new UserAuthInfo("ID", "EMAIL", "NAME");
-        HttpServletRequest req = mockRequest(userInfo);
-
-        Optional<UserAuthInfo> resolved = provider.resolve(req);
-
-        assertThat(resolved).isPresent().contains(userInfo);
-        verifyNoInteractions(directoryUserProfileFetcher);
+    @AfterEach
+    void clearContext() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
-    void usesUserProfileFetcherWhenOnlyIdProvided() {
-        var userInfo = new UserAuthInfo("ID", null, null);
-        HttpServletRequest req = mockRequest(userInfo);
+    void resolvesUserFromJwtClaims() {
+        authenticate(Map.of("sub", "ID", "email", "EMAIL", "name", "NAME"));
 
-        DirectoryUserProfile directoryProfile = new DirectoryUserProfile(
-            userInfo.userId(),
-            "NAME",
-            "EMAIL"
+        Optional<UserAuthInfo> resolved = provider.resolve();
+
+        assertThat(resolved).contains(new UserAuthInfo("ID", "EMAIL", "NAME"));
+    }
+
+    @Test
+    void resolvesUserWithoutOptionalClaims() {
+        authenticate(Map.of("sub", "ID"));
+
+        Optional<UserAuthInfo> resolved = provider.resolve();
+
+        assertThat(resolved).contains(new UserAuthInfo("ID", null, null));
+    }
+
+    @Test
+    void returnsEmptyWhenNotAuthenticated() {
+        assertThat(provider.resolve()).isEmpty();
+    }
+
+    @Test
+    void returnsEmptyForAnonymousAuthentication() {
+        SecurityContextHolder.getContext().setAuthentication(
+            new AnonymousAuthenticationToken("key", "anonymous", AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS"))
         );
-        when(directoryUserProfileFetcher.fetchUserProfileById(userInfo.userId()))
-            .thenReturn(Optional.of(directoryProfile));
 
-        Optional<UserAuthInfo> resolved = provider.resolve(req);
-
-        var expectedUserInfo = new UserAuthInfo("ID", "EMAIL", "NAME");
-
-        assertThat(resolved).isPresent().contains(expectedUserInfo);
+        assertThat(provider.resolve()).isEmpty();
     }
 
-    @Test
-    void returnsJustIdWhenNoDirectoryProfile() {
-        var userInfo = new UserAuthInfo("ID", null, null);
-        HttpServletRequest req = mockRequest(userInfo);
-
-        when(directoryUserProfileFetcher.fetchUserProfileById(userInfo.userId()))
-            .thenReturn(Optional.empty());
-
-        Optional<UserAuthInfo> resolved = provider.resolve(req);
-        assertThat(resolved).isPresent().contains(userInfo);
-    }
-
-    @Test
-    void returnsEmptyWhenNoUserProfileId() {
-         HttpServletRequest req = mockRequest(null);
-
-        Optional<UserAuthInfo> resolved  = provider.resolve(req);
-
-        assertThat(resolved).isEmpty();
-    }
-
-    private HttpServletRequest mockRequest(@Nullable UserAuthInfo info) {
-        HttpServletRequest req = mock(HttpServletRequest.class);
-        if (info == null) {
-            when(req.getHeader("X-Auth-User-Id")).thenReturn(null);
-            when(req.getHeader("X-Auth-User-Name")).thenReturn(null);
-            when(req.getHeader("X-Auth-User-Email")).thenReturn(null);
-        } else {
-            when(req.getHeader("X-Auth-User-Id")).thenReturn(info.userId());
-            when(req.getHeader("X-Auth-User-Name")).thenReturn(info.name());
-            when(req.getHeader("X-Auth-User-Email")).thenReturn(info.email());
-        }
-        return req;
+    private static void authenticate(Map<String, Object> claims) {
+        Jwt jwt = new Jwt("token", Instant.now(), Instant.now().plusSeconds(60), Map.of("alg", "HS256"), claims);
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt, AuthorityUtils.NO_AUTHORITIES));
     }
 }
