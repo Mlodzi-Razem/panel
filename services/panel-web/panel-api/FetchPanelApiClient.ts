@@ -22,6 +22,7 @@ import IPanelApiClient, {
     PanelApiRequestConfig,
 } from "@/panel-api/IPanelApiClient";
 import env from "@/config/env";
+import { mintServiceToken } from "@/panel-api/serviceToken";
 
 function requestInit(req: PanelApiRequest, config: PanelApiRequestConfig) {
     return {
@@ -58,9 +59,7 @@ function url(endpointUrl: string) {
 function headers(req: PanelApiRequest, config: PanelApiRequestConfig) {
     return {
         ...req.headers,
-        ['X-Auth-User-Id']: config.user.id,
-        ...(config.user.email ? {['X-Auth-User-Email']: config.user.email} : {}),
-        ...(config.user.name ? {['X-Auth-User-Name']: config.user.name} : {}),
+        ['Authorization']: `Bearer ${mintServiceToken(config.user)}`,
     } satisfies HeadersInit;
 }
 

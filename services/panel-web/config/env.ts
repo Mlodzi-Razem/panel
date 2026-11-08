@@ -22,6 +22,7 @@ const REQUIRED_ENV_VARS = {
     PANEL_GOOGLE_CLIENT_SECRET: 'The client secret of the Google OAuth2 application',
     PANEL_GOOGLE_WORKSPACE_DOMAIN: 'The Google Workspace primary domain whose accounts are allowed to sign in (e.g. example.org)',
     PANEL_API_URL: 'The URL of the panel-api component',
+    PANEL_API_AUTH_SECRET: 'The shared secret (at least 32 bytes) used to sign service tokens sent to panel-api',
     NEXTAUTH_SECRET: 'The secret used for NextAuth.js',
     NEXTAUTH_URL: 'The URL of the server',
 } as const;
