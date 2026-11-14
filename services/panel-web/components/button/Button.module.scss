@@ -26,9 +26,17 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--size-spacing);
+    white-space: nowrap;
+    width: fit-content;
 
-    &[disabled="true"] {
+    &:disabled {
         cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--color-secondary);
+        outline-offset: 2px;
     }
 
     > * {
@@ -45,6 +53,14 @@
 
     &[data-variant="secondary"] {
         background-color: var(--color-secondary);
+
+        > * {
+            color: var(--color-on-text);
+        }
+    }
+
+    &[data-variant="danger"] {
+        background-color: var(--color-danger);
 
         > * {
             color: var(--color-on-text);

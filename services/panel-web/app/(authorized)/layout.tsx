@@ -16,8 +16,12 @@
  */
 
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { getPanelServerSession } from "@/auth/authOptions";
 import PanelAppRoot from "@/app/PanelAppRoot";
+import ApiErrorNotice from "@/components/members/ApiErrorNotice";
+import { Card, Page } from "@/components/page/Page";
+import { getMe } from "@/panel-api/members/me";
 import React from "react";
 
 export default async function AuthorizedLayout({children}: React.PropsWithChildren<object>) {
@@ -27,7 +31,27 @@ export default async function AuthorizedLayout({children}: React.PropsWithChildr
         redirect('/login');
     }
 
-    return <PanelAppRoot session={session}>
-        {children}
+    const me = await getMe();
+    if (me.kind === 'unauthenticated') {
+        redirect('/login');
+    }
+
+    if (me.kind === 'linked') {
+        const routes = ['user', 'bodies', 'fees'];
+        if (me.me.canSeeMembers) {
+            routes.splice(1, 0, 'members');
+        }
+        return <PanelAppRoot session={session} visibleRoutes={routes}>
+            {children}
+        </PanelAppRoot>;
+    }
+
+    const t = await getTranslations('notLinked');
+    return <PanelAppRoot session={session} visibleRoutes={[]}>
+        <Page title={me.kind === 'unlinked' ? t('title') : t('errorTitle')}>
+            {me.kind === 'unlinked'
+                ? <Card><p>{t('body')}</p></Card>
+                : <ApiErrorNotice error={me.error}/>}
+        </Page>
     </PanelAppRoot>;
 }

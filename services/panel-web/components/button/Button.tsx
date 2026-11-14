@@ -19,7 +19,7 @@ import styles from './Button.module.scss';
 import css from "@/util/css";
 import React from "react";
 
-export type ButtonVariant = 'primary' | 'secondary' | 'outline';
+export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'danger';
 
 export type ButtonProps = React.PropsWithChildren<{
     onClick?: () => void;
@@ -29,6 +29,8 @@ export type ButtonProps = React.PropsWithChildren<{
     iconLeft?: React.ReactNode;
     iconRight?: React.ReactNode;
     disabled?: boolean;
+    type?: 'button' | 'submit' | 'reset';
+    ariaLabel?: string;
 }>;
 
 export default function Button({
@@ -39,13 +41,17 @@ export default function Button({
     style,
     iconLeft,
     iconRight,
-    disabled = false
+    disabled = false,
+    type = 'button',
+    ariaLabel,
 }: ButtonProps) {
     return <button onClick={onClick}
+                   type={type}
+                   aria-label={ariaLabel}
                    className={css(styles.button, className)}
                    style={style}
                    data-variant={variant}
-    disabled={disabled}>
+                   disabled={disabled}>
         {iconLeft && <div className={styles.iconContainer}>{iconLeft}</div>}
         <div>{children}</div>
         {iconRight && <div className={styles.iconContainer}>{iconRight}</div>}

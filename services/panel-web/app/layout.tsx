@@ -19,6 +19,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.scss";
 import React from "react";
 import { NextIntlClientProvider } from "next-intl";
+import { getLocale } from "next-intl/server";
 
 export const metadata: Metadata = {
     title: "Młodzi Razem | Panel",
@@ -31,13 +32,15 @@ export const viewport: Viewport = {
     viewportFit: 'cover'
 }
 
-export default function RootLayout({
+export default async function RootLayout({
     children,
 }: Readonly<{
     children: React.ReactNode;
 }>) {
+    const locale = await getLocale();
+
     return (
-        <html data-scroll-behavior="smooth">
+        <html lang={locale} data-scroll-behavior="smooth">
             <body>
                 <NextIntlClientProvider>
                     {children}

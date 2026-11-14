@@ -20,7 +20,7 @@
 import { User } from "next-auth";
 import PSideMenu, { PSideMenuRoute } from "@/components/menu/side-menu/PSideMenu";
 import { useSelectedLayoutSegments } from "next/dist/client/components/navigation";
-import { MoneyIcon, UserIcon, UsersThreeIcon } from "@phosphor-icons/react/ssr";
+import { BuildingsIcon, MoneyIcon, UserIcon, UsersThreeIcon } from "@phosphor-icons/react/ssr";
 import { useTranslations } from "next-intl";
 import { signOut } from "next-auth/react";
 
@@ -39,6 +39,12 @@ const routes: PSideMenuRoute[] = [
         children: [],
     },
     {
+        urlSegment: "bodies",
+        labelKey: "bodies",
+        icon: <BuildingsIcon {...iconProps}/>,
+        children: [],
+    },
+    {
         urlSegment: "fees",
         labelKey: "fees",
         icon: <MoneyIcon {...iconProps}/>,
@@ -46,9 +52,9 @@ const routes: PSideMenuRoute[] = [
     },
 ] as const;
 
-export default function SideMenu({user}: { user: User }) {
+export default function SideMenu({user, visibleRoutes}: { user: User; visibleRoutes: string[] }) {
     const urlSegments = useSelectedLayoutSegments();
     const t = useTranslations('menu');
 
-    return <PSideMenu user={user} routes={routes} urlSegments={urlSegments} t={t} signOut={signOut}/>
+    return <PSideMenu user={user} routes={routes.filter(r => visibleRoutes.includes(r.urlSegment))} urlSegments={urlSegments} t={t} signOut={signOut}/>
 }

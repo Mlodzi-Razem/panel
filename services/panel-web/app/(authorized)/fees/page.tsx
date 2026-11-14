@@ -15,7 +15,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-export default function FeesPage() {
-    return <div>
-    </div>
+import { getTranslations } from "next-intl/server";
+import { Card, Page } from "@/components/page/Page";
+
+export default async function FeesPage() {
+    const t = await getTranslations('fees');
+    return <Page title={t('title')}>
+        <Card>
+            <p>{t('comingSoon')}</p>
+        </Card>
+    </Page>;
 }

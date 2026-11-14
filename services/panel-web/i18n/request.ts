@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import { cookies, headers } from 'next/headers';
 import { getRequestConfig } from 'next-intl/server';
 
 import messagesEn from './messages/messages-en';
@@ -31,8 +32,26 @@ function validateLocale(locale: string): locale is keyof typeof localesMap {
     return supportedLocales.includes(locale);
 }
 
+async function detectLocale(): Promise<keyof typeof localesMap> {
+    const cookieLocale = (await cookies()).get('NEXT_LOCALE')?.value;
+    if (cookieLocale && validateLocale(cookieLocale)) {
+        return cookieLocale;
+    }
+
+    const acceptLanguage = (await headers()).get('accept-language') ?? '';
+    for (const part of acceptLanguage.split(',')) {
+        const language = part.trim().split(';')[0]?.toLowerCase().split('-')[0];
+        if (language && validateLocale(language)) {
+            return language;
+        }
+    }
+
+    return 'en';
+}
+
 export default getRequestConfig(async ({requestLocale}) => {
-    const locale = (await requestLocale) ?? 'en';
+    const requested = await requestLocale;
+    const locale = requested ?? await detectLocale();
 
     if (!validateLocale(locale)) {
         throw new Error(`Unsupported locale: ${locale}`);

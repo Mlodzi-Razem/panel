@@ -21,14 +21,15 @@ import SideMenu from "@/components/menu/side-menu/SideMenu";
 import SuspenseFallback from "@/app/SuspenseFallback";
 import { Session, User } from "next-auth";
 
-export type PanelAppRootProps = React.PropsWithChildren<{ session: Session }>;
+export type PanelAppRootProps = React.PropsWithChildren<{ session: Session; visibleRoutes: string[] }>;
 
 const PanelAppRoot = ({
     session,
+    visibleRoutes,
     children,
 }: PanelAppRootProps) => {
     return <div className={styles.container}>
-        <SideMenu user={session.user as User}/>
+        <SideMenu user={session.user as User} visibleRoutes={visibleRoutes}/>
         <div className={styles.content}>
             <Suspense fallback={<SuspenseFallback/>}>
                 {children}

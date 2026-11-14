@@ -15,5 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import { redirect } from "next/navigation";
+
 export default function Home() {
+    redirect('/user');
 }

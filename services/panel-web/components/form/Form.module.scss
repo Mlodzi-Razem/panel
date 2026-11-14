@@ -1,0 +1,190 @@
+/*!
+ * Copyright (C) 2026 Stowarzyszenie Młodzi Razem
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: calc(2 * var(--size-spacing));
+    min-width: 0;
+}
+
+.fieldGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    gap: var(--size-spacing) calc(2 * var(--size-spacing));
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+    border: none;
+}
+
+.label {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.required {
+    color: var(--color-danger);
+}
+
+.hint {
+    font-size: 0.8rem;
+    color: var(--color-muted);
+}
+
+.input {
+    width: 100%;
+    min-height: 2.25rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--color-border);
+    border-color: color-mix(in srgb, var(--color-text), transparent 70%);
+    border-radius: 0.5rem;
+    background-color: var(--color-background);
+    font: inherit;
+
+    &:focus-visible {
+        outline: 2px solid var(--color-secondary);
+        outline-offset: 1px;
+    }
+
+    &[aria-invalid="true"] {
+        border-color: var(--color-danger);
+        background-color: var(--color-danger-bg);
+    }
+
+    &:disabled {
+        background-color: var(--color-background-deep);
+    }
+}
+
+textarea.input {
+    min-height: 5rem;
+    resize: vertical;
+}
+
+.checkbox {
+    display: flex;
+    gap: var(--size-spacing);
+    align-items: center;
+
+    input {
+        width: 1.1rem;
+        height: 1.1rem;
+        accent-color: var(--color-primary);
+    }
+}
+
+.listRows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-spacing);
+}
+
+.listRow {
+    display: flex;
+    gap: var(--size-spacing);
+    align-items: center;
+}
+
+.buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--size-spacing);
+    align-items: center;
+}
+
+.status {
+    padding: var(--size-padding) calc(2 * var(--size-padding));
+    border-radius: 0.5rem;
+
+    &[data-tone="error"] {
+        background-color: var(--color-danger-bg);
+        color: var(--color-danger);
+
+        * {
+            color: inherit;
+        }
+    }
+
+    &[data-tone="success"] {
+        background-color: var(--color-success-bg);
+        color: var(--color-success);
+    }
+
+    ul {
+        padding-left: 1.2rem;
+    }
+}
+
+.dialog {
+    border: none;
+    border-radius: var(--size-border-radius);
+    padding: calc(2 * var(--size-padding));
+    max-width: min(40rem, calc(100vw - 2rem));
+    width: 100%;
+    box-shadow: var(--shadow-1);
+    background-color: var(--color-background);
+
+    &::backdrop {
+        background-color: rgba(0, 0, 0, 0.4);
+    }
+}
+
+.dialogBody {
+    display: flex;
+    flex-direction: column;
+    gap: calc(2 * var(--size-spacing));
+}
+
+.picker {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-spacing);
+}
+
+.pickerResults {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.pickerOption {
+    width: 100%;
+    text-align: left;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    background-color: var(--color-background);
+    cursor: pointer;
+    font: inherit;
+
+    &:hover, &:focus-visible {
+        background-color: var(--color-background-deep);
+    }
+}
+
+.pickerSelected {
+    display: flex;
+    gap: var(--size-spacing);
+    align-items: center;
+    flex-wrap: wrap;
+}
