@@ -1,0 +1,119 @@
+/*
+ * Copyright (C) 2025 Stowarzyszenie Młodzi Razem
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package org.mlodzirazem.panel.services.panelapi.api.v1.common;
+
+import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
+import org.mlodzirazem.panel.services.panelapi.bodies.AssignmentBlockedException;
+import org.mlodzirazem.panel.services.panelapi.bodies.ConfirmationRequiredException;
+import org.mlodzirazem.panel.services.panelapi.core.error.ConflictException;
+import org.mlodzirazem.panel.services.panelapi.core.error.DomainException;
+import org.mlodzirazem.panel.services.panelapi.core.error.ForbiddenException;
+import org.mlodzirazem.panel.services.panelapi.core.error.NotFoundException;
+import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+
+import java.util.List;
+
+@Slf4j
+@RestControllerAdvice
+class ApiExceptionHandler extends ResponseEntityExceptionHandler {
+    @ExceptionHandler(ApiException.class)
+    ResponseEntity<ErrorResponse> api(ApiException e) {
+        return respond(e.getStatus(), ErrorResponse.of(e.getCode(), e.getMessage(), e.getFields()));
+    }
+
+    @ExceptionHandler(NotFoundException.class)
+    ResponseEntity<ErrorResponse> notFound(NotFoundException e) {
+        return respond(HttpStatus.NOT_FOUND, ErrorResponse.of(e.getCode(), e.getMessage()));
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    ResponseEntity<ErrorResponse> forbidden(ForbiddenException e) {
+        return respond(HttpStatus.FORBIDDEN, ErrorResponse.of(e.getCode(), e.getMessage()));
+    }
+
+    @ExceptionHandler(ConfirmationRequiredException.class)
+    ResponseEntity<ErrorResponse> confirmation(ConfirmationRequiredException e) {
+        return respond(HttpStatus.CONFLICT, new ErrorResponse(e.getCode(), e.getMessage(), null, e.getCheck()));
+    }
+
+    @ExceptionHandler(AssignmentBlockedException.class)
+    ResponseEntity<ErrorResponse> blocked(AssignmentBlockedException e) {
+        return respond(HttpStatus.UNPROCESSABLE_ENTITY,
+            new ErrorResponse(e.getCode(), e.getMessage(), null, e.getCheck()));
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    ResponseEntity<ErrorResponse> conflict(ConflictException e) {
+        return respond(HttpStatus.CONFLICT, ErrorResponse.of(e.getCode(), e.getMessage(), e.getFields()));
+    }
+
+    @ExceptionHandler(RuleViolationException.class)
+    ResponseEntity<ErrorResponse> ruleViolation(RuleViolationException e) {
+        return respond(HttpStatus.UNPROCESSABLE_ENTITY, ErrorResponse.of(e.getCode(), e.getMessage()));
+    }
+
+    @ExceptionHandler(DomainException.class)
+    ResponseEntity<ErrorResponse> domain(DomainException e) {
+        return respond(HttpStatus.BAD_REQUEST, ErrorResponse.of(e.getCode(), e.getMessage()));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ResponseEntity<ErrorResponse> integrity(DataIntegrityViolationException e) {
+        log.warn("Data integrity violation", e);
+        return respond(HttpStatus.CONFLICT, ErrorResponse.of("DATA_CONFLICT", "The data conflicts with existing records"));
+    }
+
+    @ExceptionHandler(Exception.class)
+    ResponseEntity<ErrorResponse> unexpected(Exception e) {
+        log.error("Unhandled error", e);
+        return respond(HttpStatus.INTERNAL_SERVER_ERROR, ErrorResponse.of("INTERNAL_ERROR", "Unexpected error"));
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleExceptionInternal(
+        Exception ex,
+        @Nullable Object body,
+        HttpHeaders headers,
+        HttpStatusCode statusCode,
+        WebRequest request
+    ) {
+        HttpStatus status = HttpStatus.resolve(statusCode.value());
+        String reason = status == null ? "Error" : status.getReasonPhrase();
+        String code = reason.toUpperCase().replace(' ', '_');
+
+        if (statusCode.value() == 400) {
+            code = "BAD_REQUEST";
+        }
+
+        return ResponseEntity.status(statusCode).headers(headers).body(ErrorResponse.of(code, reason));
+    }
+
+    private static ResponseEntity<ErrorResponse> respond(HttpStatus status, ErrorResponse body) {
+        return ResponseEntity.status(status).body(body);
+    }
+}
