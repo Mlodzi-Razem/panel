@@ -19,6 +19,7 @@ package org.mlodzirazem.panel.services.panelapi.persistence.entity.audit;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -28,6 +29,8 @@ import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnTransformer;
+import org.jspecify.annotations.Nullable;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember;
 import org.springframework.data.annotation.Immutable;
 
@@ -57,13 +60,14 @@ public class TAuditedOperation {
     @Column(name = "operation_timestamp", nullable = false)
     private ZonedDateTime timestamp;
 
+    @ColumnTransformer(write = "?::jsonb")
     @Column(name = "operation_payload", nullable = false, columnDefinition = "JSONB")
     private String payload;
 
     @JoinColumn(name = "triggered_by_id", nullable = true)
-    @ManyToOne
-    TMember triggeredBy;
+    @ManyToOne(fetch = FetchType.LAZY)
+    private @Nullable TMember triggeredBy;
 
     @Column(name = "triggered_by_ip", nullable = true)
-    String triggeredByIp;
+    private @Nullable String triggeredByIp;
 }

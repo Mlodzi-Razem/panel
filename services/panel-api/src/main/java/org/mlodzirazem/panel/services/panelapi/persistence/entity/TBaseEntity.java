@@ -18,40 +18,49 @@
 package org.mlodzirazem.panel.services.panelapi.persistence.entity;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import lombok.Getter;
 import lombok.Setter;
+import org.jspecify.annotations.Nullable;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember;
 
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 
 @MappedSuperclass
 @Getter
 @Setter
-public class TBaseEntity {
-    public static final String ID_SEQ = "entity_id_seq_generator";
-
-    @Id
-    @Column(name = "id", nullable = false, updatable = false)
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = ID_SEQ)
-    private Long id;
-
+public abstract class TBaseEntity {
     @JoinColumn(name = "created_by_user_id")
-    @ManyToOne
-    private TMember createdBy;
+    @ManyToOne(fetch = FetchType.LAZY)
+    private @Nullable TMember createdBy;
 
     @JoinColumn(name = "updated_by_user_id")
-    @ManyToOne
-    private TMember updatedBy;
+    @ManyToOne(fetch = FetchType.LAZY)
+    private @Nullable TMember updatedBy;
 
     @Column(name = "created_at", nullable = false)
-    private ZonedDateTime createdAt;
+    private @Nullable ZonedDateTime createdAt;
 
     @Column(name = "updated_at", nullable = true)
-    private ZonedDateTime updatedAt;
+    private @Nullable ZonedDateTime updatedAt;
+
+    public abstract Long getId();
+
+    @PrePersist
+    void onPersist() {
+        if (createdAt == null) {
+            createdAt = ZonedDateTime.now(ZoneOffset.UTC);
+        }
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = ZonedDateTime.now(ZoneOffset.UTC);
+    }
 }

@@ -24,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -34,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @PostgresTest
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class SchemaFixesTest {
     private static final String UNIQUE_VIOLATION = "23505";
     private static final String FOREIGN_KEY_VIOLATION = "23503";
@@ -179,7 +181,7 @@ class SchemaFixesTest {
     @Test
     void memberTypeRequiresExistingPermissionGroup() {
         Long template = jdbc.queryForObject(
-            "INSERT INTO body_templates (scope, name) VALUES ('LOCAL', 't') RETURNING id", Long.class);
+            "INSERT INTO body_templates (scope, name, kind) VALUES ('LOCAL', 't', 'TEAM') RETURNING id", Long.class);
 
         assertSqlState(FOREIGN_KEY_VIOLATION, () -> jdbc.update(
             "INSERT INTO body_template_member_types (name, is_default, body_template_id, permission_group_id) "
@@ -224,15 +226,16 @@ class SchemaFixesTest {
     ) {
         Long id = jdbc.queryForObject("""
                 INSERT INTO members (status, preferred_name_first, preferred_name_middle, preferred_name_last,
-                                     formal_name, pseudonym, domain_email, domain_email_aliases, private_emails,
+                                     formal_name_first, formal_name_last, pseudonym, domain_email, domain_email_aliases, private_emails,
                                      birth_date, address_country_code, address_postal_code, address_state,
                                      address_province, address_city, address_street, address_building,
                                      address_apartment)
-                VALUES ('ACTIVE', ?, ?, ?, ?, ?, ?, ?::text[], ?::text[],
+                VALUES ('ACTIVE', ?, ?, ?, ?, ?, ?, ?, ?::text[], ?::text[],
                         DATE '1990-01-01', 'POL', '00-001', 's', 'p', 'c', 'st', '1', '1')
                 RETURNING id
                 """,
-            Long.class, first, middle, last, formal, pseudonym, domainEmail, aliases, privateEmails);
+            Long.class, first, middle, last, formal.substring(0, formal.lastIndexOf(' ')), formal.substring(formal.lastIndexOf(' ') + 1),
+            pseudonym, domainEmail, aliases, privateEmails);
         assertThat(id).isNotNull();
         return id;
     }

@@ -16,8 +16,8 @@
  */
 
 @NullMarked
-@NamedInterface
+@ApplicationModule(allowedDependencies = {"persistence::*", "core::user", "core::uuid"})
 package org.mlodzirazem.panel.services.panelapi.audit;
 
 import org.jspecify.annotations.NullMarked;
-import org.springframework.modulith.NamedInterface;
+import org.springframework.modulith.ApplicationModule;
