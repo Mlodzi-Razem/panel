@@ -16,6 +16,8 @@ Stowarzyszenie Młodzi Razem <it@mlodzirazem.org>
 [preface]
 = Introduction
 
+include::features/index.adoc[]
+
 include::technical-internals/index.adoc[]
 
 [index]

@@ -1,0 +1,308 @@
+== Members
+
+The member register replaces the spreadsheet currently used by the national board.
+It covers the register itself, district-board access, member self-service with change
+requests, and a one-off import of the existing spreadsheet.
+Recruitment is a separate feature built on top of it.
+
+=== Organisation model
+
+The model follows the statute of 15 September 2024 (articles referenced as _Art._).
+
+==== Bodies
+
+Every organ, unit and position is a `bodies` row created from a body template.
+Templates and their member types (roles) are seeded; bodies are created by the national board.
+
+[%autowidth]
+|===
+| Template | Scope | Parent | Roles (member types) | Statute
+
+| General Assembly (_Walne Zebranie Osób Członkowskich_) / Assembly of Delegates
+| `GLOBAL` | -- | Delegate | Art. 24--27
+| National Board (_Zarząd Krajowy_, ZK)
+| `GLOBAL` | -- | Co-chair (2), Vice-chair (3), Secretary, Treasurer | Art. 28--29
+| National Peer Court (_Krajowy Sąd Koleżeński_, KSK)
+| `GLOBAL` | -- | Chair, Vice-chair, Secretary, Member (7 in total) | Art. 30--33
+| National Audit Commission (_Krajowa Komisja Rewizyjna_, KKR)
+| `GLOBAL` | -- | Chair, Vice-chair, Secretary, Member (5 in total) | Art. 34--36
+| National Electoral Commission (_Krajowa Komisja Wyborcza_, KKW)
+| `GLOBAL` | -- | Chair, Vice-chair, Secretary, Member (5 in total) | Art. 37--40
+| Press Spokesperson
+| `GLOBAL` | -- | Spokesperson | Art. 29.1.5
+| Commission / Team / Educational circle / Group (appointed by ZK)
+| `GLOBAL` | -- | Leader, Member | Art. 29.2.1
+| District (_Okręg_)
+| `LOCAL` | -- | -- | Art. 41--42
+| District Assembly (_Walne Zebranie Okręgu_)
+| `LOCAL` | District | -- | Art. 44
+| District Board (_Zarząd Okręgu_, ZO)
+| `LOCAL` | District | Coordinator, Vice-coordinator (0--6) | Art. 45--48
+| District Treasurer
+| `LOCAL` | District | Treasurer | Art. 50
+| District Commissioner (_Osoba Komisarska Okręgu_)
+| `LOCAL` | District | Commissioner | Art. 51--52
+| Local Circle (_Koło terenowe_)
+| `LOCAL` | District | Coordinator, Member | Art. 53--55
+|===
+
+Seeded bodies: the national organs above and 17 districts -- one per voivodeship
+(dolnośląskie, kujawsko-pomorskie, lubelskie, lubuskie, łódzkie, małopolskie, mazowieckie,
+opolskie, podkarpackie, podlaskie, pomorskie, śląskie, świętokrzyskie, warmińsko-mazurskie,
+wielkopolskie, zachodniopomorskie) and _Zagranica_ (abroad) -- each with its District Assembly,
+District Board and District Treasurer. Local circles are created later by the national board.
+
+Who holds which role is stored in `body_memberships`
+(member, body, member type, `valid_from`, `valid_to`).
+A membership is active when `valid_from <= today` and `valid_to` is empty or in the future.
+
+==== Rules on holding functions
+
+Checked whenever a body membership is created:
+
+* *Incompatibility (Art. 21)* -- ZK, KSK, KKR and KKW exclude each other, and ZK cannot be
+  combined with ZO; KSK, KKR and KKW cannot be combined with ZO unless the ZO is single-person.
+  The pairs are data (`body_template_incompatibilities`), not code.
+  Assigning an incompatible function ends the earlier mandate (Art. 21.2): the panel shows the
+  conflict and, after confirmation, sets `valid_to` of the earlier membership.
+  An incompatible function starting on the same day or later than the existing one is rejected.
+  Adding a second person to a single-person ZO whose member sits on KSK, KKR or KKW produces a
+  warning, because that combination stops being exempt and has to be resolved by the national board.
+* *Term limit (Art. 20)* -- more than 2 consecutive terms in the same body produces a warning,
+  not an error; validating elections belongs to KKW.
+* *Commissioner term (Art. 52)* -- at most 3 months, extendable twice; `valid_to` is required.
+
+==== Membership of the association
+
+Members are natural persons. Supporting membership of legal persons (Art. 7.4, 10.2) is out of scope.
+
+* `membership_type`: `ORDINARY` | `SUPPORTING` | `HONORARY` (Art. 7.2).
+* Ordinary membership requires age 16--26 at admission (Art. 9);
+  supporting membership of a natural person requires age 14+ (Art. 10).
+* Ordinary and supporting membership ends at the end of the calendar year in which the member
+  turns 26 (Art. 17.1.2). The panel lists members whose membership ends this year;
+  ending it stays a board action.
+* Every member has exactly one active *primary* district and any number of *supporting*
+  district affiliations without electoral rights (Art. 41.3--41.7), stored in
+  `member_district_affiliations` (member, district, `PRIMARY` | `SUPPORTING`, `valid_from`, `valid_to`).
+  Moving the primary district is decided by the board of the target district (Art. 41.4--41.5).
+
+==== Permissions
+
+Each member type points to a `permission_group`; a permission group grants `permission_type`
+values through `permission_group_permissions`. The scope of the group decides where they apply:
+
+* `GLOBAL` -- every district.
+* `LOCAL` -- the district the body belongs to (the body itself for a district, otherwise its parent).
+  A member falls under a district through their *primary* affiliation; boards of a
+  *supporting* district get contact-data read access only.
+* `BODY` -- the body itself only.
+
+A user's effective permissions are the union over their active body memberships.
+The national board can change the groups; the seeded defaults are:
+
+[%autowidth]
+|===
+| Role | Scope | Permissions
+
+| ZO Coordinator, ZO Vice-coordinator, District Commissioner
+| `LOCAL`
+| contact and formal data read and manage
+| District Treasurer
+| `LOCAL`
+| contact data read, `FEES_READ`
+| All ZK roles (the Secretary keeps the register, Art. 28.5)
+| `GLOBAL`
+| contact and formal data read and manage, `BODIES_MANAGE`, `DIRECTORY_GROUPS_MANAGE`, `DIRECTORY_USERS_MANAGE`
+| ZK Treasurer
+| `GLOBAL`
+| as all ZK roles, plus `FEES_READ`, `FEES_MANAGE`
+| KSK, KKR, KKW, Local Circle, teams
+| --
+| none by default
+|===
+
+=== Linking a signed-in user to a member
+
+The service token carries the Google account `sub` and e-mail.
+
+. A member with `directory_user_id = sub` is the current user.
+. Otherwise a member with `domain_email` equal to the token e-mail (case-insensitive) is linked
+  by setting `directory_user_id = sub`, and the link is audited.
+. Otherwise the user has no member record: they can sign in but see only an
+  "account not linked" page.
+
+=== Fields
+
+[%autowidth]
+|===
+| Group | Columns | Member edits own | Change request | Board (`*_MANAGE` in scope)
+
+| Contact
+| `private_emails`, `phone_numbers`, `social_profile_url`
+| yes
+| --
+| yes
+
+| Naming and personal
+| `preferred_name_*`, `pseudonym`, `pronouns`, `institution`
+| yes
+| --
+| yes
+
+| Formal
+| `formal_name_first`, `formal_name_last`, `formal_identifier`, `birth_date`,
+  `address_line`, `address_*`
+| no
+| yes
+| yes
+
+| Organisational
+| `status`, `membership_type`, `member_id`, `member_since`, `probation_*`, `request_date`,
+  `removed_at`, `domain_email`, `domain_email_aliases`, `declaration_reference`,
+  district affiliations (incl. the voting district)
+| no
+| no
+| yes
+|===
+
+Schema changes against `0.0.2`:
+
+* `formal_name_first`, `formal_name_last` (`NOT NULL`); `formal_name` becomes a generated column.
+* New nullable columns `pronouns`, `institution`, `social_profile_url`, `address_line`,
+  `declaration_reference`, and `membership_type` (`NOT NULL`, default `ORDINARY`).
+* Structured address columns (`address_country_code` ... `address_apartment`) become nullable;
+  `address_line` holds the free-text address.
+* `member_district_affiliations.votes_here` -- exactly one active affiliation per member has it;
+  it defaults to the primary district (Art. 41.8).
+
+Reading follows the same split: `CONTACT_PERSONAL_DATA_READ` exposes contact and naming fields,
+`FORMAL_PERSONAL_DATA_READ` additionally exposes formal and organisational fields.
+`formal_identifier` is returned masked (last 4 characters) unless the caller explicitly
+requests it with `FORMAL_PERSONAL_DATA_MANAGE`; every unmasked read is audited.
+
+=== Change requests
+
+A member requests changes to formal fields; the request stores the proposed values and
+a snapshot of the current ones.
+
+* Status: `PENDING` -> `APPROVED` | `REJECTED` | `CANCELLED` (by the requester).
+* Approved by anyone holding `FORMAL_PERSONAL_DATA_MANAGE` for the member's district
+  (in practice their district board; the national board can too).
+* Approval applies the values in the same transaction, unless a field changed since the
+  snapshot -- then the approval fails and the approver must reject or re-check.
+* At most one `PENDING` request per member.
+* Nobody decides their own request.
+
+=== Auditing
+
+Every write (create, edit, self-edit, change-request decision, user linking, unmasked
+`formal_identifier` read, body-membership change) produces an `audited_operations` row
+containing the operation id, the acting user, the member id and the *names* of the changed
+fields -- never the values.
+
+=== Workspace synchronisation
+
+The panel is the source of truth for board memberships.
+Every body-membership change publishes a `BodyMembershipChanged` application event.
+A future Google directory provider first reconciles all Workspace groups with the panel's
+current state, then listens to these events (via Spring Modulith's event publication registry,
+so they survive restarts) to apply changes incrementally.
+
+=== API
+
+All endpoints require the panel-web service token.
+
+[%autowidth]
+|===
+| Method and path | Who | Purpose
+
+| `GET /me` | any linked user | Own member record and effective permissions per district
+| `PATCH /me` | any linked user | Edit own contact and naming fields
+| `POST /me/change-requests` | any linked user | Request a formal-data change
+| `GET /me/change-requests` | any linked user | Own requests
+| `DELETE /me/change-requests/{id}` | requester | Cancel a pending request
+| `GET /members` | `*_READ` in scope | List and search (`q`, `status`, `district`), paginated
+| `GET /members/{id}` | `*_READ` in scope | Detail, fields filtered by permission
+| `POST /members` | `FORMAL_PERSONAL_DATA_MANAGE` in the target district | Create
+| `PATCH /members/{id}` | `*_MANAGE` for the edited field groups | Edit
+| `GET /change-requests` | `FORMAL_PERSONAL_DATA_MANAGE` in scope | Pending requests to decide
+| `POST /change-requests/{id}/approve` and `/reject` | `FORMAL_PERSONAL_DATA_MANAGE` in scope | Decide
+| `GET /members/ending-this-year` | `FORMAL_PERSONAL_DATA_READ` in scope | Members whose membership ends at year end (Art. 17.1.2)
+| `POST/DELETE /members/{id}/affiliations` | `FORMAL_PERSONAL_DATA_MANAGE` in the target district | Add or end district affiliations; moving the primary district needs the target district
+| `GET /districts` | any linked user | Districts the caller can act on
+| `GET /bodies`, `GET /bodies/{id}` | any linked user | Bodies and their current composition
+| `POST/PATCH /bodies` | `BODIES_MANAGE` (global) | Create bodies (districts, circles, teams)
+| `GET/POST/DELETE /bodies/{id}/memberships` | `BODIES_MANAGE` (global) | Manage who holds which function, with the Art. 20--21 checks
+|===
+
+=== User interface
+
+* *User* tab -- own record, inline edit of contact and naming fields, "Request a change" for
+  formal fields, list of own requests.
+* *Members* tab -- visible only with any `*_READ` permission: searchable table filtered to
+  the caller's districts, detail and edit views, and a "Change requests" inbox.
+* *Bodies* view -- everyone can see the organs and who holds which function;
+  the national board creates bodies and assigns functions, seeing incompatibility conflicts
+  and term-limit warnings before confirming.
+
+=== Spreadsheet import
+
+A one-off, idempotent import of the current spreadsheet, exported as UTF-8 CSV.
+It runs as a command-line mode of `panel-api`, always prints a dry-run report first,
+and writes only when run again with `--apply`.
+
+Matching: by `member_id` (column A, which has no header); otherwise by `domain_email`;
+otherwise by `formal_identifier`. A row matching two different members is an error.
+
+[%autowidth]
+|===
+| Column | Target | Notes
+
+| A (no header) | `member_id` | Required
+| Imię / Nazwisko | `formal_name_first` / `formal_name_last` | Required
+| Preferowane imię / Preferowane nazwisko | `preferred_name_first` / `preferred_name_last` | Formal name when empty
+| zaimki | `pronouns` |
+| nr tel | `phone_numbers` | Split on `,` or `;`
+| Prywatny adres e-mail | `private_emails` | Split on `,` or `;`
+| Okręg stowarzyszenia | Primary district affiliation | Matched to a seeded district, ignoring case, diacritics and the word "okręg"
+| Okręg wyborczy | Affiliation with `votes_here` | Adds a supporting affiliation when it differs from the primary district
+| powiat / miasto / adres | `address_province` / `address_city` / `address_line` |
+| uczelnia/pracodawca | `institution` |
+| Data urodzenia | `birth_date` | `YYYY-MM-DD`, `DD.MM.YYYY` or `DD/MM/YYYY`
+| pesel | `formal_identifier` | Validated checksum; mismatch with the birth date is reported
+| Facebook | `social_profile_url` |
+| data przyjęcia | `member_since` |
+| Adres konta w organizacji | `domain_email` |
+| Deklaracja członkowska | `declaration_reference` |
+| Wiek, Czy może głosować, Zeus CSV | -- | Computed by the panel; disagreements are reported
+| Głosowanie nad usunieciem | -- | Non-empty values are listed for manual follow-up
+|===
+
+Every imported member gets `status = ACTIVE` and `membership_type = ORDINARY`.
+Functions in bodies are not in the spreadsheet; the national board assigns them in the panel.
+The report never prints personal data beyond `member_id` and the column name of each problem.
+
+=== Electoral rights and Zeus
+
+The National Electoral Commission (KKW) runs elections in https://zeus.grnet.gr[Zeus].
+The register must be able to answer "who may vote in this election", so a future integration
+only has to export it as a Zeus voter list:
+
+* active ordinary members only (Art. 12.1, 15.1);
+* without unjustified fee arrears longer than 3 months (Art. 14) -- known once fees exist;
+* not suspended in membership rights (Art. 31.2.3, 33.2);
+* for district elections: members whose *primary* district is that district (Art. 41.7);
+  in delegate elections a member may vote in a supporting district instead (Art. 41.8).
+
+The register also tells KKW which of its members hold a district function, since they may not
+administer that district's votes and elections (Art. 39.6).
+
+Electoral rights are computed, never stored, so they always reflect the current register.
+The export itself (voter list file or Zeus API) is not part of this feature.
+
+=== Out of scope
+
+* Recruitment -- next feature; at _PRZYJĘTA_ it creates a member through this module.
+* Google Workspace synchronisation itself (see above).
+* Fees.
