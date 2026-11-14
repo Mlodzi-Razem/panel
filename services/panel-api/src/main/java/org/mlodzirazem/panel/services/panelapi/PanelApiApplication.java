@@ -18,7 +18,9 @@
 package org.mlodzirazem.panel.services.panelapi;
 
 import org.springframework.boot.SpringApplication;
+import org.mlodzirazem.panel.services.panelapi.importer.ImportMode;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.resilience.annotation.EnableResilientMethods;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -35,7 +37,26 @@ public class PanelApiApplication {
     public static void main(String[] args) {
         setTimezoneToUtc();
 
-        SpringApplication.run(PanelApiApplication.class, args);
+        SpringApplication application = new SpringApplication(PanelApiApplication.class);
+
+        if (!ImportMode.requestedBy(args)) {
+            application.run(args);
+            return;
+        }
+
+        application.addListeners(new ImportMode.Initializer());
+
+        int exitCode;
+
+        try {
+            ConfigurableApplicationContext context = application.run(args);
+            exitCode = SpringApplication.exit(context);
+        } catch (RuntimeException | Error ex) {
+            System.err.println("FATAL: import could not start (" + ex.getClass().getSimpleName() + ")");
+            exitCode = ImportMode.EXIT_FATAL;
+        }
+
+        System.exit(exitCode);
     }
 
     private static void setTimezoneToUtc() {

@@ -20,10 +20,11 @@
 JAVA_OPTS="${JAVA_OPTS:-}"
 
 java "-Dfile.encoding=UTF-8" \
+     "-Dstdout.encoding=UTF-8" \
      "-XX:NativeMemoryTracking=summary" \
      "-XX:+HeapDumpOnOutOfMemoryError" \
      "-XX:+UseContainerSupport" \
      "-XX:MaxRAMPercentage=80" \
      "-XX:+UseStringDeduplication" \
      $JAVA_OPTS \
-     org.springframework.boot.loader.launch.JarLauncher
+     org.springframework.boot.loader.launch.JarLauncher "$@"

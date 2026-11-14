@@ -23,12 +23,14 @@ import org.mlodzirazem.panel.services.panelapi.core.event.RpcEventPublisher;
 import org.mlodzirazem.panel.services.panelapi.core.uuid.UuidGenerator;
 import org.mlodzirazem.panel.services.panelapi.directory.beans.ReloadDirectoryEvent;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
 @Component
+@Profile("!import")
 @RequiredArgsConstructor
 @Slf4j
 public class InitialDirectoryLoader {

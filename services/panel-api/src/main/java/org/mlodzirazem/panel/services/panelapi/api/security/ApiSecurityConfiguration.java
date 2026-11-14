@@ -19,6 +19,7 @@ package org.mlodzirazem.panel.services.panelapi.api.security;
 
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -52,6 +53,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Configuration(proxyBeanMethods = false)
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @EnableWebSecurity
 @EnableConfigurationProperties(ServiceTokenProperties.class)
 class ApiSecurityConfiguration {
