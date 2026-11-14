@@ -18,7 +18,7 @@
 @NullMarked
 @ApplicationModule(
     displayName = "Importer",
-    allowedDependencies = {"persistence::*", "audit", "members", "bodies", "core::error"}
+    allowedDependencies = {"persistence::*", "audit", "members", "bodies", "core::error", "core::cli"}
 )
 package org.mlodzirazem.panel.services.panelapi.importer;
 

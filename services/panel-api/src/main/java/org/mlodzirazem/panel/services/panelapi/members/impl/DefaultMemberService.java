@@ -24,6 +24,7 @@ import org.mlodzirazem.panel.services.panelapi.audit.AuditPayload;
 import org.mlodzirazem.panel.services.panelapi.core.error.NotFoundException;
 import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
 import org.mlodzirazem.panel.services.panelapi.members.AffiliationService;
+import org.mlodzirazem.panel.services.panelapi.members.BodiesManagerGuard;
 import org.mlodzirazem.panel.services.panelapi.members.CurrentMemberResolver;
 import org.mlodzirazem.panel.services.panelapi.members.MemberField;
 import org.mlodzirazem.panel.services.panelapi.members.MemberRules;
@@ -61,6 +62,7 @@ class DefaultMemberService implements MemberService {
 
     private final TMemberRepository members;
     private final AffiliationService affiliations;
+    private final BodiesManagerGuard bodiesManagerGuard;
     private final CurrentMemberResolver currentMemberResolver;
     private final AuditLog auditLog;
     private final Clock clock;
@@ -112,7 +114,19 @@ class DefaultMemberService implements MemberService {
     @Override
     @Transactional
     public MemberUpdate update(long memberId, Map<MemberField, @Nullable Object> changes) {
+        boolean removing = changes.get(MemberField.STATUS) == MemberStatus.REMOVED;
+
+        if (removing) {
+            bodiesManagerGuard.lock();
+        }
+
         TMember member = get(memberId);
+
+        if (removing && member.getStatus() != MemberStatus.REMOVED
+            && bodiesManagerGuard.wouldLeaveNone(List.of(), memberId, 0)) {
+            throw new RuleViolationException(BodiesManagerGuard.VIOLATION_CODE,
+                "Removing this member would leave nobody able to manage bodies");
+        }
 
         Set<MemberField> changed = apply(member, changes);
 

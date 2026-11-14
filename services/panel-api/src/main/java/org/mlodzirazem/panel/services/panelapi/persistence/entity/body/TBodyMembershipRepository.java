@@ -17,6 +17,9 @@
 
 package org.mlodzirazem.panel.services.panelapi.persistence.entity.body;
 
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.MemberStatus;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionScope;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -125,5 +128,27 @@ public interface TBodyMembershipRepository extends JpaRepository<TBodyMembership
         @Param("bodyId") Long bodyId,
         @Param("excludedMemberId") Long excludedMemberId,
         @Param("date") LocalDate date
+    );
+
+    @Query(value = "select 1 from (select pg_advisory_xact_lock(:key)) l", nativeQuery = true)
+    int lockTransactionally(@Param("key") long key);
+
+    @Query("""
+        select count(bm) from TBodyMembership bm
+          join bm.member m
+          join bm.memberType mt
+          join mt.permissionGroup g
+        where g.scope = :scope and :permission member of g.permissions
+          and m.status <> :excludedStatus and m.id <> :excludedMemberId
+          and bm.id not in :excludedMembershipIds
+          and bm.validFrom <= :today and bm.validTo is null
+        """)
+    long countOpenEndedHolders(
+        @Param("scope") PermissionScope scope,
+        @Param("permission") PermissionType permission,
+        @Param("excludedStatus") MemberStatus excludedStatus,
+        @Param("excludedMemberId") Long excludedMemberId,
+        @Param("excludedMembershipIds") Collection<Long> excludedMembershipIds,
+        @Param("today") LocalDate today
     );
 }

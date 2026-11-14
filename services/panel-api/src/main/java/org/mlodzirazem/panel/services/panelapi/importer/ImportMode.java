@@ -17,50 +17,15 @@
 
 package org.mlodzirazem.panel.services.panelapi.importer;
 
-import org.springframework.boot.context.event.ApplicationEnvironmentPreparedEvent;
-import org.springframework.context.ApplicationListener;
-import org.springframework.core.env.CommandLinePropertySource;
-import org.springframework.core.env.ConfigurableEnvironment;
-import org.springframework.core.env.MapPropertySource;
-import org.springframework.core.env.SimpleCommandLinePropertySource;
-
-import java.util.Map;
+import org.mlodzirazem.panel.services.panelapi.core.cli.CliMode;
 
 public final class ImportMode {
     public static final String FILE_PROPERTY = "panel.import.file";
-    public static final String PROFILE = "import";
-    public static final int EXIT_OK = 0;
-    public static final int EXIT_PROBLEMS = 1;
-    public static final int EXIT_FATAL = 2;
+    public static final CliMode.Trigger TRIGGER = new CliMode.Trigger(FILE_PROPERTY, "PANEL_IMPORT_FILE");
+    public static final int EXIT_OK = CliMode.EXIT_OK;
+    public static final int EXIT_PROBLEMS = CliMode.EXIT_PROBLEMS;
+    public static final int EXIT_FATAL = CliMode.EXIT_FATAL;
 
     private ImportMode() {
-    }
-
-    public static boolean requestedBy(String[] args) {
-        CommandLinePropertySource<?> source = new SimpleCommandLinePropertySource(args);
-
-        return source.containsProperty(FILE_PROPERTY)
-            || System.getProperty(FILE_PROPERTY) != null
-            || System.getenv("PANEL_IMPORT_FILE") != null;
-    }
-
-    public static final class Initializer implements ApplicationListener<ApplicationEnvironmentPreparedEvent> {
-        @Override
-        public void onApplicationEvent(ApplicationEnvironmentPreparedEvent event) {
-            ConfigurableEnvironment environment = event.getEnvironment();
-
-            if (!environment.containsProperty(FILE_PROPERTY)) {
-                return;
-            }
-
-            environment.getPropertySources().addFirst(new MapPropertySource("panelImportMode", Map.of(
-                "spring.main.web-application-type", "none",
-                "spring.main.banner-mode", "off",
-                "management.otlp.metrics.export.enabled", "false",
-                "management.tracing.export.otlp.enabled", "false",
-                "logging.level.org.hibernate.engine.jdbc.spi.SqlExceptionHelper", "OFF"
-            )));
-            environment.addActiveProfile(PROFILE);
-        }
     }
 }

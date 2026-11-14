@@ -76,6 +76,7 @@ const plMessages: typeof enMessages = {
         MEMBER_TYPE_MISMATCH: "Wybrana rola nie należy do tego organu.",
         DUPLICATE_MEMBERSHIP: "Ta osoba już pełni tę funkcję w tym organie.",
         INCOMPATIBLE_LATER_MANDATE: "Osoba ma późniejszy, niezgodny mandat.",
+        LAST_BODIES_MANAGER: "Nikt nie mógłby wtedy zarządzać organami. Najpierw przypisz następcę do Zarządu Krajowego.",
     },
     fieldGroups: {
         CONTACT: "Dane kontaktowe",

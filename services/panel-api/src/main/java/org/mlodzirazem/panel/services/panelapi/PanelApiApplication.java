@@ -18,6 +18,8 @@
 package org.mlodzirazem.panel.services.panelapi;
 
 import org.springframework.boot.SpringApplication;
+import org.mlodzirazem.panel.services.panelapi.admin.AdminMode;
+import org.mlodzirazem.panel.services.panelapi.core.cli.CliMode;
 import org.mlodzirazem.panel.services.panelapi.importer.ImportMode;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -39,12 +41,14 @@ public class PanelApiApplication {
 
         SpringApplication application = new SpringApplication(PanelApiApplication.class);
 
-        if (!ImportMode.requestedBy(args)) {
+        CliMode.Trigger[] triggers = {ImportMode.TRIGGER, AdminMode.TRIGGER};
+
+        if (!CliMode.requested(args, triggers)) {
             application.run(args);
             return;
         }
 
-        application.addListeners(new ImportMode.Initializer());
+        application.addListeners(CliMode.initializer(triggers));
 
         int exitCode;
 
@@ -52,8 +56,8 @@ public class PanelApiApplication {
             ConfigurableApplicationContext context = application.run(args);
             exitCode = SpringApplication.exit(context);
         } catch (RuntimeException | Error ex) {
-            System.err.println("FATAL: import could not start (" + ex.getClass().getSimpleName() + ")");
-            exitCode = ImportMode.EXIT_FATAL;
+            System.err.println("FATAL: command could not start (" + ex.getClass().getSimpleName() + ")");
+            exitCode = CliMode.EXIT_FATAL;
         }
 
         System.exit(exitCode);

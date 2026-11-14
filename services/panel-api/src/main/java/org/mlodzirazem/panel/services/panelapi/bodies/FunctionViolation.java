@@ -27,6 +27,7 @@ public record FunctionViolation(Code code, String message) {
         COMMISSIONER_VALID_TO_REQUIRED,
         COMMISSIONER_TERM_TOO_LONG,
         COMMISSIONER_EXTENSIONS_EXCEEDED,
-        COMMISSIONER_TOTAL_TOO_LONG
+        COMMISSIONER_TOTAL_TOO_LONG,
+        LAST_BODIES_MANAGER
     }
 }

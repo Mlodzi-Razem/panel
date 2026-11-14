@@ -35,6 +35,7 @@ type Input = { memberId: number; memberTypeId: number; validFrom?: string; valid
 export default function AssignFunctionForm({bodyId, memberTypes}: { bodyId: number; memberTypes: MemberType[] }) {
     const t = useTranslations('bodies');
     const tc = useTranslations('common');
+    const te = useTranslations('errors');
     const formRef = useRef<HTMLFormElement>(null);
     const [member, setMember] = useState<MemberPickerItem | null>(null);
     const [query, setQuery] = useState('');
@@ -187,7 +188,7 @@ export default function AssignFunctionForm({bodyId, memberTypes}: { bodyId: numb
                 {error && <ErrorStatus error={error}/>}
                 {violations.length > 0 && <Notice tone="danger" role="alert">
                     <p>{t('violationsTitle')}</p>
-                    <ul>{violations.map(v => <li key={v.code}>{v.message}</li>)}</ul>
+                    <ul>{violations.map(v => <li key={v.code}>{te.has(v.code) ? te(v.code) : v.message}</li>)}</ul>
                 </Notice>}
                 {message && <Notice tone="success" role="status">{message}</Notice>}
             </div>

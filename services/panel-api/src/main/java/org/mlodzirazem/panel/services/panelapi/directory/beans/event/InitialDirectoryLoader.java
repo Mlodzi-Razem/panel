@@ -30,7 +30,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 
 @Component
-@Profile("!import")
+@Profile("!cli")
 @RequiredArgsConstructor
 @Slf4j
 public class InitialDirectoryLoader {

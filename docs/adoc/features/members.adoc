@@ -71,6 +71,12 @@ Checked whenever a body membership is created:
 * *Term limit (Art. 20)* -- more than 2 consecutive terms in the same body produces a warning,
   not an error; validating elections belongs to KKW.
 * *Commissioner term (Art. 52)* -- at most 3 months, extendable twice; `valid_to` is required.
+* *Lockout guard* -- at least one active, open-ended membership granting `BODIES_MANAGE` with
+  `GLOBAL` scope, held by a member who is not `REMOVED`, must always remain. Confirming an Art. 21
+  conflict, ending a membership (also with a future end date) and setting a member to `REMOVED` are
+  refused with `LAST_BODIES_MANAGER` when they would remove the last such holder; assigning a
+  successor first resolves it. The check is data-driven (member type, permission group, scope) and
+  serialised by a transaction-scoped advisory lock, so two managers cannot end each other concurrently.
 
 ==== Membership of the association
 
@@ -121,6 +127,35 @@ The national board can change the groups; the seeded defaults are:
 | --
 | none by default
 |===
+
+=== Break-glass procedure
+
+For recovery when nobody can manage bodies any more, and for bootstrapping the first national board
+member in production. It adds one function from today, open-ended, and bypasses the Art. 20/21/52
+checks and the lockout guard; it never ends anything. The body, member type and member must exist,
+the member must not be `REMOVED`, and a member who already holds the function is left untouched.
+
+Anyone with server or database access can run it; there is no panel login involved.
+It is a command-line mode of `panel-api` (no web server), dry run by default:
+
+[source,sh]
+----
+docker run --rm --env-file panel-api.env ghcr.io/mlodzi-razem/panel-api:<version> \
+  --panel.admin.assign-function=national-board:SECRETARY \
+  --panel.admin.member=jan.kowalski@example.org \
+  --panel.admin.operator="Jan Admin" \
+  --panel.admin.reason="Last ZK manager removed, ticket 123" \
+  --panel.admin.apply=true
+----
+
+* `--panel.admin.assign-function` -- `<body code>:<member type code>`.
+* `--panel.admin.member` -- domain e-mail, `member_id` or numeric database id.
+* `--panel.admin.operator` and `--panel.admin.reason` -- required, stored in the audit row.
+* Exit code `0` done or nothing to do, `1` validation problem, `2` fatal error.
+* Output contains no personal data beyond the identifier passed in.
+
+The write is audited as `admin :: break-glass` (member, body, member type and membership ids, operator
+and reason) and publishes the usual `BodyMembershipChanged` event.
 
 === Linking a signed-in user to a member
 

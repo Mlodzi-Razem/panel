@@ -128,4 +128,21 @@ class BodiesApiTest extends ApiTestSupport {
         assertThat(renamed.body().path("name").asString()).isEqualTo("Renamed");
         assertThat(post(secretary, "/bodies", Map.of("name", "x")).code()).isEqualTo("FIELD_REQUIRED");
     }
+
+    @Test
+    void endingTheLastNationalBoardSeatIsUnprocessable() {
+        String path = "/bodies/" + body("national-board").getId() + "/memberships/";
+        long zkSeat = jdbc.queryForObject("SELECT id FROM body_memberships WHERE member_id = ?", Long.class,
+            zkMember.getId());
+        long ownSeat = jdbc.queryForObject("SELECT id FROM body_memberships WHERE member_id = ?", Long.class,
+            secretary.getId());
+
+        assertThat(delete(secretary, path + zkSeat).status()).isEqualTo(200);
+
+        Res refused = delete(secretary, path + ownSeat);
+        assertThat(refused.status()).isEqualTo(422);
+        assertThat(refused.code()).isEqualTo("LAST_BODIES_MANAGER");
+        assertThat(jdbc.queryForObject("SELECT valid_to FROM body_memberships WHERE id = ?", java.time.LocalDate.class,
+            ownSeat)).isNull();
+    }
 }

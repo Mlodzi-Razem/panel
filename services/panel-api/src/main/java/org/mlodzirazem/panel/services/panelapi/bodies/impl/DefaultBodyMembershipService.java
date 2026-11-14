@@ -34,6 +34,7 @@ import org.mlodzirazem.panel.services.panelapi.bodies.FunctionWarning;
 import org.mlodzirazem.panel.services.panelapi.core.error.ConflictException;
 import org.mlodzirazem.panel.services.panelapi.core.error.NotFoundException;
 import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
+import org.mlodzirazem.panel.services.panelapi.members.BodiesManagerGuard;
 import org.mlodzirazem.panel.services.panelapi.members.CurrentMemberResolver;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBody;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBodyMembership;
@@ -68,6 +69,7 @@ class DefaultBodyMembershipService implements BodyMembershipService {
     private final TBodyTemplateIncompatibilityRepository incompatibilities;
     private final TMemberRepository members;
     private final CurrentMemberResolver currentMemberResolver;
+    private final BodiesManagerGuard bodiesManagerGuard;
     private final ApplicationEventPublisher events;
     private final AuditLog auditLog;
     private final Clock clock;
@@ -81,6 +83,8 @@ class DefaultBodyMembershipService implements BodyMembershipService {
     @Override
     @Transactional
     public AssignmentResult assign(AssignMembership request, boolean confirmed) {
+        bodiesManagerGuard.lock();
+
         Evaluation evaluation = evaluate(request);
         AssignmentCheck check = evaluation.check();
 
@@ -128,6 +132,8 @@ class DefaultBodyMembershipService implements BodyMembershipService {
     @Override
     @Transactional
     public TBodyMembership end(long membershipId, @Nullable LocalDate endDate) {
+        bodiesManagerGuard.lock();
+
         TBodyMembership membership = memberships.findById(membershipId)
                                                 .orElseThrow(() -> new NotFoundException("Body membership",
                                                     membershipId));
@@ -140,6 +146,11 @@ class DefaultBodyMembershipService implements BodyMembershipService {
 
         if (membership.getValidTo() != null && !membership.getValidTo().isAfter(date)) {
             throw new ConflictException("ALREADY_ENDED", "The membership already ended");
+        }
+
+        if (membership.getValidTo() == null && bodiesManagerGuard.wouldLeaveNone(List.of(membership.getId()), null, 0)) {
+            throw new RuleViolationException(BodiesManagerGuard.VIOLATION_CODE,
+                "Ending this membership would leave nobody able to manage bodies");
         }
 
         membership.setValidTo(date);
@@ -232,7 +243,32 @@ class DefaultBodyMembershipService implements BodyMembershipService {
             checkCommissionerTerm(body, template, existing, span, violations);
         }
 
+        if (violations.isEmpty()) {
+            checkLastBodiesManager(request, memberType, conflicts, violations);
+        }
+
         return new Evaluation(member, body, memberType, existing, new AssignmentCheck(conflicts, warnings, violations));
+    }
+
+    private void checkLastBodiesManager(
+        AssignMembership request,
+        TBodyTemplateMemberType memberType,
+        List<FunctionConflict> conflicts,
+        List<FunctionViolation> violations
+    ) {
+        if (conflicts.isEmpty()) {
+            return;
+        }
+
+        List<Long> endedIds = conflicts.stream().map(FunctionConflict::membershipId).toList();
+        int successors = bodiesManagerGuard.grantsGlobalManagement(memberType, request.validFrom(), request.validTo())
+            ? 1
+            : 0;
+
+        if (bodiesManagerGuard.wouldLeaveNone(endedIds, null, successors)) {
+            violations.add(violation(FunctionViolation.Code.LAST_BODIES_MANAGER,
+                "Ending the conflicting mandate would leave nobody able to manage bodies"));
+        }
     }
 
     private void checkDuplicates(

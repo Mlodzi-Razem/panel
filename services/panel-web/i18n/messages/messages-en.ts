@@ -74,6 +74,7 @@ const enMessages = {
         MEMBER_TYPE_MISMATCH: "The selected role does not belong to this body.",
         DUPLICATE_MEMBERSHIP: "This member already holds this function in this body.",
         INCOMPATIBLE_LATER_MANDATE: "The member has a later, incompatible mandate.",
+        LAST_BODIES_MANAGER: "This would leave nobody able to manage bodies. Assign a successor to the national board first.",
     },
     fieldGroups: {
         CONTACT: "Contact details",
