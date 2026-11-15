@@ -83,7 +83,8 @@ public class MembersController {
         @RequestParam(name = "q", required = false) @Nullable String q,
         @RequestParam(name = "status", required = false) @Nullable MemberStatus status,
         @RequestParam(name = "membershipType", required = false) @Nullable MembershipType membershipType,
-        @RequestParam(name = "district", required = false) @Nullable Long district
+        @RequestParam(name = "district", required = false) @Nullable Long district,
+        @RequestParam(name = "sort", required = false) @Nullable String sort
     ) {
         Caller caller = callers.require();
         var p = caller.permissions();
@@ -104,7 +105,7 @@ public class MembersController {
         int safeSize = Math.min(MAX_PAGE_SIZE, Math.max(1, size));
 
         MemberSearch.Result result = search.search(scope, new MemberSearch.Filter(q, status, membershipType, district),
-            safePage, safeSize);
+            MemberSearch.Sort.parse(sort), safePage, safeSize);
 
         return PageResponse.of(summaries(result.ids(), caller, false), safePage, safeSize, result.total());
     }

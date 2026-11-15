@@ -204,6 +204,8 @@ class DefaultChangeRequestService implements ChangeRequestService {
 
         return requests.findByStatusOrderByCreatedAtAsc(ChangeRequestStatus.PENDING)
                        .stream()
+                       .filter(r -> r.getMember().getId() != actorMemberId)
+                       .filter(r -> r.getRequestedBy() == null || r.getRequestedBy().getId() != actorMemberId)
                        .filter(r -> permissions.can(actorMemberId, PermissionType.FORMAL_PERSONAL_DATA_MANAGE,
                            r.getMember().getId()))
                        .collect(Collectors.toList());

@@ -126,6 +126,33 @@ class MembersApiTest extends ApiTestSupport {
     }
 
     @Test
+    void listCanBeSortedWithoutOrderingByHiddenFields() {
+        java.util.List<Long> byNameDesc = new java.util.ArrayList<>();
+        get(zk, "/members?size=100&sort=name:desc").body().path("items").forEach(n -> byNameDesc.add(n.path("id").asLong()));
+        java.util.List<Long> byNameAsc = new java.util.ArrayList<>();
+        get(zk, "/members?size=100&sort=name:asc").body().path("items").forEach(n -> byNameAsc.add(n.path("id").asLong()));
+        assertThat(byNameDesc).isEqualTo(byNameAsc.reversed());
+
+        java.util.List<String> districtsAsc = new java.util.ArrayList<>();
+        get(zk, "/members?size=100&sort=district:asc").body().path("items")
+            .forEach(n -> districtsAsc.add(n.path("primaryDistrict").path("name").asString()));
+        java.util.List<String> districtsDesc = new java.util.ArrayList<>();
+        get(zk, "/members?size=100&sort=district:desc").body().path("items")
+            .forEach(n -> districtsDesc.add(n.path("primaryDistrict").path("name").asString()));
+        assertThat(districtsAsc).isNotEmpty();
+        assertThat(java.util.List.copyOf(new java.util.LinkedHashSet<>(districtsDesc)))
+            .isEqualTo(java.util.List.copyOf(new java.util.LinkedHashSet<>(districtsAsc)).reversed());
+
+        memberService.update(supportingInA.getId(), Map.of(MemberField.STATUS,
+            org.mlodzirazem.panel.services.panelapi.persistence.entity.member.MemberStatus.PROBATION));
+        java.util.List<Long> byStatus = new java.util.ArrayList<>();
+        get(zoA, "/members?size=100&sort=status:asc").body().path("items").forEach(n -> byStatus.add(n.path("id").asLong()));
+        assertThat(byStatus).last().isEqualTo(supportingInA.getId());
+
+        assertThat(get(zk, "/members?sort=nope:desc").status()).isEqualTo(200);
+    }
+
+    @Test
     void searchDoesNotMatchFieldsTheCallerCannotRead() {
         memberService.update(supportingInA.getId(), Map.of(MemberField.FORMAL_NAME_LAST, "Tajemnicza"));
 

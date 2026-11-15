@@ -190,6 +190,7 @@ class ChangeRequestServiceTest extends DomainTestSupport {
         TMemberChangeRequest own = service.create(coordinator.getId(), coordinator.getId(),
             Map.of(MemberField.ADDRESS_LINE, "x"), null);
 
+        assertThat(service.pendingFor(coordinator.getId())).isEmpty();
         assertThatThrownBy(() -> service.approve(own.getId(), coordinator.getId(), null))
             .isInstanceOf(ForbiddenException.class).extracting("code").isEqualTo("SELF_DECISION_FORBIDDEN");
         assertThatThrownBy(() -> service.reject(own.getId(), coordinator.getId(), null))
@@ -199,6 +200,7 @@ class ChangeRequestServiceTest extends DomainTestSupport {
         TMemberChangeRequest onBehalf = service.create(subject.getId(), coordinator.getId(),
             Map.of(MemberField.ADDRESS_LINE, "y"), null);
 
+        assertThat(service.pendingFor(coordinator.getId())).isEmpty();
         assertThatThrownBy(() -> service.approve(onBehalf.getId(), coordinator.getId(), null))
             .isInstanceOf(ForbiddenException.class).extracting("code").isEqualTo("SELF_DECISION_FORBIDDEN");
     }
