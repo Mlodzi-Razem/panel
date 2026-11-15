@@ -16,13 +16,15 @@
  */
 
 import { getTranslations } from "next-intl/server";
+import { MapPinIcon } from "@phosphor-icons/react/ssr";
 import ApiErrorNotice from "@/components/members/ApiErrorNotice";
 import { BodyCard } from "@/components/bodies/BodyViews";
 import CreateBodyForm from "@/components/bodies/CreateBodyForm";
-import Button from "@/components/button/Button";
-import formStyles from "@/components/form/Form.module.scss";
+import styles from "@/components/bodies/Bodies.module.scss";
 import { Card, LinkButton, Notice, Page } from "@/components/page/Page";
 import { getBody, listBodies, listBodyTemplates } from "@/panel-api/members/bodies";
+import { Toolbar } from "@/components/ui/Blocks";
+import { UrlFilterSelect } from "@/components/ui/UrlControls";
 import { requireMe } from "@/panel-api/members/requireMe";
 import { Body } from "@/panel-api/members/types";
 
@@ -71,32 +73,22 @@ export default async function BodiesPage({searchParams}: { searchParams: SearchP
     const details = await Promise.all(shown.map(b => getBody(b.id)));
 
     return <Page title={t('title')} subtitle={t('subtitle')}>
-        <Card>
-            <form method="get" action="/bodies" className={formStyles.fieldGrid} aria-label={t('scopeLabel')}>
-                <div className={formStyles.field}>
-                    <label className={formStyles.label} htmlFor="bodies-district">{t('scope')}</label>
-                    <select id="bodies-district"
-                            name="district"
-                            className={formStyles.input}
-                            defaultValue={selectedDistrict ? String(selectedDistrict.id) : ''}>
-                        <option value="">{t('national')}</option>
-                        {districts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </select>
-                </div>
-                <div className={formStyles.field}>
-                    <span className={formStyles.label} aria-hidden="true">&nbsp;</span>
-                    <Button type="submit" variant="outline">{t('show')}</Button>
-                </div>
-            </form>
-            {selectedDistrict && me.canManageBodies && <div>
-                <LinkButton href={`/bodies/${selectedDistrict.id}`}>{t('manageDistrict')}</LinkButton>
-            </div>}
-        </Card>
+        <Toolbar end={selectedDistrict && me.canManageBodies
+            ? <LinkButton href={`/bodies/${selectedDistrict.id}`}>{t('manageDistrict')}</LinkButton>
+            : undefined}>
+            <UrlFilterSelect param="district"
+                             label={t('scopeLabel')}
+                             allLabel={t('nationalShort')}
+                             icon={<MapPinIcon aria-hidden/>}
+                             options={districts.map(d => ({value: String(d.id), label: d.name}))}/>
+        </Toolbar>
 
         {shown.length === 0 && <Notice>{t('noBodies')}</Notice>}
-        {details.map((detail, index) => detail.ok
-            ? <BodyCard key={shown[index]!.id} detail={detail.data} canManage={me.canManageBodies} linkMembers={me.canSeeMembers}/>
-            : <ApiErrorNotice key={shown[index]!.id} error={detail.error}/>)}
+        <div className={styles.grid}>
+            {details.map((detail, index) => detail.ok
+                ? <BodyCard key={shown[index]!.id} detail={detail.data} canManage={me.canManageBodies} linkMembers={me.canSeeMembers}/>
+                : <ApiErrorNotice key={shown[index]!.id} error={detail.error}/>)}
+        </div>
 
         {me.canManageBodies && <Card id="create-body" title={t('createTitle')} hint={t('createHint')}>
             {templatesResult?.ok

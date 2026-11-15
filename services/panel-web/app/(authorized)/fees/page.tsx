@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 Stowarzyszenie Młodzi Razem
+ * Copyright (C) 2026 Stowarzyszenie Młodzi Razem
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,13 +16,17 @@
  */
 
 import { getTranslations } from "next-intl/server";
+import { MoneyIcon } from "@phosphor-icons/react/ssr";
 import { Card, Page } from "@/components/page/Page";
+import { EmptyState } from "@/components/ui/Blocks";
 
 export default async function FeesPage() {
     const t = await getTranslations('fees');
-    return <Page title={t('title')}>
+    return <Page title={t('title')} subtitle={t('subtitle')}>
         <Card>
-            <p>{t('comingSoon')}</p>
+            <EmptyState icon={<MoneyIcon aria-hidden/>} title={t('comingSoonTitle')}>
+                <span>{t('comingSoon')}</span>
+            </EmptyState>
         </Card>
     </Page>;
 }

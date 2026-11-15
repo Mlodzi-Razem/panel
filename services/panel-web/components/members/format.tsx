@@ -17,7 +17,7 @@
 
 import React from "react";
 import { useFormatter, useTranslations } from "next-intl";
-import { DescriptionList, Muted } from "@/components/page/Page";
+import { Badge, DescriptionList, Muted, Tone } from "@/components/page/Page";
 import { FIELD_GROUPS, FieldDef, FieldGroup } from "@/panel-api/members/fields";
 
 function str(fields: Record<string, unknown>, key: string): string {
@@ -46,6 +46,38 @@ export function FormattedDate({value}: { value: string | null | undefined }) {
     </time>;
 }
 
+export function memberStatusTone(status: string | null | undefined): Tone {
+    switch (status) {
+        case 'ACTIVE':
+            return 'success';
+        case 'PROBATION':
+            return 'warning';
+        case 'FORM_REQUEST':
+            return 'info';
+        case 'SUSPENDED':
+            return 'danger';
+        case 'REMOVED':
+            return 'muted';
+        default:
+            return 'neutral';
+    }
+}
+
+export function changeRequestStatusTone(status: string | null | undefined): Tone {
+    switch (status) {
+        case 'PENDING':
+            return 'info';
+        case 'APPROVED':
+            return 'success';
+        case 'REJECTED':
+            return 'danger';
+        case 'CANCELLED':
+            return 'muted';
+        default:
+            return 'neutral';
+    }
+}
+
 export function Empty() {
     const t = useTranslations('common');
     return <Muted>{t('notProvided')}</Muted>;
@@ -69,7 +101,9 @@ export function FieldValue({def, value}: { def: Pick<FieldDef, 'name' | 'kind'>;
         case 'date':
             return <FormattedDate value={text}/>;
         case 'status':
-            return <>{tEnums.has(`memberStatus.${text}`) ? tEnums(`memberStatus.${text}`) : text}</>;
+            return <Badge tone={memberStatusTone(text)}>
+                {tEnums.has(`memberStatus.${text}`) ? tEnums(`memberStatus.${text}`) : text}
+            </Badge>;
         case 'membershipType':
             return <>{tEnums.has(`membershipType.${text}`) ? tEnums(`membershipType.${text}`) : text}</>;
         case 'url':
@@ -92,10 +126,10 @@ export function FieldList({defs, values, slots, showAbsent = false}: FieldListPr
     const t = useTranslations('fields');
     const visible = defs.filter(def => showAbsent || def.name in values);
     return <>
-        {visible.map(def => <React.Fragment key={def.name}>
+        {visible.map(def => <div key={def.name}>
             <dt>{t(def.name)}</dt>
             <dd>{slots?.[def.name] ?? <FieldValue def={def} value={values[def.name]}/>}</dd>
-        </React.Fragment>)}
+        </div>)}
     </>;
 }
 

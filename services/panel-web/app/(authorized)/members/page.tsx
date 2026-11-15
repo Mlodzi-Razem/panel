@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 Stowarzyszenie Młodzi Razem
+ * Copyright (C) 2026 Stowarzyszenie Młodzi Razem
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,18 +15,24 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import React from "react";
 import { getTranslations } from "next-intl/server";
+import { IdentificationCardIcon, MapPinIcon, PlusIcon, SealCheckIcon } from "@phosphor-icons/react/ssr";
 import ApiErrorNotice from "@/components/members/ApiErrorNotice";
-import MemberFilters from "@/components/members/MemberFilters";
 import MembersTable from "@/components/members/MembersTable";
-import { Card, LinkButton, Page, pageStyles } from "@/components/page/Page";
-import Link from "next/link";
-import { MEMBER_STATUSES, MEMBERSHIP_TYPES } from "@/panel-api/members/fields";
+import { LinkButton, Page } from "@/components/page/Page";
+import { Pagination, parseSort, ResultCount, Toolbar } from "@/components/ui/Blocks";
+import { UrlFilterSelect, UrlSearchField } from "@/components/ui/UrlControls";
 import { listDistricts, listMembers } from "@/panel-api/members/members";
 import { requireMe } from "@/panel-api/members/requireMe";
+import { MEMBER_STATUSES, MEMBERSHIP_TYPES } from "@/panel-api/members/fields";
 import { PERMISSIONS } from "@/panel-api/members/types";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+const DEFAULT_SIZE = 25;
+const SIZES = [10, 25, 50, 100];
+const SORT_FIELDS = ['name', 'memberId', 'status', 'membershipType', 'district'] as const;
 
 function single(value: string | string[] | undefined): string | undefined {
     return Array.isArray(value) ? value[0] : value;
@@ -43,6 +49,7 @@ export default async function MembersPage({searchParams}: { searchParams: Search
     }
 
     const t = await getTranslations('members');
+    const tEnums = await getTranslations('enums');
     if (!me.canSeeMembers) {
         return <Page title={t('title')}><ApiErrorNotice error={{status: 403, code: 'FORBIDDEN', message: ''}}/></Page>;
     }
@@ -50,71 +57,86 @@ export default async function MembersPage({searchParams}: { searchParams: Search
     const params = await searchParams;
     const q = single(params['q'])?.trim().slice(0, 100) ?? '';
     const pageNumber = Math.max(0, Number.parseInt(single(params['page']) ?? '0', 10) || 0);
+    const sizeParam = Number.parseInt(single(params['size']) ?? '', 10);
+    const size = SIZES.includes(sizeParam) ? sizeParam : DEFAULT_SIZE;
     const districtParam = Number.parseInt(single(params['district']) ?? '', 10);
     const status = oneOf(single(params['status']), MEMBER_STATUSES);
     const membershipType = oneOf(single(params['membershipType']), MEMBERSHIP_TYPES);
+    const sortRaw = single(params['sort']);
+    const sort = parseSort(sortRaw, SORT_FIELDS, {field: 'name', dir: 'asc'});
 
     const [districtsResult, membersResult] = await Promise.all([
         listDistricts(),
         listMembers({
             page: pageNumber,
+            size,
             q,
             status,
             membershipType,
             district: Number.isFinite(districtParam) ? districtParam : undefined,
+            sort: sortRaw ? `${sort.field}:${sort.dir}` : undefined,
         }),
     ]);
 
     const districts = districtsResult.ok ? districtsResult.data : [];
     const canCreate = districts.some(d => d.permissions.includes(PERMISSIONS.formalManage));
-    const canDecide = canCreate || me.permissions.global.includes(PERMISSIONS.formalManage)
-        || me.permissions.perDistrict.some(d => d.permissions.includes(PERMISSIONS.formalManage));
     const canReadFormal = districts.some(d => d.permissions.includes(PERMISSIONS.formalRead))
         || me.permissions.global.includes(PERMISSIONS.formalRead);
 
-    const hrefFor = (page: number) => {
+    const hrefWith = (changes: Record<string, string | undefined>) => {
         const next = new URLSearchParams();
-        if (q) next.set('q', q);
-        if (status) next.set('status', status);
-        if (membershipType) next.set('membershipType', membershipType);
-        if (Number.isFinite(districtParam)) next.set('district', String(districtParam));
-        if (page > 0) next.set('page', String(page));
+        const current: Record<string, string | undefined> = {
+            q: q || undefined,
+            status,
+            membershipType,
+            district: Number.isFinite(districtParam) ? String(districtParam) : undefined,
+            size: size !== DEFAULT_SIZE ? String(size) : undefined,
+            sort: sortRaw ? `${sort.field}:${sort.dir}` : undefined,
+            page: pageNumber > 0 ? String(pageNumber) : undefined,
+        };
+        for (const [key, value] of Object.entries({...current, ...changes})) {
+            if (value) {
+                next.set(key, value);
+            }
+        }
         const qs = next.toString();
         return qs ? `/members?${qs}` : '/members';
     };
 
     return <Page title={t('title')}
-                 actions={<>
-                     {canCreate && <LinkButton href="/members/new" primary>{t('newMember')}</LinkButton>}
-                     {canDecide && <LinkButton href="/members/change-requests">{t('changeRequests')}</LinkButton>}
-                     {canReadFormal && <LinkButton href="/members/ending">{t('endingThisYear')}</LinkButton>}
-                 </>}>
-        <Card>
-            <MemberFilters districts={districts.map(d => ({id: d.id, name: d.name}))}
-                           showStatus={canReadFormal}/>
-            {membersResult.ok
-                ? <>
-                    <p aria-live="polite" className={pageStyles.muted}>
-                        {t('resultCount', {count: membersResult.data.totalItems})}
-                    </p>
-                    <MembersTable items={membersResult.data.items}/>
-                    {membersResult.data.totalPages > 1 && <nav className={pageStyles.pager} aria-label={t('pagination')}>
-                        <Link href={hrefFor(pageNumber - 1)}
-                              className={pageStyles.linkButton}
-                              aria-disabled={pageNumber <= 0}
-                              tabIndex={pageNumber <= 0 ? -1 : undefined}>
-                            {t('previous')}
-                        </Link>
-                        <span>{t('pageOf', {page: membersResult.data.page + 1, total: membersResult.data.totalPages})}</span>
-                        <Link href={hrefFor(pageNumber + 1)}
-                              className={pageStyles.linkButton}
-                              aria-disabled={pageNumber + 1 >= membersResult.data.totalPages}
-                              tabIndex={pageNumber + 1 >= membersResult.data.totalPages ? -1 : undefined}>
-                            {t('next')}
-                        </Link>
-                    </nav>}
-                </>
-                : <ApiErrorNotice error={membersResult.error}/>}
-        </Card>
+                 subtitle={t('subtitle')}
+                 actions={canCreate && <LinkButton href="/members/new" primary><PlusIcon aria-hidden/>{t('newMember')}</LinkButton>}>
+        <Toolbar end={membersResult.ok && <ResultCount>{t('resultCount', {count: membersResult.data.totalItems})}</ResultCount>}>
+            <UrlSearchField label={t('search')} placeholder={t('searchPlaceholder')}/>
+            <UrlFilterSelect param="district"
+                             label={t('district')}
+                             allLabel={t('allDistricts')}
+                             icon={<MapPinIcon aria-hidden/>}
+                             options={districts.map(d => ({value: String(d.id), label: d.name}))}/>
+            {canReadFormal && <UrlFilterSelect param="status"
+                                               label={t('status')}
+                                               allLabel={t('anyStatus')}
+                                               icon={<SealCheckIcon aria-hidden/>}
+                                               options={MEMBER_STATUSES.map(s => ({value: s, label: tEnums(`memberStatus.${s}`)}))}/>}
+            <UrlFilterSelect param="membershipType"
+                             label={t('membershipType')}
+                             allLabel={t('anyType')}
+                             icon={<IdentificationCardIcon aria-hidden/>}
+                             options={MEMBERSHIP_TYPES.map(s => ({value: s, label: tEnums(`membershipType.${s}`)}))}/>
+        </Toolbar>
+        {membersResult.ok
+            ? <>
+                <MembersTable items={membersResult.data.items}
+                              sort={sort}
+                              sortHref={sortParam => hrefWith({sort: sortParam, page: undefined})}/>
+                <Pagination page={membersResult.data.page}
+                            totalPages={membersResult.data.totalPages}
+                            totalItems={membersResult.data.totalItems}
+                            size={size}
+                            defaultSize={DEFAULT_SIZE}
+                            sizeOptions={SIZES}
+                            hrefFor={p => hrefWith({page: p > 0 ? String(p) : undefined})}/>
+            </>
+            : <ApiErrorNotice error={membersResult.error}/>}
     </Page>;
 }

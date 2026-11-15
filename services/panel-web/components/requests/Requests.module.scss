@@ -1,0 +1,70 @@
+/*!
+ * Copyright (C) 2026 Stowarzyszenie Młodzi Razem
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+.detail {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    gap: var(--space-6);
+    align-items: start;
+
+    @media (max-width: 1100px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    min-width: 0;
+}
+
+.side {
+    position: sticky;
+    top: var(--space-6);
+
+    @media (max-width: 1100px) {
+        position: static;
+    }
+}
+
+.proposed {
+    svg {
+        color: var(--color-text-muted);
+        margin-right: var(--space-2);
+        vertical-align: -0.125em;
+    }
+
+    strong {
+        color: var(--color-primary);
+    }
+}
+
+.staleLine {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-1);
+    font-size: 0.8125rem;
+}
+
+.stale {
+    > th, > td:first-of-type {
+        background: var(--color-warning-bg);
+    }
+}

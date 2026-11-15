@@ -48,16 +48,25 @@ export default async function NewMemberPage() {
         </Page>;
     }
 
+    const sections = [
+        {key: 'sectionNames', defs: FIELDS.filter(f => f.group === 'NAMING')},
+        {key: 'sectionFormal', defs: FIELDS.filter(f => f.group === 'FORMAL')},
+        {key: 'sectionContact', defs: FIELDS.filter(f => f.group === 'CONTACT')},
+        {key: 'organisationalTitle', defs: FIELDS.filter(f => f.group === 'ORGANISATIONAL')},
+    ] as const;
+
     return <Page title={t('newMember')} subtitle={t('newMemberHint')} backHref="/members" backLabel={t('title')}>
-        <Card>
-            <ActionForm action={createMemberAction} submitLabel={t('createMember')} ariaLabel={t('newMember')}>
+        <ActionForm action={createMemberAction} submitLabel={t('createMember')} ariaLabel={t('newMember')}>
+            <Card title={t('sectionDistrict')}>
                 <SelectField name="primaryDistrictId"
                              label={t('primaryDistrict')}
                              required
                              emptyLabel={targets.length === 1 ? undefined : t('chooseDistrict')}
                              options={targets.map(d => ({value: String(d.id), label: d.name}))}/>
-                <FieldInputs defs={FIELDS} requireMandatory/>
-            </ActionForm>
-        </Card>
+            </Card>
+            {sections.map(section => <Card key={section.key} title={t(section.key)}>
+                <FieldInputs defs={section.defs} requireMandatory showGroupTitles={false}/>
+            </Card>)}
+        </ActionForm>
     </Page>;
 }

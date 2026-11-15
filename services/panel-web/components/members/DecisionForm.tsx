@@ -20,6 +20,7 @@
 import React, { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { CheckIcon, XIcon } from "@phosphor-icons/react/ssr";
 import { decideChangeRequestAction } from "@/app/actions/changeRequests";
 import Button from "@/components/button/Button";
 import { ErrorStatus } from "@/components/form/ActionForm";
@@ -56,11 +57,13 @@ export default function DecisionForm({requestId}: { requestId: number }) {
         </div>
         <div className={formStyles.buttons}>
             <Button variant="primary"
+                    iconLeft={<CheckIcon aria-hidden/>}
                     disabled={pending}
                     onClick={() => decide('approve')}>
                 {t('approve')}
             </Button>
             <Button variant="danger"
+                    iconLeft={<XIcon aria-hidden/>}
                     disabled={pending}
                     onClick={() => decide('reject')}>
                 {t('reject')}

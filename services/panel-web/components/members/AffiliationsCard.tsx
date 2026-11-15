@@ -19,93 +19,103 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
+import { MapPinIcon } from "@phosphor-icons/react/ssr";
 import { changeAffiliationAction, endAffiliationAction } from "@/app/actions/members";
 import ActionButton from "@/components/form/ActionButton";
 import ActionForm from "@/components/form/ActionForm";
 import { CheckboxField, SelectField } from "@/components/form/Fields";
 import { FormattedDate } from "@/components/members/format";
-import { Badge, Card, Muted, TableWrap } from "@/components/page/Page";
+import styles from "@/components/members/record/record.module.scss";
+import { Badge, Card } from "@/components/page/Page";
+import { EmptyState } from "@/components/ui/Blocks";
 import { Affiliation } from "@/panel-api/members/types";
 
 export type DistrictOption = { id: number; name: string };
 
-export default function AffiliationsCard({memberId, affiliations, targetDistricts}: {
+export default function AffiliationsCard({memberId, affiliations, targetDistricts = [], readOnly = false}: {
     memberId: number;
     affiliations: Affiliation[];
-    targetDistricts: DistrictOption[];
+    targetDistricts?: DistrictOption[];
+    readOnly?: boolean;
 }) {
     const t = useTranslations('members');
     const tEnums = useTranslations('enums');
-    const tc = useTranslations('common');
 
+    const primary = affiliations.find(a => a.kind === 'PRIMARY');
+    const supporting = affiliations.filter(a => a.kind === 'SUPPORTING');
     const affiliatedIds = new Set(affiliations.map(a => a.districtId));
     const addable = targetDistricts.filter(d => !affiliatedIds.has(d.id));
     const movable = targetDistricts.filter(d => !affiliations.some(a => a.districtId === d.id && a.kind === 'PRIMARY'));
     const options = (list: DistrictOption[]) => list.map(d => ({value: String(d.id), label: d.name}));
+    const manageable = !readOnly && (addable.length > 0 || movable.length > 0);
 
     return <Card id="affiliations" title={t('affiliationsTitle')} hint={t('affiliationsHint')}>
-        {affiliations.length === 0 && <p>{t('noAffiliations')}</p>}
-        {affiliations.length > 0 && <TableWrap>
-            <thead>
-                <tr>
-                    <th scope="col">{t('district')}</th>
-                    <th scope="col">{t('affiliationKind')}</th>
-                    <th scope="col">{t('since')}</th>
-                    <th scope="col">{tc('actions')}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {affiliations.map(a => <tr key={a.districtId}>
-                    <td>{a.districtName}</td>
-                    <td>
-                        <Badge>{tEnums(`affiliationKind.${a.kind}`)}</Badge>{' '}
-                        {a.votesHere && <Badge tone="success">{t('votesHere')}</Badge>}
-                    </td>
-                    <td><FormattedDate value={a.validFrom}/></td>
-                    <td>
-                        {a.kind === 'SUPPORTING' ? <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
-                            {!a.votesHere && <ActionButton label={t('setVoting')}
-                                                           ariaLabel={`${t('setVoting')}: ${a.districtName}`}
-                                                           action={() => changeAffiliationAction(memberId, {
-                                                               action: 'SET_VOTING',
-                                                               districtId: a.districtId,
-                                                           })}/>}
-                            <ActionButton label={t('endAffiliation')}
-                                          ariaLabel={`${t('endAffiliation')}: ${a.districtName}`}
-                                          confirmMessage={t('endAffiliationConfirm', {district: a.districtName})}
-                                          action={() => endAffiliationAction(memberId, a.districtId)}/>
-                        </div> : <Muted>—</Muted>}
-                    </td>
-                </tr>)}
-            </tbody>
-        </TableWrap>}
+        {affiliations.length === 0 && <EmptyState icon={<MapPinIcon aria-hidden/>} title={t('noAffiliations')}/>}
 
-        {addable.length > 0 && <ActionForm ariaLabel={t('addSupporting')}
-                                          submitLabel={t('addSupporting')}
-                                          successMessage={t('affiliationSaved')}
-                                          resetOnSuccess
-                                          action={fd => changeAffiliationAction(memberId, {
-                                              action: 'ADD_SUPPORTING',
-                                              districtId: Number(fd.get('districtId')),
-                                              votesHere: fd.get('votesHere') === 'true',
-                                          })}>
-            <SelectField name="districtId" label={t('supportingDistrict')} required
-                         emptyLabel={t('chooseDistrict')} options={options(addable)}/>
-            <CheckboxField name="votesHere" label={t('votesHereOption')}/>
-        </ActionForm>}
+        {primary && <div className={styles.primaryDistrict}>
+            <div>
+                <small>{tEnums('affiliationKind.PRIMARY')}</small>
+                <strong>{primary.districtName}</strong>
+                <small>{t('since')} <FormattedDate value={primary.validFrom}/></small>
+            </div>
+            {primary.votesHere && <Badge tone="success">{t('votesHere')}</Badge>}
+        </div>}
 
-        {movable.length > 0 && <ActionForm ariaLabel={t('movePrimary')}
-                                          submitLabel={t('movePrimary')}
-                                          successMessage={t('affiliationSaved')}
-                                          resetOnSuccess
-                                          action={fd => changeAffiliationAction(memberId, {
-                                              action: 'SET_PRIMARY',
-                                              districtId: Number(fd.get('districtId')),
-                                              keepPreviousAsSupporting: fd.get('keepPreviousAsSupporting') === 'true',
-                                          })}>
-            <SelectField name="districtId" label={t('newPrimaryDistrict')} required
-                         emptyLabel={t('chooseDistrict')} options={options(movable)}/>
-            <CheckboxField name="keepPreviousAsSupporting" label={t('keepPreviousOption')}/>
-        </ActionForm>}
+        {supporting.length > 0 && <div>
+            <h3>{t('supportingDistricts')}</h3>
+            <ul className={styles.districtRows}>
+                {supporting.map(a => <li key={a.districtId}>
+                    <div>
+                        <span className={styles.rowTitle}>
+                            {a.districtName}
+                            {a.votesHere && <Badge tone="success">{t('votesHere')}</Badge>}
+                        </span>
+                        <small>{t('since')} <FormattedDate value={a.validFrom}/></small>
+                    </div>
+                    {!readOnly && <div className={styles.rowActions}>
+                        {!a.votesHere && <ActionButton label={t('setVoting')}
+                                                       ariaLabel={`${t('setVoting')}: ${a.districtName}`}
+                                                       action={() => changeAffiliationAction(memberId, {
+                                                           action: 'SET_VOTING',
+                                                           districtId: a.districtId,
+                                                       })}/>}
+                        <ActionButton label={t('endAffiliation')}
+                                      ariaLabel={`${t('endAffiliation')}: ${a.districtName}`}
+                                      confirmMessage={t('endAffiliationConfirm', {district: a.districtName})}
+                                      action={() => endAffiliationAction(memberId, a.districtId)}/>
+                    </div>}
+                </li>)}
+            </ul>
+        </div>}
+
+        {manageable && <div className={styles.manage}>
+            {addable.length > 0 && <ActionForm ariaLabel={t('addSupporting')}
+                                              submitLabel={t('addSupporting')}
+                                              successMessage={t('affiliationSaved')}
+                                              resetOnSuccess
+                                              action={fd => changeAffiliationAction(memberId, {
+                                                  action: 'ADD_SUPPORTING',
+                                                  districtId: Number(fd.get('districtId')),
+                                                  votesHere: fd.get('votesHere') === 'true',
+                                              })}>
+                <SelectField name="districtId" label={t('supportingDistrict')} required
+                             emptyLabel={t('chooseDistrict')} options={options(addable)}/>
+                <CheckboxField name="votesHere" label={t('votesHereOption')}/>
+            </ActionForm>}
+
+            {movable.length > 0 && <ActionForm ariaLabel={t('movePrimary')}
+                                              submitLabel={t('movePrimary')}
+                                              successMessage={t('affiliationSaved')}
+                                              resetOnSuccess
+                                              action={fd => changeAffiliationAction(memberId, {
+                                                  action: 'SET_PRIMARY',
+                                                  districtId: Number(fd.get('districtId')),
+                                                  keepPreviousAsSupporting: fd.get('keepPreviousAsSupporting') === 'true',
+                                              })}>
+                <SelectField name="districtId" label={t('newPrimaryDistrict')} required
+                             emptyLabel={t('chooseDistrict')} options={options(movable)}/>
+                <CheckboxField name="keepPreviousAsSupporting" label={t('keepPreviousOption')}/>
+            </ActionForm>}
+        </div>}
     </Card>;
 }

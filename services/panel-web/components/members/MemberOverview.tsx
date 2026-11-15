@@ -18,43 +18,37 @@
 import React from "react";
 import Link from "next/link";
 import { useFormatter, useTranslations } from "next-intl";
+import { BriefcaseIcon } from "@phosphor-icons/react/ssr";
 import { FormattedDate } from "@/components/members/format";
-import { Badge, Card, Notice } from "@/components/page/Page";
-import { Affiliation, BodyFunction, MemberDetail } from "@/panel-api/members/types";
+import styles from "@/components/members/record/record.module.scss";
+import { Badge, Card, DescriptionList, Notice, TableWrap } from "@/components/page/Page";
+import { EmptyState } from "@/components/ui/Blocks";
+import { BodyFunction, MemberDetail } from "@/panel-api/members/types";
 
-export function AffiliationList({affiliations}: { affiliations: Affiliation[] }) {
+export function BodyFunctionsCard({functions, linkBodies = true}: { functions: BodyFunction[]; linkBodies?: boolean }) {
     const t = useTranslations('members');
-    const tEnums = useTranslations('enums');
-    if (affiliations.length === 0) {
-        return <p>{t('noAffiliations')}</p>;
-    }
-    return <ul>
-        {affiliations.map(a => <li key={a.districtId}>
-            {a.districtName}{' '}
-            <Badge>{tEnums(`affiliationKind.${a.kind}`)}</Badge>{' '}
-            {a.votesHere && <Badge tone="success">{t('votesHere')}</Badge>}{' '}
-            <span>{t('since')} <FormattedDate value={a.validFrom}/></span>
-        </li>)}
-    </ul>;
-}
-
-export function BodyFunctionList({functions, linkBodies}: { functions: BodyFunction[]; linkBodies: boolean }) {
-    const t = useTranslations('members');
-    if (functions.length === 0) {
-        return <p>{t('noFunctions')}</p>;
-    }
-    return <ul>
-        {functions.map(f => <li key={f.membershipId}>
-            {linkBodies
-                ? <Link href={`/bodies/${f.bodyId}`}>{f.bodyName}</Link>
-                : f.bodyName}
-            {' – '}{f.memberTypeName}{' '}
-            <span>
-                (<FormattedDate value={f.validFrom}/>{' – '}
-                {f.validTo ? <FormattedDate value={f.validTo}/> : t('ongoing')})
-            </span>
-        </li>)}
-    </ul>;
+    return <Card id="functions" title={t('functionsTitle')} hint={t('functionsHint')}>
+        {functions.length === 0
+            ? <EmptyState icon={<BriefcaseIcon aria-hidden/>} title={t('noFunctions')}/>
+            : <TableWrap>
+                <thead>
+                    <tr>
+                        <th scope="col">{t('fnBody')}</th>
+                        <th scope="col">{t('fnRole')}</th>
+                        <th scope="col">{t('fnFrom')}</th>
+                        <th scope="col">{t('fnTo')}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {functions.map(f => <tr key={f.membershipId}>
+                        <td>{linkBodies ? <Link href={`/bodies/${f.bodyId}`}>{f.bodyName}</Link> : f.bodyName}</td>
+                        <td><Badge tone="brand">{f.memberTypeName}</Badge></td>
+                        <td><FormattedDate value={f.validFrom}/></td>
+                        <td>{f.validTo ? <FormattedDate value={f.validTo}/> : t('ongoing')}</td>
+                    </tr>)}
+                </tbody>
+            </TableWrap>}
+    </Card>;
 }
 
 export function ElectoralRights({member}: { member: MemberDetail }) {
@@ -65,41 +59,47 @@ export function ElectoralRights({member}: { member: MemberDetail }) {
     }
     const votingDistrict = member.affiliations?.find(a => a.districtId === rights.votingDistrictId);
     return <Card id="electoral-rights" title={t('title')} hint={t('hint')}>
+        <DescriptionList>
+            <div>
+                <dt>{t('eligibleLabel')}</dt>
+                <dd><Badge tone={rights.eligible ? 'success' : 'warning'}>
+                    {rights.eligible ? t('yes') : t('no')}
+                </Badge></dd>
+            </div>
+            <div>
+                <dt>{t('nationalLabel')}</dt>
+                <dd><Badge tone={rights.canVoteInNationalElection ? 'success' : 'muted'}>
+                    {rights.canVoteInNationalElection ? t('yes') : t('no')}
+                </Badge></dd>
+            </div>
+            {votingDistrict && <div>
+                <dt>{t('districtLabel')}</dt>
+                <dd>{votingDistrict.districtName}</dd>
+            </div>}
+        </DescriptionList>
         <Notice tone={rights.eligible ? 'success' : 'warning'} role="status">
-            {rights.eligible ? t('eligible') : t('notEligible')}
+            <p>{rights.eligible ? t('eligible') : t('notEligible')}</p>
+            {!rights.eligible && <ul>
+                {!rights.activeOrdinaryMember && <li>{t('reasonNotOrdinary')}</li>}
+                {rights.suspended && <li>{t('reasonSuspended')}</li>}
+                {rights.feeArrears && <li>{t('reasonArrears')}</li>}
+            </ul>}
+            <p>{rights.canVoteInNationalElection ? t('nationalYes') : t('nationalNo')}</p>
+            {votingDistrict && <p>{t('votingDistrict', {district: votingDistrict.districtName})}</p>}
         </Notice>
-        {!rights.eligible && <ul>
-            {!rights.activeOrdinaryMember && <li>{t('reasonNotOrdinary')}</li>}
-            {rights.suspended && <li>{t('reasonSuspended')}</li>}
-            {rights.feeArrears && <li>{t('reasonArrears')}</li>}
-        </ul>}
-        <p>{rights.canVoteInNationalElection ? t('nationalYes') : t('nationalNo')}</p>
-        {votingDistrict && <p>{t('votingDistrict', {district: votingDistrict.districtName})}</p>}
     </Card>;
 }
 
-export default function MemberOverview({member, showAffiliations = true, linkBodies = true}: {
-    member: MemberDetail;
-    showAffiliations?: boolean;
-    linkBodies?: boolean;
-}) {
+export function MembershipEndNotice({endsOn}: { endsOn: string | null | undefined }) {
     const t = useTranslations('members');
     const format = useFormatter();
-    return <>
-        {showAffiliations && member.affiliations && <Card id="affiliations" title={t('affiliationsTitle')}>
-            <AffiliationList affiliations={member.affiliations}/>
-        </Card>}
-        <Card id="functions" title={t('functionsTitle')}>
-            <BodyFunctionList functions={member.bodyFunctions} linkBodies={linkBodies}/>
-        </Card>
-        {member.membershipEndsOn && <Card id="membership-end" title={t('membershipEndTitle')}>
-            <p>{t('membershipEndText', {
-                date: format.dateTime(new Date(`${member.membershipEndsOn}T00:00:00Z`), {
-                    dateStyle: 'long',
-                    timeZone: 'UTC',
-                }),
-            })}</p>
-        </Card>}
-        <ElectoralRights member={member}/>
-    </>;
+    if (!endsOn) {
+        return null;
+    }
+    return <Notice tone="info" role="status">
+        <p className={styles.rowTitle}>{t('membershipEndTitle')}</p>
+        <p>{t('membershipEndText', {
+            date: format.dateTime(new Date(`${endsOn}T00:00:00Z`), {dateStyle: 'long', timeZone: 'UTC'}),
+        })}</p>
+    </Notice>;
 }

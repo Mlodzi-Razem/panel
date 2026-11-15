@@ -38,6 +38,7 @@ export type MemberSearchParams = {
     status?: string;
     membershipType?: string;
     district?: number;
+    sort?: string;
 };
 
 export function listMembers(params: MemberSearchParams): Promise<ApiResult<MemberPage>> {
@@ -51,6 +52,7 @@ export function listMembers(params: MemberSearchParams): Promise<ApiResult<Membe
             status: params.status,
             membershipType: params.membershipType,
             district: params.district,
+            sort: params.sort,
         },
     }, memberPageSchema);
 }
@@ -74,8 +76,12 @@ export function updateMember(id: number, fields: Record<string, unknown>): Promi
     return apiCall({method: 'PATCH', path: `/members/${id}`, body: {fields}}, memberDetailSchema);
 }
 
-export function membersEndingThisYear(): Promise<ApiResult<MemberSummary[]>> {
-    return apiCall({method: 'GET', path: '/members/ending-this-year'}, z.array(memberSummarySchema));
+export function membersEndingThisYear(year?: number): Promise<ApiResult<MemberSummary[]>> {
+    return apiCall({
+        method: 'GET',
+        path: '/members/ending-this-year',
+        query: {year},
+    }, z.array(memberSummarySchema));
 }
 
 export type AffiliationChange =

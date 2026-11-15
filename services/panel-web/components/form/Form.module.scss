@@ -18,27 +18,28 @@
 .form {
     display: flex;
     flex-direction: column;
-    gap: calc(2 * var(--size-spacing));
+    gap: var(--space-5);
     min-width: 0;
 }
 
 .fieldGrid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
-    gap: var(--size-spacing) calc(2 * var(--size-spacing));
+    gap: var(--space-4) var(--space-5);
 }
 
 .field {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.375rem;
     min-width: 0;
     border: none;
 }
 
 .label {
-    font-size: 0.9rem;
-    font-weight: 500;
+    font-size: 0.8125rem;
+    font-weight: 550;
+    color: var(--gray-800);
 }
 
 .required {
@@ -47,22 +48,27 @@
 
 .hint {
     font-size: 0.8rem;
-    color: var(--color-muted);
+    color: var(--color-text-muted);
 }
 
 .input {
     width: 100%;
-    min-height: 2.25rem;
-    padding: 0.4rem 0.6rem;
-    border: 1px solid var(--color-border);
-    border-color: color-mix(in srgb, var(--color-text), transparent 70%);
-    border-radius: 0.5rem;
-    background-color: var(--color-background);
+    min-height: var(--control-height);
+    padding: 0.5rem 0.8rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+    background-color: var(--color-surface);
     font: inherit;
+    transition: border-color var(--duration-transition), box-shadow var(--duration-transition);
 
-    &:focus-visible {
-        outline: 2px solid var(--color-secondary);
-        outline-offset: 1px;
+    &:hover {
+        border-color: var(--gray-400);
+    }
+
+    &:focus, &:focus-visible {
+        outline: none;
+        border-color: var(--plum-600);
+        box-shadow: 0 0 0 3px var(--color-focus);
     }
 
     &[aria-invalid="true"] {
@@ -71,18 +77,28 @@
     }
 
     &:disabled {
-        background-color: var(--color-background-deep);
+        background-color: var(--gray-100);
+        color: var(--color-text-muted);
     }
 }
 
+select.input {
+    appearance: none;
+    padding-right: 2.25rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath fill='%236b6270' d='M213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32Z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 0.9rem;
+}
+
 textarea.input {
-    min-height: 5rem;
+    min-height: 6rem;
     resize: vertical;
 }
 
 .checkbox {
     display: flex;
-    gap: var(--size-spacing);
+    gap: var(--space-2);
     align-items: center;
 
     input {
@@ -95,25 +111,27 @@ textarea.input {
 .listRows {
     display: flex;
     flex-direction: column;
-    gap: var(--size-spacing);
+    gap: var(--space-2);
 }
 
 .listRow {
     display: flex;
-    gap: var(--size-spacing);
+    gap: var(--space-2);
     align-items: center;
 }
 
 .buttons {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--size-spacing);
+    gap: var(--space-2);
     align-items: center;
+    padding-top: var(--space-1);
 }
 
 .status {
-    padding: var(--size-padding) calc(2 * var(--size-padding));
-    border-radius: 0.5rem;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
 
     &[data-tone="error"] {
         background-color: var(--color-danger-bg);
@@ -135,29 +153,36 @@ textarea.input {
 }
 
 .dialog {
+    margin: auto;
     border: none;
-    border-radius: var(--size-border-radius);
-    padding: calc(2 * var(--size-padding));
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
     max-width: min(40rem, calc(100vw - 2rem));
     width: 100%;
-    box-shadow: var(--shadow-1);
-    background-color: var(--color-background);
+    box-shadow: var(--shadow-3);
+    background-color: var(--color-surface);
 
     &::backdrop {
-        background-color: rgba(0, 0, 0, 0.4);
+        background-color: rgba(24, 19, 26, 0.45);
+        backdrop-filter: blur(2px);
+    }
+
+    h2 {
+        font-size: 1.25rem;
+        font-weight: 600;
     }
 }
 
 .dialogBody {
     display: flex;
     flex-direction: column;
-    gap: calc(2 * var(--size-spacing));
+    gap: var(--space-4);
 }
 
 .picker {
     display: flex;
     flex-direction: column;
-    gap: var(--size-spacing);
+    gap: var(--space-2);
 }
 
 .pickerResults {
@@ -165,26 +190,29 @@ textarea.input {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    max-height: 16rem;
+    overflow-y: auto;
 }
 
 .pickerOption {
     width: 100%;
     text-align: left;
-    padding: 0.4rem 0.6rem;
+    padding: 0.55rem 0.8rem;
     border: 1px solid var(--color-border);
-    border-radius: 0.5rem;
-    background-color: var(--color-background);
+    border-radius: var(--radius-sm);
+    background-color: var(--color-surface);
     cursor: pointer;
     font: inherit;
 
     &:hover, &:focus-visible {
-        background-color: var(--color-background-deep);
+        background-color: var(--plum-50);
+        border-color: var(--plum-200);
     }
 }
 
 .pickerSelected {
     display: flex;
-    gap: var(--size-spacing);
+    gap: var(--space-2);
     align-items: center;
     flex-wrap: wrap;
 }

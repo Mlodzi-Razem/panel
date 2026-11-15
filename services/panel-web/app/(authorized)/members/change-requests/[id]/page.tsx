@@ -15,16 +15,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { ArrowRightIcon } from "@phosphor-icons/react/ssr";
+import styles from "@/components/requests/Requests.module.scss";
 import ApiErrorNotice from "@/components/members/ApiErrorNotice";
-import { StatusBadge } from "@/components/members/ChangeRequestList";
 import DecisionForm from "@/components/members/DecisionForm";
 import { FieldValue, FormattedDate } from "@/components/members/format";
-import { Badge, Card, Notice, Page, TableWrap } from "@/components/page/Page";
-import { fieldDef } from "@/panel-api/members/fields";
+import { Badge, Card, DescriptionList, Muted, Notice, Page, TableWrap } from "@/components/page/Page";
+import RequestStatus from "@/components/requests/RequestStatus";
+import { RecordHeader } from "@/components/ui/Blocks";
 import { getChangeRequest } from "@/panel-api/members/changeRequests";
+import { fieldDef } from "@/panel-api/members/fields";
 import { requireMe } from "@/panel-api/members/requireMe";
 
 export default async function ChangeRequestPage({params}: { params: Promise<{ id: string }> }) {
@@ -52,54 +54,73 @@ export default async function ChangeRequestPage({params}: { params: Promise<{ id
     }
 
     const {request, changes} = result.data;
+    const pending = request.status === 'PENDING';
     const anyStale = changes.some(c => c.stale);
+
+    const header = <RecordHeader name={request.member.displayName}
+                                 subtitle={t('requestedByLabel', {name: request.requestedBy.displayName})}
+                                 badges={<RequestStatus status={request.status}/>}
+                                 facts={[
+                                     {label: t('createdAt'), value: <FormattedDate value={request.createdAt}/>},
+                                     {label: t('changesCount'), value: changes.length},
+                                 ]}/>;
 
     return <Page title={t('detailTitle', {member: request.member.displayName})}
                  backHref="/members/change-requests"
                  backLabel={t('title')}
-                 actions={<StatusBadge status={request.status}/>}>
-        <Card id="request-summary">
-            <p>
-                <Link href={`/members/${request.member.id}`}>{request.member.displayName}</Link>
-                {' · '}{t('requestedByLabel', {name: request.requestedBy.displayName})}
-                {request.createdAt && <>{' · '}<FormattedDate value={request.createdAt}/></>}
-            </p>
-            {request.reason && <p>{t('reason')}: {request.reason}</p>}
-            {request.decisionNote && <p>{t('decisionNote')}: {request.decisionNote}</p>}
-            {request.decidedBy && <p>{t('decidedBy', {name: request.decidedBy.displayName})}</p>}
-        </Card>
+                 header={header}>
+        {anyStale && pending && <Notice tone="warning" role="alert">{t('staleWarning')}</Notice>}
 
-        {anyStale && request.status === 'PENDING' && <Notice tone="warning" role="alert">{t('staleWarning')}</Notice>}
+        <div className={styles.detail}>
+            <div className={styles.main}>
+                <Card id="request-changes" title={t('changesTitle')}>
+                    <TableWrap>
+                        <thead>
+                            <tr>
+                                <th scope="col">{t('field')}</th>
+                                <th scope="col">{t('current')}</th>
+                                <th scope="col">{t('proposed')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {changes.map(change => {
+                                const def = fieldDef(change.field) ?? {name: change.field, kind: 'text' as const};
+                                return <tr key={change.field} className={change.stale ? styles.stale : undefined}>
+                                    <th scope="row">{tf.has(change.field) ? tf(change.field) : change.field}</th>
+                                    <td>
+                                        <FieldValue def={def} value={change.current}/>
+                                        {change.stale && <div className={styles.staleLine}>
+                                            <Badge tone="warning">{t('stale')}</Badge>
+                                            <Muted>{t('snapshot')}: <FieldValue def={def} value={change.snapshot}/></Muted>
+                                        </div>}
+                                    </td>
+                                    <td className={styles.proposed}>
+                                        <ArrowRightIcon aria-hidden/>
+                                        <strong><FieldValue def={def} value={change.proposed}/></strong>
+                                    </td>
+                                </tr>;
+                            })}
+                        </tbody>
+                    </TableWrap>
+                </Card>
 
-        <Card id="request-changes" title={t('changesTitle')}>
-            <TableWrap>
-                <thead>
-                    <tr>
-                        <th scope="col">{t('field')}</th>
-                        <th scope="col">{t('snapshot')}</th>
-                        <th scope="col">{t('current')}</th>
-                        <th scope="col">{t('proposed')}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {changes.map(change => {
-                        const def = fieldDef(change.field) ?? {name: change.field, kind: 'text' as const};
-                        return <tr key={change.field}>
-                            <th scope="row">
-                                {tf.has(change.field) ? tf(change.field) : change.field}{' '}
-                                {change.stale && <Badge tone="warning">{t('stale')}</Badge>}
-                            </th>
-                            <td><FieldValue def={def} value={change.snapshot}/></td>
-                            <td><FieldValue def={def} value={change.current}/></td>
-                            <td><strong><FieldValue def={def} value={change.proposed}/></strong></td>
-                        </tr>;
-                    })}
-                </tbody>
-            </TableWrap>
-        </Card>
+                {(request.reason || request.decisionNote || request.decidedBy) && <Card id="request-notes" title={t('notesTitle')}>
+                    <DescriptionList>
+                        {request.reason && <div><dt>{t('reason')}</dt><dd>{request.reason}</dd></div>}
+                        {request.decidedBy && <div>
+                            <dt>{t('decidedByLabel')}</dt>
+                            <dd>{request.decidedBy.displayName}</dd>
+                        </div>}
+                        {request.decisionNote && <div><dt>{t('decisionNote')}</dt><dd>{request.decisionNote}</dd></div>}
+                    </DescriptionList>
+                </Card>}
+            </div>
 
-        {request.status === 'PENDING' && <Card id="request-decision" title={t('decisionTitle')} hint={t('decisionHint')}>
-            <DecisionForm requestId={request.id}/>
-        </Card>}
+            {pending && <aside className={styles.side}>
+                <Card id="request-decision" title={t('decisionTitle')} hint={t('decisionHint')}>
+                    <DecisionForm requestId={request.id}/>
+                </Card>
+            </aside>}
+        </div>
     </Page>;
 }

@@ -22,16 +22,20 @@ import EditCard from "@/components/form/EditCard";
 import AffiliationsCard from "@/components/members/AffiliationsCard";
 import ApiErrorNotice from "@/components/members/ApiErrorNotice";
 import FieldInputs from "@/components/members/FieldInputs";
-import { Empty, GroupedFieldList, hasAnyField, memberName } from "@/components/members/format";
-import MemberOverview from "@/components/members/MemberOverview";
+import { Empty, GroupedFieldList, hasAnyField } from "@/components/members/format";
+import { BodyFunctionsCard, ElectoralRights, MembershipEndNotice } from "@/components/members/MemberOverview";
+import RecordShell, { RecordTab, resolveTab } from "@/components/members/record/RecordShell";
 import RevealIdentifier from "@/components/members/RevealIdentifier";
-import { Badge, Card, Page } from "@/components/page/Page";
+import { Card, Page } from "@/components/page/Page";
 import { FieldDef, fieldsOfGroups } from "@/panel-api/members/fields";
 import { getMember, listDistricts } from "@/panel-api/members/members";
 import { requireMe } from "@/panel-api/members/requireMe";
 import { PERMISSIONS } from "@/panel-api/members/types";
 
-export default async function MemberPage({params}: { params: Promise<{ id: string }> }) {
+export default async function MemberPage({params, searchParams}: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
     const me = await requireMe();
     if (!me) {
         return null;
@@ -44,7 +48,6 @@ export default async function MemberPage({params}: { params: Promise<{ id: strin
     const id = Number(rawId);
 
     const t = await getTranslations('members');
-    const tEnums = await getTranslations('enums');
     const result = await getMember(id);
     if (!result.ok) {
         if (result.error.status === 404) {
@@ -66,64 +69,77 @@ export default async function MemberPage({params}: { params: Promise<{ id: strin
     const selfDefs = present(fieldsOfGroups(['CONTACT', 'NAMING']));
     const formalDefs = present(fieldsOfGroups(['FORMAL']));
     const orgDefs = present(fieldsOfGroups(['ORGANISATIONAL']));
-    const status = typeof fields['status'] === 'string' ? fields['status'] : null;
     const identifier = typeof fields['formalIdentifier'] === 'string' ? fields['formalIdentifier'] : null;
     const updateAction = updateMemberAction.bind(null, id);
 
-    return <Page title={memberName(fields) || `#${id}`}
-                 backHref="/members"
-                 backLabel={t('title')}
-                 actions={status && <Badge tone={status === 'ACTIVE' ? 'success' : 'warning'}>
-                     {tEnums(`memberStatus.${status}`)}
-                 </Badge>}>
-        {hasAnyField(fields, selfDefs) && (access.manageContact
-            ? <EditCard id="member-contact"
-                        title={t('contactTitle')}
-                        action={updateAction}
-                        successMessage={t('memberSaved')}
-                        readView={<GroupedFieldList defs={selfDefs} values={fields}/>}>
-                <FieldInputs defs={selfDefs} values={fields}/>
-            </EditCard>
-            : <Card id="member-contact" title={t('contactTitle')}>
-                <GroupedFieldList defs={selfDefs} values={fields}/>
-            </Card>)}
+    const tabs: RecordTab[] = [{key: 'details', label: t('tabDetails')}];
+    if (member.affiliations) {
+        tabs.push({key: 'districts', label: t('tabDistricts'), count: member.affiliations.length});
+    }
+    tabs.push({key: 'functions', label: t('tabFunctions'), count: member.bodyFunctions.length});
+    const activeTab = resolveTab((await searchParams)['tab'], tabs);
 
-        {hasAnyField(fields, formalDefs) && (() => {
-            const slots = {
-                formalIdentifier: access.manageFormal && !access.formalIdentifierRevealed
-                    ? <RevealIdentifier memberId={id} masked={identifier}/>
-                    : identifier ? <code>{identifier}</code> : <Empty/>,
-            };
-            return access.manageFormal
-                ? <EditCard id="member-formal"
-                            title={t('formalTitle')}
+    return <RecordShell title={`#${id}`}
+                        member={member}
+                        backHref="/members"
+                        backLabel={t('title')}
+                        basePath={`/members/${id}`}
+                        tabs={tabs}
+                        activeTab={activeTab}>
+        {activeTab === 'details' && <>
+            {hasAnyField(fields, selfDefs) && (access.manageContact
+                ? <EditCard id="member-contact"
+                            title={t('contactTitle')}
                             action={updateAction}
                             successMessage={t('memberSaved')}
-                            readView={<GroupedFieldList defs={formalDefs} values={fields} slots={slots}/>}>
-                    <FieldInputs defs={formalDefs} values={fields} showGroupTitles={false}/>
+                            readView={<GroupedFieldList defs={selfDefs} values={fields}/>}>
+                    <FieldInputs defs={selfDefs} values={fields}/>
                 </EditCard>
-                : <Card id="member-formal" title={t('formalTitle')}>
-                    <GroupedFieldList defs={formalDefs} values={fields} slots={slots}/>
-                </Card>;
-        })()}
+                : <Card id="member-contact" title={t('contactTitle')}>
+                    <GroupedFieldList defs={selfDefs} values={fields}/>
+                </Card>)}
 
-        {hasAnyField(fields, orgDefs) && (access.manageFormal
-            ? <EditCard id="member-organisational"
-                        title={t('organisationalTitle')}
-                        action={updateAction}
-                        successMessage={t('memberSaved')}
-                        readView={<GroupedFieldList defs={orgDefs} values={fields}/>}>
-                <FieldInputs defs={orgDefs} values={fields} showGroupTitles={false}/>
-            </EditCard>
-            : <Card id="member-organisational" title={t('organisationalTitle')}>
-                <GroupedFieldList defs={orgDefs} values={fields}/>
-            </Card>)}
+            {hasAnyField(fields, formalDefs) && (() => {
+                const slots = {
+                    formalIdentifier: access.manageFormal && !access.formalIdentifierRevealed
+                        ? <RevealIdentifier memberId={id} masked={identifier}/>
+                        : identifier ? <code>{identifier}</code> : <Empty/>,
+                };
+                return access.manageFormal
+                    ? <EditCard id="member-formal"
+                                title={t('formalTitle')}
+                                action={updateAction}
+                                successMessage={t('memberSaved')}
+                                readView={<GroupedFieldList defs={formalDefs} values={fields} slots={slots}/>}>
+                        <FieldInputs defs={formalDefs} values={fields} showGroupTitles={false}/>
+                    </EditCard>
+                    : <Card id="member-formal" title={t('formalTitle')}>
+                        <GroupedFieldList defs={formalDefs} values={fields} slots={slots}/>
+                    </Card>;
+            })()}
 
-        {access.manageFormal && member.affiliations
+            {hasAnyField(fields, orgDefs) && (access.manageFormal
+                ? <EditCard id="member-organisational"
+                            title={t('organisationalTitle')}
+                            action={updateAction}
+                            successMessage={t('memberSaved')}
+                            readView={<GroupedFieldList defs={orgDefs} values={fields}/>}>
+                    <FieldInputs defs={orgDefs} values={fields} showGroupTitles={false}/>
+                </EditCard>
+                : <Card id="member-organisational" title={t('organisationalTitle')}>
+                    <GroupedFieldList defs={orgDefs} values={fields}/>
+                </Card>)}
+
+            <ElectoralRights member={member}/>
+            <MembershipEndNotice endsOn={member.membershipEndsOn}/>
+        </>}
+
+        {activeTab === 'districts' && member.affiliations
             && <AffiliationsCard memberId={id}
                                  affiliations={member.affiliations}
+                                 readOnly={!access.manageFormal}
                                  targetDistricts={targetDistricts.map(d => ({id: d.id, name: d.name}))}/>}
 
-        <MemberOverview member={member} showAffiliations={!(access.manageFormal && member.affiliations)}/>
-    </Page>;
+        {activeTab === 'functions' && <BodyFunctionsCard functions={member.bodyFunctions}/>}
+    </RecordShell>;
 }

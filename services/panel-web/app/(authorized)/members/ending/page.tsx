@@ -15,27 +15,49 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import React from "react";
 import { getTranslations } from "next-intl/server";
+import { CalendarBlankIcon } from "@phosphor-icons/react/ssr";
 import ApiErrorNotice from "@/components/members/ApiErrorNotice";
 import MembersTable from "@/components/members/MembersTable";
-import { Card, Page } from "@/components/page/Page";
+import { Notice, Page } from "@/components/page/Page";
+import { ResultCount, Toolbar } from "@/components/ui/Blocks";
+import { UrlFilterSelect } from "@/components/ui/UrlControls";
 import { membersEndingThisYear } from "@/panel-api/members/members";
 import { requireMe } from "@/panel-api/members/requireMe";
 
-export default async function EndingThisYearPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function currentYear(): number {
+    return new Date().getUTCFullYear();
+}
+
+export default async function EndingThisYearPage({searchParams}: { searchParams: SearchParams }) {
     const me = await requireMe();
     if (!me) {
         return null;
     }
 
     const t = await getTranslations('members');
-    const result = await membersEndingThisYear();
+    const te = await getTranslations('ending');
+    const params = await searchParams;
+    const yearRaw = Array.isArray(params['year']) ? params['year'][0] : params['year'];
+    const thisYear = currentYear();
+    const years = [thisYear, thisYear + 1];
+    const year = years.find(y => String(y) === yearRaw) ?? thisYear;
+    const result = await membersEndingThisYear(year);
 
     return <Page title={t('endingTitle')} subtitle={t('endingHint')} backHref="/members" backLabel={t('title')}>
-        <Card>
-            {result.ok
-                ? <MembersTable items={result.data} showEnding/>
-                : <ApiErrorNotice error={result.error}/>}
-        </Card>
+        <Notice tone="info">{te('notice')}</Notice>
+        <Toolbar end={result.ok && <ResultCount>{te('resultCount', {count: result.data.length})}</ResultCount>}>
+            <UrlFilterSelect param="year"
+                             label={te('year')}
+                             defaultValue={String(thisYear)}
+                             icon={<CalendarBlankIcon aria-hidden/>}
+                             options={years.map(y => ({value: String(y), label: String(y)}))}/>
+        </Toolbar>
+        {result.ok
+            ? <MembersTable items={result.data} showEnding/>
+            : <ApiErrorNotice error={result.error}/>}
     </Page>;
 }

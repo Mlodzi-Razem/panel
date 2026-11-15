@@ -16,48 +16,73 @@
  */
 
 import React from "react";
-import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Empty, FieldValue, FormattedDate, memberName } from "@/components/members/format";
+import { EyeIcon, UsersThreeIcon } from "@phosphor-icons/react/ssr";
+import { FieldValue, FormattedDate, memberName } from "@/components/members/format";
 import { TableWrap } from "@/components/page/Page";
+import { Chips, EmptyState, IconLink, NameCell, RowActions, SortHeader, SortState } from "@/components/ui/Blocks";
 import { MemberSummary } from "@/panel-api/members/types";
 
-export default function MembersTable({items, showEnding = false}: { items: MemberSummary[]; showEnding?: boolean }) {
+export type MembersTableProps = {
+    items: MemberSummary[];
+    showEnding?: boolean;
+    sort?: SortState;
+    sortHref?: (sortParam: string) => string;
+};
+
+export default function MembersTable({items, showEnding = false, sort, sortHref}: MembersTableProps) {
     const t = useTranslations('members');
+    const tCommon = useTranslations('common');
     const hasStatus = items.some(i => 'status' in i.fields);
     const hasMemberId = items.some(i => 'memberId' in i.fields);
 
     if (items.length === 0) {
-        return <p>{t('noResults')}</p>;
+        return <EmptyState icon={<UsersThreeIcon aria-hidden/>} title={t('noResults')}>
+            <span>{t('noResultsHint')}</span>
+        </EmptyState>;
     }
+
+    const header = (label: string, field: string) => sort && sortHref
+        ? <SortHeader label={label} field={field} sort={sort} hrefFor={sortHref}/>
+        : <th scope="col">{label}</th>;
 
     return <TableWrap>
         <thead>
             <tr>
-                <th scope="col">{t('name')}</th>
-                {hasMemberId && <th scope="col">{t('memberId')}</th>}
-                {hasStatus && <th scope="col">{t('status')}</th>}
-                {hasStatus && <th scope="col">{t('membershipType')}</th>}
-                <th scope="col">{t('primaryDistrict')}</th>
-                <th scope="col">{t('supportingDistricts')}</th>
+                {header(t('name'), 'name')}
+                {hasMemberId && header(t('memberId'), 'memberId')}
+                {hasStatus && header(t('status'), 'status')}
+                {hasStatus && header(t('membershipType'), 'membershipType')}
+                {header(t('primaryDistrict'), 'district')}
                 {showEnding && <th scope="col">{t('membershipEnds')}</th>}
+                <th scope="col"><span style={{display: 'block', textAlign: 'right'}}>{tCommon('actions')}</span></th>
             </tr>
         </thead>
         <tbody>
-            {items.map(item => <tr key={item.id}>
-                <td><Link href={`/members/${item.id}`}>{memberName(item.fields) || `#${item.id}`}</Link></td>
-                {hasMemberId && <td><FieldValue def={{name: 'memberId', kind: 'text'}} value={item.fields['memberId']}/></td>}
-                {hasStatus && <td><FieldValue def={{name: 'status', kind: 'status'}} value={item.fields['status']}/></td>}
-                {hasStatus && <td>
-                    <FieldValue def={{name: 'membershipType', kind: 'membershipType'}}
-                                value={item.fields['membershipType']}/>
-                </td>}
-                <td>{item.primaryDistrict?.name ?? <Empty/>}</td>
-                <td>{item.supportingDistricts.length > 0
-                    ? item.supportingDistricts.map(d => d.name).join(', ')
-                    : <Empty/>}</td>
-                {showEnding && <td><FormattedDate value={item.membershipEndsOn}/></td>}
-            </tr>)}
+            {items.map(item => {
+                const name = memberName(item.fields) || `#${item.id}`;
+                const pseudonym = typeof item.fields['pseudonym'] === 'string' ? item.fields['pseudonym'] as string : null;
+                const domainEmail = typeof item.fields['domainEmail'] === 'string' ? item.fields['domainEmail'] as string : null;
+                return <tr key={item.id}>
+                    <td><NameCell name={name} secondary={domainEmail ?? pseudonym} href={`/members/${item.id}`}/></td>
+                    {hasMemberId && <td>{typeof item.fields['memberId'] === 'string' && item.fields['memberId'] ? item.fields['memberId'] as string : '—'}</td>}
+                    {hasStatus && <td><FieldValue def={{name: 'status', kind: 'status'}} value={item.fields['status']}/></td>}
+                    {hasStatus && <td>
+                        <FieldValue def={{name: 'membershipType', kind: 'membershipType'}} value={item.fields['membershipType']}/>
+                    </td>}
+                    <td>
+                        <div>{item.primaryDistrict?.name ?? '—'}</div>
+                        {item.supportingDistricts.length > 0 &&
+                            <Chips items={item.supportingDistricts.map(d => `+ ${d.name}`)}/>}
+                    </td>
+                    {showEnding && <td><FormattedDate value={item.membershipEndsOn}/></td>}
+                    <td>
+                        <RowActions>
+                            <IconLink href={`/members/${item.id}`} label={t('open', {name})}><EyeIcon aria-hidden/></IconLink>
+                        </RowActions>
+                    </td>
+                </tr>;
+            })}
         </tbody>
     </TableWrap>;
 }

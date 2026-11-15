@@ -1,0 +1,278 @@
+/*!
+ * Copyright (C) 2026 Stowarzyszenie Młodzi Razem
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+$mobile: 960px;
+
+.shell {
+    display: grid;
+    grid-template-columns: var(--size-sidebar-width) minmax(0, 1fr);
+    min-height: 100dvh;
+
+    @media (max-width: $mobile) {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto 1fr;
+    }
+}
+
+.main {
+    min-width: 0;
+    min-height: 100dvh;
+
+    @media (max-width: $mobile) {
+        min-height: auto;
+    }
+}
+
+.sidebar {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, var(--plum-900), var(--plum-950));
+    color: rgba(255, 255, 255, 0.82);
+    z-index: 30;
+
+    @media (max-width: $mobile) {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: min(18rem, 86vw);
+        transform: translateX(-100%);
+        transition: transform var(--duration-transition) ease-out;
+        box-shadow: var(--shadow-3);
+
+        &[data-open="true"] {
+            transform: translateX(0);
+        }
+    }
+}
+
+.backdrop {
+    display: none;
+
+    @media (max-width: $mobile) {
+        &[data-open="true"] {
+            display: block;
+            position: fixed;
+            inset: 0;
+            background: rgba(24, 19, 26, 0.45);
+            z-index: 25;
+        }
+    }
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-5) var(--space-5) var(--space-4);
+}
+
+.brandLink {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.logo {
+    width: 4.25rem;
+    height: auto;
+    filter: brightness(0) invert(1);
+}
+
+.brandLabel {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.6);
+    padding-left: var(--space-3);
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.closeButton {
+    display: none !important;
+
+    @media (max-width: $mobile) {
+        display: inline-flex !important;
+    }
+}
+
+.groups {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-2) var(--space-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+
+    ul {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+}
+
+.groupLabel {
+    padding: 0 var(--space-3) var(--space-2);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.45);
+}
+
+.item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: 0.6rem var(--space-3);
+    border-radius: var(--radius-sm);
+    color: rgba(255, 255, 255, 0.78);
+    font-weight: 500;
+    transition: var(--transition-all);
+
+    svg {
+        width: 1.25rem;
+        height: 1.25rem;
+        flex-shrink: 0;
+    }
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.07);
+        color: #ffffff;
+    }
+
+    &[aria-current="page"] {
+        background: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+
+        &::before {
+            content: '';
+            position: absolute;
+            left: calc(var(--space-3) * -1);
+            top: 0.45rem;
+            bottom: 0.45rem;
+            width: 3px;
+            border-radius: 0 3px 3px 0;
+            background: var(--plum-200);
+        }
+    }
+}
+
+.itemLabel {
+    flex: 1;
+    min-width: 0;
+}
+
+.itemBadge {
+    min-width: 1.4rem;
+    height: 1.4rem;
+    padding: 0 0.4rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-pill);
+    background: #ffffff;
+    color: var(--plum-800);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.user {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin: var(--space-3);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.userText {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.userName {
+    color: #ffffff;
+    font-weight: 550;
+    font-size: 0.9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.userEmail {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.55);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.iconButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: var(--transition-all);
+
+    svg {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #ffffff;
+    }
+}
+
+.topbar {
+    display: none;
+
+    @media (max-width: $mobile) {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        padding: var(--space-2) var(--space-3);
+        background: var(--plum-900);
+        color: #ffffff;
+    }
+}
+
+.topbarLogo {
+    width: 3.75rem;
+    height: auto;
+    filter: brightness(0) invert(1);
+}

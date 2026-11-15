@@ -19,7 +19,9 @@ import React from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { FormattedDate } from "@/components/members/format";
-import { Badge, Card, LinkButton } from "@/components/page/Page";
+import { Badge, LinkButton, Muted } from "@/components/page/Page";
+import { NameCell } from "@/components/ui/Blocks";
+import styles from "./Bodies.module.scss";
 import { BodyDetail, CompositionEntry } from "@/panel-api/members/types";
 
 export function MemberLink({entry, linkMembers}: { entry: CompositionEntry; linkMembers: boolean }) {
@@ -29,20 +31,14 @@ export function MemberLink({entry, linkMembers}: { entry: CompositionEntry; link
 export function CompositionSummary({entries, linkMembers}: { entries: CompositionEntry[]; linkMembers: boolean }) {
     const t = useTranslations('bodies');
     if (entries.length === 0) {
-        return <p>{t('noComposition')}</p>;
+        return <p className={styles.noMembers}>{t('noComposition')}</p>;
     }
-    const byRole = new Map<string, CompositionEntry[]>();
-    for (const entry of entries) {
-        byRole.set(entry.memberTypeName, [...(byRole.get(entry.memberTypeName) ?? []), entry]);
-    }
-    return <ul>
-        {[...byRole.entries()].map(([role, list]) => <li key={role}>
-            <strong>{role}:</strong>{' '}
-            {list.map((entry, index) => <React.Fragment key={entry.membershipId}>
-                {index > 0 && ', '}
-                <MemberLink entry={entry} linkMembers={linkMembers}/>
-                {entry.validTo && <> (<FormattedDate value={entry.validTo}/>)</>}
-            </React.Fragment>)}
+    return <ul className={styles.composition}>
+        {entries.map(entry => <li key={entry.membershipId}>
+            <NameCell name={entry.memberName}
+                      secondary={entry.memberTypeName}
+                      href={linkMembers ? `/members/${entry.memberId}` : undefined}/>
+            {entry.validTo && <Muted>{t('until')} <FormattedDate value={entry.validTo}/></Muted>}
         </li>)}
     </ul>;
 }
@@ -52,7 +48,7 @@ export function KindBadge({kind}: { kind: string | null | undefined }) {
     if (!kind) {
         return null;
     }
-    return <Badge>{t.has(`bodyKind.${kind}`) ? t(`bodyKind.${kind}`) : kind}</Badge>;
+    return <Badge tone="brand">{t.has(`bodyKind.${kind}`) ? t(`bodyKind.${kind}`) : kind}</Badge>;
 }
 
 export function BodyCard({detail, canManage, linkMembers}: {
@@ -62,13 +58,18 @@ export function BodyCard({detail, canManage, linkMembers}: {
 }) {
     const t = useTranslations('bodies');
     const {body} = detail;
-    return <Card id={`body-${body.id}`}
-                 title={body.name}
-                 actions={<>
-                     <KindBadge kind={body.kind}/>
-                     <LinkButton href={`/bodies/${body.id}`}>{canManage ? t('manage') : t('details')}</LinkButton>
-                 </>}>
-        {body.email && <p>{body.email}</p>}
+    const headingId = `body-${body.id}-title`;
+    return <article className={styles.bodyCard} id={`body-${body.id}`} aria-labelledby={headingId}>
+        <header className={styles.bodyHead}>
+            <div className={styles.bodyTitle}>
+                <h2 id={headingId}>{body.name}</h2>
+                <KindBadge kind={body.kind}/>
+            </div>
+            {body.email && <a className={styles.bodyEmail} href={`mailto:${body.email}`}>{body.email}</a>}
+        </header>
         <CompositionSummary entries={detail.composition} linkMembers={linkMembers}/>
-    </Card>;
+        <footer className={styles.bodyFoot}>
+            <LinkButton href={`/bodies/${body.id}`} primary={canManage}>{canManage ? t('manage') : t('details')}</LinkButton>
+        </footer>
+    </article>;
 }

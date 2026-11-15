@@ -19,7 +19,7 @@ import styles from './Button.module.scss';
 import css from "@/util/css";
 import React from "react";
 
-export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'danger';
+export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost';
 
 export type ButtonProps = React.PropsWithChildren<{
     onClick?: () => void;

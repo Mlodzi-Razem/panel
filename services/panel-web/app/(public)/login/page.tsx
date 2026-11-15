@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 Stowarzyszenie Młodzi Razem
+ * Copyright (C) 2026 Stowarzyszenie Młodzi Razem
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,10 +15,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import Centered from "@/components/layout/centered/Centered";
-import { isAuthenticated } from "@/auth/authOptions";
+import Image from "next/image";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
+import { isAuthenticated } from "@/auth/authOptions";
 import LoginPageSignInButton from "@/app/(public)/login/LoginPageSignInButton";
+import mrLogo from "@/assets/mr-logo.svg";
 
 import styles from './LoginPage.module.scss';
 
@@ -27,15 +29,22 @@ export default async function Login() {
         redirect('/');
     }
 
-    return <div className={styles.page}>
-        <Centered>
-            <main className={styles.container}>
-                <div>
-                    <h3 style={{textAlign: 'center'}}>Młodzi Razem</h3>
-                    <h4 style={{textAlign: 'center'}}>Panel</h4>
+    const t = await getTranslations('login');
+
+    return <main className={styles.page}>
+        <section className={styles.brand}>
+            <Image src={mrLogo} alt="Młodzi Razem" unoptimized priority className={styles.logo}/>
+            <p className={styles.pitch}>{t('pitch')}</p>
+        </section>
+        <section className={styles.formSide}>
+            <div className={styles.card}>
+                <div className={styles.cardText}>
+                    <h1>{t('title')}</h1>
+                    <p>{t('subtitle')}</p>
                 </div>
                 <LoginPageSignInButton/>
-            </main>
-        </Centered>
-    </div>;
+                <p className={styles.note}>{t('workspaceOnly')}</p>
+            </div>
+        </section>
+    </main>;
 }

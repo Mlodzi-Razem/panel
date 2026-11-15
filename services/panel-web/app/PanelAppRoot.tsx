@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 Stowarzyszenie Młodzi Razem
+ * Copyright (C) 2026 Stowarzyszenie Młodzi Razem
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -16,25 +16,20 @@
  */
 
 import React, { Suspense } from "react";
-import styles from './PanelAppRoot.module.scss';
-import SideMenu from "@/components/menu/side-menu/SideMenu";
 import SuspenseFallback from "@/app/SuspenseFallback";
-import { Session, User } from "next-auth";
+import Sidebar, { SidebarUser } from "@/components/shell/Sidebar";
+import { NavGroup } from "@/components/shell/nav";
+import styles from "@/components/shell/Shell.module.scss";
 
-export type PanelAppRootProps = React.PropsWithChildren<{ session: Session; visibleRoutes: string[] }>;
+export type PanelAppRootProps = React.PropsWithChildren<{ user: SidebarUser; groups: NavGroup[] }>;
 
-const PanelAppRoot = ({
-    session,
-    visibleRoutes,
-    children,
-}: PanelAppRootProps) => {
-    return <div className={styles.container}>
-        <SideMenu user={session.user as User} visibleRoutes={visibleRoutes}/>
-        <div className={styles.content}>
+export default function PanelAppRoot({user, groups, children}: PanelAppRootProps) {
+    return <div className={styles.shell}>
+        <Sidebar user={user} groups={groups}/>
+        <div className={styles.main}>
             <Suspense fallback={<SuspenseFallback/>}>
                 {children}
             </Suspense>
         </div>
     </div>;
-};
-export default PanelAppRoot;
+}

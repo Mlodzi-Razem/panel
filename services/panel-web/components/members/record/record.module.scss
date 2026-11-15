@@ -1,0 +1,167 @@
+/*!
+ * Copyright (C) 2026 Stowarzyszenie Młodzi Razem
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+.stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+    min-width: 0;
+}
+
+.twoCols {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+    gap: var(--space-5);
+    align-items: start;
+}
+
+.rowTitle {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    font-weight: 550;
+    color: var(--gray-950);
+}
+
+.primaryDistrict {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+    border-radius: var(--radius-md);
+    background: var(--plum-50);
+    border: 1px solid var(--plum-100);
+
+    strong {
+        display: block;
+        font-size: 1.125rem;
+        color: var(--plum-900);
+    }
+
+    small {
+        color: var(--color-text-muted);
+    }
+}
+
+.districtRows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+
+    li {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+        padding: var(--space-3) 0;
+        border-top: 1px solid var(--color-border);
+    }
+
+    small {
+        display: block;
+        color: var(--color-text-muted);
+    }
+}
+
+.rowActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.manage {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: var(--space-5);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--color-border);
+}
+
+.badges {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+}
+
+.requestFields {
+    margin: 0;
+    padding-left: 1.1rem;
+}
+
+.notes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 12rem;
+}
+
+.matrix {
+    th[scope="row"] {
+        text-align: left;
+        font-weight: 550;
+    }
+
+    td, th:not(:first-child) {
+        text-align: center;
+    }
+}
+
+.yes, .no {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.yes {
+    color: var(--color-success);
+}
+
+.no {
+    color: var(--gray-400);
+}
+
+.srOnly {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.electoralFacts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.sectionLegend {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+}
+
+.formStack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}

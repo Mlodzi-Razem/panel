@@ -17,6 +17,7 @@
 
 import React from "react";
 import Link from "next/link";
+import { ArrowLeftIcon } from "@phosphor-icons/react/ssr";
 import styles from "./Page.module.scss";
 
 export type PageProps = React.PropsWithChildren<{
@@ -25,18 +26,21 @@ export type PageProps = React.PropsWithChildren<{
     actions?: React.ReactNode;
     backHref?: string;
     backLabel?: string;
+    header?: React.ReactNode;
 }>;
 
-export function Page({title, subtitle, actions, backHref, backLabel, children}: PageProps) {
+export function Page({title, subtitle, actions, backHref, backLabel, header, children}: PageProps) {
     return <main className={styles.page}>
-        {backHref && <Link href={backHref} className={styles.backLink}>{'← '}{backLabel}</Link>}
-        <header className={styles.header}>
-            <div>
+        {backHref && <Link href={backHref} className={styles.backLink}>
+            <ArrowLeftIcon aria-hidden/>{backLabel}
+        </Link>}
+        {header ?? <header className={styles.header}>
+            <div className={styles.headerText}>
                 <h1 className={styles.title}>{title}</h1>
                 {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
             </div>
             {actions && <div className={styles.actions}>{actions}</div>}
-        </header>
+        </header>}
         {children}
     </main>;
 }
@@ -60,7 +64,7 @@ export function Card({title, hint, actions, id, children}: CardProps) {
     </section>;
 }
 
-export type Tone = 'neutral' | 'success' | 'warning' | 'danger';
+export type Tone = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'muted' | 'brand';
 
 export function Badge({tone = 'neutral', children}: React.PropsWithChildren<{ tone?: Tone }>) {
     return <span className={styles.badge} data-tone={tone}>{children}</span>;
