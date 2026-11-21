@@ -203,6 +203,9 @@ const Secrets = z.object({
         tenantId: z.string(),
         clientId: z.string(),
         clientSecret: z.string(),
+        // PEM X.509 and PKCS#8; panel-api signs its Graph client credentials with the pair when present.
+        clientCertificate: z.string(),
+        clientCertificateKey: z.string(),
     }).optional(),
     panel: z.object({
         web: z.object({

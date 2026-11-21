@@ -131,8 +131,11 @@ panel:
     cloudflare:
       apiKey: '{{ fail "Missing panel.secrets.cloudflare.apiKey" }}'
     # The Panel MR app registration in Microsoft Entra. Leave empty to disable Microsoft 365 sign-in and the Teams app;
-    # the tenant and client IDs alone enable the Teams app, the secret also enables sign-in in the browser.
+    # the tenant and client IDs alone enable the Teams app, the secret also enables sign-in in the browser,
+    # and the certificate with its key signs panel-api's Graph lookups (the tenant blocks client secrets).
     entra:
       tenantId: ''
       clientId: ''
       clientSecret: ''
+      clientCertificate: ''
+      clientCertificateKey: ''

@@ -76,7 +76,7 @@ spec:
                   key: auth-secret
                   name: panel-api-auth
                   optional: false
-            {{- range $env, $key := dict "PANEL_ENTRA_TENANT_ID" "entra-tenant-id" "PANEL_ENTRA_CLIENT_ID" "entra-client-id" "PANEL_ENTRA_CLIENT_SECRET" "entra-client-secret" }}
+            {{- range $env, $key := dict "PANEL_ENTRA_TENANT_ID" "entra-tenant-id" "PANEL_ENTRA_CLIENT_ID" "entra-client-id" "PANEL_ENTRA_CLIENT_SECRET" "entra-client-secret" "PANEL_ENTRA_CLIENT_CERTIFICATE" "entra-client-certificate" "PANEL_ENTRA_CLIENT_CERTIFICATE_KEY" "entra-client-certificate-key" }}
             - name: {{ $env }}
               valueFrom:
                 secretKeyRef:
