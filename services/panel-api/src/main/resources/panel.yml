@@ -14,3 +14,6 @@ panel:
     mock:
       enabled: true
       state-file: classpath:directory/mock-state.json
+  entra:
+    client-certificate: ${PANEL_ENTRA_CLIENT_CERTIFICATE:}
+    client-certificate-key: ${PANEL_ENTRA_CLIENT_CERTIFICATE_KEY:}
