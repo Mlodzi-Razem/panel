@@ -1,0 +1,290 @@
+/*
+ * Panel MR — custom CSS for the Microsoft Entra ID sign-in page
+ * (revision 2: mirrors the Panel MR browser login page)
+ * ============================================================================
+ *
+ *   GOAL
+ *   The tenant sign-in experience should look VERY similar to the Panel MR
+ *   browser login (the Google sign-in page at /login): left brand panel with
+ *   the plum gradient, right side a calm gray form area with a white card,
+ *   pill buttons, one accent colour (plum), generous whitespace.
+ *
+ *   DESIGN SOURCE OF TRUTH (worktree files mirrored here — every rule cites
+ *   its token below):
+ *     - app/(public)/login/LoginPage.module.scss  (.brand .formSide .card
+ *       .cardText .note)
+ *     - app/theme/theme.scss                      (all token values,
+ *       :focus-visible recipe, h1 rules)
+ *     - components/button/Button.module.scss      (primary/secondary buttons)
+ *     - components/form/Form.module.scss         (.input incl. focus/error)
+ *
+ *   HOW THE LOOK IS ASSEMBLED (tenant owner actions this file assumes)
+ *     1. Layout template: "partial-screen background" (verticalSplit) —
+ *        the background panel on the split side shows the brand gradient,
+ *        the form side gets .formSide's gray (mirrored on
+ *        .ext-vertical-split-main-section below).
+ *     2. Background image: build/background-plum-gradient-1920x1080.png —
+ *        a faithful 1920x1080 raster of the .brand gradient (radial plum-500
+ *        highlight at 20%/15% over the 145deg plum-700→900→950 linear ramp).
+ *     3. Layout → Show header = OFF (Panel login has no top strip; the mr
+ *        badge identity comes from the banner logo inside the card).
+ *     4. This file styles the sign-in box (.card), title, subtitle, links,
+ *        inputs and buttons to the Panel tokens.
+ *
+ *   HARD RULES FOLLOWED (verified 2026-11-21 — research-notes.md §6):
+ *   learn.microsoft.com/en-us/entra/fundamentals/reference-company-branding-css-template
+ *   - only the doc-enumerated selectors: body, a (+states), and the .ext-*
+ *     list. No other element, id or class is touched.
+ *   - none of the 58 deprecated layout/positioning properties (position,
+ *     margin*, transform*, translate/scale/rotate, opacity, overflow*,
+ *     display, visibility, filter, pointer-events, inset, order, grid-*, ...).
+ *     Properties used here: color, background-color, border, border-radius,
+ *     box-shadow, font-family, font-size, font-weight, line-height,
+ *     letter-spacing, outline, outline-offset, text-align, text-decoration,
+ *     transition (safe, named properties only).
+ *   - no ::before/::after content insertion, no external fonts or @import:
+ *     General Sans is not web-safe, so only a system sans stack is used.
+ *
+ *   AVAILABILITY WARNING
+ *   Microsoft is retiring custom CSS: tenants created after 2026-01-05 never
+ *   got it, and after 2026-07-21 tenants that did not already use custom CSS
+ *   can no longer configure it. Check the Layout section of Company Branding
+ *   in the admin centre first (README §C). This file is a non-load-bearing
+ *   bonus: background, logo and text slots alone already carry the identity.
+ *
+ *   TOKEN MAP (app/theme/theme.scss)
+ *   plum-950 #2a0619 · plum-900 #3d0a27 · plum-800 #540838 ·
+ *   plum-700 #720546 (primary) · plum-600 #8c0d58 · plum-500 #a8216f ·
+ *   gray-950 #18131a (text) · gray-800 #3a323d · gray-900 #241d27 ·
+ *   gray-600 #6b6270 (muted) · gray-400 #b3abb6 · gray-300 #d6d0d8 ·
+ *   gray-200 #e8e4ea (border) · gray-50 #f8f7f9 (background-deep) ·
+ *   focus = color-mix(plum-600 35%) = rgba(140,13,88,0.35) · danger #c62a3b ·
+ *  danger-bg #fdecee · white #ffffff (surface) ·
+ *  radius-lg 16px · radius-pill 999px · radius-sm 8px ·
+ *  shadow-2 = 0 4px 12px rgba(36,29,39,.08), 0 1px 3px rgba(36,29,39,.06)
+ * ============================================================================
+ */
+
+/* --- Page canvas ---------------------------------------------------------- */
+
+/* ≙ theme body rules + .formSide: system stack for General Sans,
+   text gray-950, calm 1.5 rhythm, and the form-side deep gray as the page
+   color (visible as the split form side and while the image loads). */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif; /* fallback for --font-normal */
+  color: #18131a;  /* --gray-950 / --color-text */
+  line-height: 1.5;
+  background-color: #f8f7f9; /* --color-background-deep (.formSide) */
+}
+
+/* --- Links --------------------------------------------------------- */
+
+/* ≙ theme `a { color: ...; text-decoration: none }` + plum accent.
+   Hover/focus/active states follow too; plum-800 is Panel's single
+   "deeper" accent (no red). */
+a,
+a:link {
+  color: #720546; /* --plum-700 */
+  text-decoration: none;
+}
+
+a:hover {
+  color: #540838; /* --plum-800 */
+}
+
+/* ≙ theme :focus-visible — outline 3px var(--color-focus), offset 2px.
+   (The docs enumerate :focus, not :focus-visible, so the same recipe rides
+   on the allowed selector.) */
+a:focus {
+  outline: 3px solid rgba(140, 13, 88, 0.35); /* --color-focus = plum-600 35% */
+  outline-offset: 2px;
+}
+
+a:focus:hover {
+  color: #540838; /* --plum-800 */
+}
+
+a:active {
+  color: #540838; /* --plum-800 */
+}
+
+/* --- Layout container (vertical-split template) -------------------------- */
+
+/* ≙ .formSide background — the split template's main container holds the
+   sign-in box and the brand-image panel; painting it background-deep gives
+   the form side the exact Panel tone (the image panel covers its own side). */
+.ext-vertical-split-main-section {
+  background-color: #f8f7f9; /* --color-background-deep */
+}
+
+/* --- Sign-in box = the .card -------------------------------------------- */
+
+/* ≙ LoginPage .card: surface white, hairline gray-200 border,
+   radius-lg, shadow-2. Padding/sizing stay Microsoft's (generous already). */
+.ext-sign-in-box {
+  background-color: #ffffff; /* --color-surface */
+  border: 1px solid #e8e4ea; /* --color-border */
+  border-radius: 16px;       /* --radius-lg */
+  box-shadow: 0 4px 12px rgba(36, 29, 39, 0.08),
+    0 1px 3px rgba(36, 29, 39, 0.06); /* --shadow-2 */
+}
+
+/* --- Heading / muted text -------------------------------------------------- */
+
+/* ≙ LoginPage .cardText h1 (1.5rem) + theme h1 rules (line-height 1.25,
+   letter-spacing -0.01em) at default UA bold weight. */
+.ext-title {
+  color: #18131a; /* --gray-950 */
+  font-size: 24px;      /* 1.5rem */
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+/* ≙ .cardText p (color: --color-text-muted) on the body rhythm. */
+.ext-subtitle {
+  color: #6b6270; /* --gray-600 */
+  font-size: 15px; /* --size-font-size 0.9375rem */
+  line-height: 1.5;
+}
+
+/* Internal navigation links (e.g. password-reset entry, sign-in options):
+   the doc-recommended selector; hover/focus colours arrive via the generic
+   `a` states above. */
+.ext-link {
+  color: #720546; /* --plum-700 */
+}
+
+/* --- Buttons (components/button/Button.module.scss) ----------------------- */
+
+/* Primary sign-in button ≙ [data-variant="primary"]: plum-700 pill,
+   white text, weight 550, soft plum drop shadow
+   (0 2px 8px color-mix(--color-primary 30%)). */
+.ext-button.ext-primary {
+  background-color: #720546; /* --plum-700 / --color-primary */
+  color: #ffffff;
+  border: 1px solid transparent;
+  border-radius: 999px; /* --radius-pill */
+  font-weight: 550;
+  box-shadow: 0 2px 8px rgba(114, 5, 70, 0.3); /* plum-700 @ 30% */
+  transition: background-color 0.18s ease-in-out, box-shadow 0.18s ease-in-out;
+}
+
+.ext-button.ext-primary:hover {
+  background-color: #540838; /* --plum-800: Button hover */
+}
+
+.ext-button.ext-primary:focus {
+  outline: 3px solid rgba(140, 13, 88, 0.35); /* --color-focus */
+  outline-offset: 2px;
+}
+
+.ext-button.ext-primary:focus:hover {
+  background-color: #540838; /* --plum-800 */
+}
+
+/* Panel defines no active jump for buttons; pegging :active to the hover
+   tone keeps the pill calm instead of flashing a vendor tint. */
+.ext-button.ext-primary:active {
+  background-color: #540838; /* --plum-800 */
+}
+
+/* Secondary buttons ≙ [data-variant="secondary"]: filled gray-900 pill with
+   white text, hover gray-800. Quiet, no red anywhere. */
+.ext-button.ext-secondary {
+  background-color: #241d27; /* --gray-900 */
+  color: #ffffff;
+  border: 1px solid transparent;
+  border-radius: 999px; /* --radius-pill */
+  font-weight: 550;
+  transition: background-color 0.18s ease-in-out;
+}
+
+.ext-button.ext-secondary:hover {
+  background-color: #3a323d; /* --gray-800 */
+}
+
+.ext-button.ext-secondary:focus {
+  outline: 3px solid rgba(140, 13, 88, 0.35); /* --color-focus */
+  outline-offset: 2px;
+}
+
+.ext-button.ext-secondary:focus:hover {
+  background-color: #3a323d; /* --gray-800 */
+}
+
+.ext-button.ext-secondary:active {
+  background-color: #3a323d; /* --gray-800 */
+}
+
+/* --- Text boxes (components/form/Form.module.scss .input) ----------------- */
+
+/* ≙ .input: surface white, hairline gray-300 border, radius-sm. */
+.ext-input.ext-text-box {
+  background-color: #ffffff; /* --color-surface */
+  color: #18131a; /* --gray-950 */
+  border: 1px solid #d6d0d8; /* --color-border-strong / gray-300 */
+  border-radius: 8px;       /* --radius-sm */
+  transition: border-color 0.18s ease-in-out, box-shadow 0.18s ease-in-out;
+}
+
+/* ≙ .input:hover — one step-up border tone. */
+.ext-input.ext-text-box:hover {
+  border-color: #b3abb6; /* --gray-400 */
+}
+
+/* ≙ .input:focus — outline replaced by plum-600 border + 3px focus ring. */
+.ext-input.ext-text-box:focus {
+  outline: none;
+  border-color: #8c0d58; /* --plum-600 */
+  box-shadow: 0 0 0 3px rgba(140, 13, 88, 0.35); /* --color-focus */
+}
+
+.ext-input.ext-text-box:focus:hover {
+  border-color: #8c0d58; /* --plum-600 */
+  box-shadow: 0 0 0 3px rgba(140, 13, 88, 0.35); /* --color-focus */
+}
+
+/* ≙ .input[aria-invalid="true"] — danger border on danger-bg field tint. */
+.ext-input.ext-text-box.ext-has-error {
+  border-color: #c62a3b;   /* --color-danger */
+  background-color: #fdecee; /* --color-danger-bg */
+}
+
+/* --- Messages --------------------------------------------------------------- */
+
+/* Error text: Panel danger token. */
+.ext-error {
+  color: #c62a3b; /* --color-danger */
+}
+
+/* The custom "Sign-in page text" ≙ LoginPage .note: small, muted, centered. */
+.ext-boilerplate-text {
+  color: #6b6270; /* --gray-600 */
+  font-size: 13px; /* 0.8125rem */
+  text-align: center;
+}
+
+/* "Sign-in options" box ≙ muted companion text. */
+.ext-promoted-fed-cred-box {
+  color: #6b6270; /* --gray-600 */
+}
+
+/* ---------------------------------------------------------------------------
+   Deliberately untouched — and why (restraint where Entra's fixed layout
+   prevents the exact Panel composition):
+   - .ext-background-image / .ext-middle / .ext-vertical-split-background-image-
+     container — the brand side IS the uploaded gradient (the .brand replica);
+     painting over it would only cloud the image.
+   - .ext-header / .ext-header-logo — the Panel login has no top strip; the
+     recommendation is Layout → Show header = OFF. If you enable it anyway,
+     Microsoft's default header styling stays (neutral, undamaged).
+   - .ext-footer / .ext-footer-links / .ext-footer-item / .ext-debug-item —
+     low-key page chrome; Microsoft defaults keep contrast on any background.
+   - No element reordering/shrink/overlay tricks: layout properties are
+     deprecated by Microsoft for anti-phishing reasons, and the calm
+     whitespace of Entra's own spacing already matches the Panel rhythm.
+   - The brand-side white "mr" logo and pitch text from the Panel login lives
+     in the logo + text slots, not in CSS (no content insertion allowed).
+   --------------------------------------------------------------------------- */

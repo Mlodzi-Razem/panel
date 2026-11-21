@@ -1,0 +1,8 @@
+# Entra company branding — local .gitignore (mirrors teams/.gitignore)
+
+# Generated binaries — regenerate with scripts/generate-assets.mjs
+build/
+
+# GDPR: the Kongres 2025 photo contains identifiable people. It must stay on
+# the machine that produced this package; never commit or push it.
+source/mr-kongres-2025-photo.jpeg
