@@ -1,0 +1,126 @@
+// Layout of the Teams tabs: no side navigation, Teams provides the tab bar.
+
+.page {
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: calc(var(--size-spacing) * 3);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--size-spacing) * 3);
+}
+
+.hero {
+    background: var(--color-primary);
+    color: var(--color-on-text);
+    border-radius: var(--radius-lg);
+    padding: calc(var(--size-spacing) * 4);
+
+    h1 {
+        margin: 0;
+        font-size: 1.75rem;
+        font-weight: 600;
+        text-wrap: balance;
+    }
+
+    p {
+        margin: var(--size-spacing) 0 0;
+        color: var(--plum-100);
+    }
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+    gap: calc(var(--size-spacing) * 2);
+}
+
+// Bottom row: a wide card with a narrow companion in the mockup's 2:1 proportion.
+.wideNarrowGrid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: calc(var(--size-spacing) * 2);
+
+    @media (max-width: 900px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.soon {
+    margin: 0;
+    color: var(--color-text-muted);
+}
+
+.link {
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
+.links {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-spacing);
+}
+
+.signIn {
+    min-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--size-spacing);
+    padding: calc(var(--size-spacing) * 3);
+    text-align: center;
+
+    h1 {
+        margin: 0;
+        font-size: 1.25rem;
+    }
+
+    p {
+        margin: 0;
+        max-width: 32rem;
+        color: var(--color-text-muted);
+    }
+}
+
+.button {
+    margin-top: var(--size-spacing);
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--control-height);
+    padding: 0 calc(var(--size-spacing) * 2);
+    border-radius: var(--radius-pill);
+    background: var(--color-primary);
+    color: var(--color-on-text);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+// The primary action of the incident card: an outlined pill in the Panel maroon.
+.reportButton {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--size-spacing);
+    width: fit-content;
+    min-height: var(--control-height);
+    padding: 0 calc(var(--size-spacing) * 2);
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-pill);
+    color: var(--color-primary);
+    font-weight: 600;
+    text-decoration: none;
+    transition: var(--transition-all);
+
+    svg {
+        width: 1.1em;
+        height: 1.1em;
+        flex: none;
+    }
+
+    &:hover {
+        background: var(--color-primary-soft);
+    }
+}

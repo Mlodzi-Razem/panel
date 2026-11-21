@@ -49,6 +49,7 @@ export function mintServiceToken(user: User): string {
         iss: ISSUER,
         aud: AUDIENCE,
         sub: user.id,
+        idp: user.idp ?? 'google',
         ...(user.email ? { email: user.email } : {}),
         ...(user.name ? { name: user.name } : {}),
         iat: now,

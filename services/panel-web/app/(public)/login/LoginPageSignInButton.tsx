@@ -22,6 +22,7 @@ import { useTranslations } from "next-intl";
 import Image from "next/image";
 import googleLogo from '@/assets/google-logo.svg';
 import Button from "@/components/button/Button";
+import { ENTRA_PROVIDER, GOOGLE_PROVIDER } from "@/auth/providers";
 
 function GoogleLogoIcon() {
     return <Image src={googleLogo}
@@ -33,13 +34,30 @@ function GoogleLogoIcon() {
                   alt="G"/>;
 }
 
-export default function LoginPageSignInButton() {
+function MicrosoftLogoIcon() {
+    return <svg viewBox="0 0 21 21" style={{height: '100%', width: 'auto'}} aria-hidden="true">
+        <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+        <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+        <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+        <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+    </svg>;
+}
+
+export default function LoginPageSignInButton({microsoft}: { microsoft: boolean }) {
     const t = useTranslations('login');
 
-    return <Button variant="primary"
-                   style={{width: '100%'}}
-                   iconLeft={<GoogleLogoIcon/>}
-                   onClick={() => signIn('google')}>
-        {t('loginWithGoogle')}
-    </Button>;
+    return <>
+        {microsoft && <Button variant="primary"
+                              style={{width: '100%'}}
+                              iconLeft={<MicrosoftLogoIcon/>}
+                              onClick={() => signIn(ENTRA_PROVIDER)}>
+            {t('loginWithMicrosoft')}
+        </Button>}
+        <Button variant={microsoft ? 'secondary' : 'primary'}
+                style={{width: '100%'}}
+                iconLeft={<GoogleLogoIcon/>}
+                onClick={() => signIn(GOOGLE_PROVIDER)}>
+            {t('loginWithGoogle')}
+        </Button>
+    </>;
 }

@@ -52,6 +52,7 @@ export async function updateOwnProfileAction(formData: FormData): Promise<Action
         return fail(result.error);
     }
     revalidatePath('/user');
+    revalidatePath('/teams', 'layout');
     return {ok: true};
 }
 
@@ -77,6 +78,7 @@ export async function requestFormalChangeAction(formData: FormData): Promise<Act
         return fail(result.error);
     }
     revalidatePath('/user');
+    revalidatePath('/teams', 'layout');
     return {ok: true};
 }
 
@@ -93,5 +95,6 @@ export async function cancelChangeRequestAction(id: number): Promise<ActionResul
         return fail(result.error);
     }
     revalidatePath('/user');
+    revalidatePath('/teams', 'layout');
     return {ok: true};
 }

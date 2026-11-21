@@ -10,6 +10,8 @@
     "test": "eslint"
   },
   "dependencies": {
+    "@microsoft/teams-js": "^2.31.0",
+    "jose": "^4.15.5",
     "@opentelemetry/api": "^1.9",
     "@opentelemetry/api-logs": "^0.211",
     "@opentelemetry/instrumentation": "^0.211",

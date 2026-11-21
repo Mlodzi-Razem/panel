@@ -18,7 +18,7 @@
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { isAuthenticated } from "@/auth/authOptions";
+import { isAuthenticated, isEntraSignInEnabled } from "@/auth/authOptions";
 import LoginPageSignInButton from "@/app/(public)/login/LoginPageSignInButton";
 import mrLogo from "@/assets/mr-logo.svg";
 
@@ -30,6 +30,7 @@ export default async function Login() {
     }
 
     const t = await getTranslations('login');
+    const microsoft = isEntraSignInEnabled();
 
     return <main className={styles.page}>
         <section className={styles.brand}>
@@ -40,10 +41,10 @@ export default async function Login() {
             <div className={styles.card}>
                 <div className={styles.cardText}>
                     <h1>{t('title')}</h1>
-                    <p>{t('subtitle')}</p>
+                    <p>{microsoft ? t('subtitleBoth') : t('subtitle')}</p>
                 </div>
-                <LoginPageSignInButton/>
-                <p className={styles.note}>{t('workspaceOnly')}</p>
+                <LoginPageSignInButton microsoft={microsoft}/>
+                <p className={styles.note}>{microsoft ? t('organisationOnly') : t('workspaceOnly')}</p>
             </div>
         </section>
     </main>;

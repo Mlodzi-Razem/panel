@@ -18,8 +18,35 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from 'next-intl/plugin';
 
+/**
+ * Hosts allowed to frame the Teams tabs: Teams, Outlook and the Microsoft 365 app.
+ * Everything else may be framed only by Panel itself.
+ */
+const MICROSOFT_365_FRAME_ANCESTORS = [
+    "'self'",
+    'https://teams.microsoft.com',
+    'https://*.teams.microsoft.com',
+    'https://*.cloud.microsoft',
+    'https://*.office.com',
+    'https://outlook.office.com',
+    'https://outlook.office365.com',
+    'https://*.microsoft365.com',
+].join(' ');
+
 const nextConfig: NextConfig = {
     reactCompiler: true,
+    async headers() {
+        return [
+            {
+                source: '/teams/:path*',
+                headers: [{key: 'Content-Security-Policy', value: `frame-ancestors ${MICROSOFT_365_FRAME_ANCESTORS}`}],
+            },
+            {
+                source: '/((?!teams/).*)',
+                headers: [{key: 'Content-Security-Policy', value: "frame-ancestors 'self'"}],
+            },
+        ];
+    },
     output: 'standalone',
     transpilePackages: ['next-intl'],
     experimental: {

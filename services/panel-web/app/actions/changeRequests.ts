@@ -41,5 +41,6 @@ export async function decideChangeRequestAction(
     }
     revalidatePath('/members', 'layout');
     revalidatePath('/user');
+    revalidatePath('/teams', 'layout');
     return {ok: true, redirectTo: '/members/change-requests'};
 }

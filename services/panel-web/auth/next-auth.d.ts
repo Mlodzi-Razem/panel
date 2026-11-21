@@ -19,9 +19,15 @@ import "next-auth";
 import "next-auth/jwt";
 
 declare module "next-auth" {
+    interface User {
+        idp?: 'google' | 'entra';
+    }
+
     interface Session {
         user: {
             id: string;
+            /** The identity provider that issued `id`: the Google `sub` or the Entra object ID. */
+            idp: 'google' | 'entra';
             name?: string | null;
             email?: string | null;
             image?: string | null;
@@ -32,5 +38,6 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
     interface JWT {
         sub?: string;
+        idp?: 'google' | 'entra';
     }
 }

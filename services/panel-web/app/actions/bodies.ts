@@ -49,6 +49,7 @@ function refresh() {
     revalidatePath('/bodies', 'layout');
     revalidatePath('/members', 'layout');
     revalidatePath('/user');
+    revalidatePath('/teams', 'layout');
 }
 
 export async function createBodyAction(formData: FormData): Promise<ActionResult> {

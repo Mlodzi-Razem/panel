@@ -53,3 +53,37 @@ const PanelEnv: Record<PanelEnvKeyName, string> = REQUIRED_ENV_VARS_NAMES
 
 export default PanelEnv;
 
+const OPTIONAL_ENV_VARS = {
+    PANEL_ENTRA_TENANT_ID: 'The Microsoft Entra tenant ID; enables Microsoft 365 sign-in and the Teams app',
+    PANEL_ENTRA_CLIENT_ID: 'The client ID of the Panel MR app registration in Microsoft Entra',
+    PANEL_ENTRA_CLIENT_SECRET: 'The client secret of the Panel MR app registration; needed only for sign-in in the browser',
+} as const;
+export type PanelOptionalEnvKeyName = keyof typeof OPTIONAL_ENV_VARS;
+
+function optional(name: PanelOptionalEnvKeyName): string | undefined {
+    const value = process.env[name]?.trim();
+    return value ? value : undefined;
+}
+
+export type EntraConfig = {
+    tenantId: string;
+    clientId: string;
+    /** Present only when browser sign-in with Microsoft 365 is enabled. */
+    clientSecret?: string;
+};
+
+/**
+ * Microsoft Entra settings, or undefined when Entra is not configured. Teams SSO needs the tenant and client IDs;
+ * browser sign-in additionally needs the client secret.
+ */
+export function entraConfig(): EntraConfig | undefined {
+    const tenantId = optional('PANEL_ENTRA_TENANT_ID');
+    const clientId = optional('PANEL_ENTRA_CLIENT_ID');
+
+    if (!tenantId || !clientId) {
+        return undefined;
+    }
+
+    return {tenantId, clientId, clientSecret: optional('PANEL_ENTRA_CLIENT_SECRET')};
+}
+
