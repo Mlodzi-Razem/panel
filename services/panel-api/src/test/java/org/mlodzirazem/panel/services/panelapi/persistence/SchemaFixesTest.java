@@ -197,15 +197,19 @@ class SchemaFixesTest {
     }
 
     @Test
-    void directoryUserIdMustBeUniqueButMayBeNull() {
+    void identitySubjectIsUniquePerProviderAndAMemberHasOneIdentityPerProvider() {
         long first = insertMember("A", null, "One", "Form One", null, null, "{}", "{}");
         long second = insertMember("B", null, "Two", "Form Two", null, null, "{}", "{}");
-        insertMember("C", null, "Three", "Form Three", null, null, "{}", "{}");
+        String insert = "INSERT INTO member_identities (member_id, provider, subject) VALUES (?, ?::identity_provider, ?)";
 
-        jdbc.update("UPDATE members SET directory_user_id = 'sub-1' WHERE id = ?", first);
+        jdbc.update(insert, first, "GOOGLE", "sub-1");
+        jdbc.update(insert, second, "ENTRA", "sub-1");
+        jdbc.update(insert, first, "ENTRA", "oid-1");
 
-        assertSqlState(UNIQUE_VIOLATION, () ->
-            jdbc.update("UPDATE members SET directory_user_id = 'sub-1' WHERE id = ?", second));
+        assertSqlState(UNIQUE_VIOLATION, () -> jdbc.update(insert, second, "GOOGLE", "sub-1"));
+        assertSqlState(UNIQUE_VIOLATION, () -> jdbc.update(insert, first, "GOOGLE", "sub-2"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM information_schema.columns "
+            + "WHERE table_name = 'members' AND column_name = 'directory_user_id'", Integer.class)).isZero();
     }
 
     private long insertBody() {

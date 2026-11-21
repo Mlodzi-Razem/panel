@@ -80,7 +80,7 @@ public class AuditPersister {
             return null;
         }
 
-        return members.findByDirectoryUserId(authInfo.get().userId()).orElse(null);
+        return members.findByIdentity(authInfo.get().provider(), authInfo.get().userId()).orElse(null);
     }
 
     private String traceId() {

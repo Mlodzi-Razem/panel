@@ -64,9 +64,6 @@ public class TMember extends TBaseEntity {
     @Column(name = "member_id")
     private @Nullable String memberId;
 
-    @Column(name = "directory_user_id")
-    private @Nullable String directoryUserId;
-
     @Column(name = "preferred_name_first", nullable = false)
     private String preferredNameFirst;
 

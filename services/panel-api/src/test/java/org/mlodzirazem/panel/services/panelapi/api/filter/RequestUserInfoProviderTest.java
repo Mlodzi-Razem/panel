@@ -19,6 +19,7 @@ package org.mlodzirazem.panel.services.panelapi.api.filter;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.mlodzirazem.panel.services.panelapi.core.user.IdentityProvider;
 import org.mlodzirazem.panel.services.panelapi.core.user.UserAuthInfo;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -56,6 +57,22 @@ class RequestUserInfoProviderTest {
         Optional<UserAuthInfo> resolved = provider.resolve();
 
         assertThat(resolved).contains(new UserAuthInfo("ID", null, null));
+    }
+
+    @Test
+    void readsTheIdentityProviderClaim() {
+        authenticate(Map.of("sub", "OID", "idp", "entra"));
+
+        assertThat(provider.resolve()).contains(new UserAuthInfo("OID", null, null, IdentityProvider.ENTRA));
+    }
+
+    @Test
+    void acceptsGoogleAndRejectsUnknownProviders() {
+        authenticate(Map.of("sub", "SUB", "idp", "google"));
+        assertThat(provider.resolve()).map(UserAuthInfo::provider).contains(IdentityProvider.GOOGLE);
+
+        authenticate(Map.of("sub", "SUB", "idp", "facebook"));
+        assertThat(provider.resolve()).isEmpty();
     }
 
     @Test

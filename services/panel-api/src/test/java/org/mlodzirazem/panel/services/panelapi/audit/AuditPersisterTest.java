@@ -71,7 +71,8 @@ class AuditPersisterTest extends DomainTestSupport {
     @Test
     void rowCarriesTraceIdTimestampAndTriggeringMember() {
         TMember member = newMember("Tim", "Trigger", "mazowieckie");
-        jdbc.update("UPDATE members SET directory_user_id = 'sub-audit' WHERE id = ?", member.getId());
+        jdbc.update("INSERT INTO member_identities (member_id, provider, subject) VALUES (?, 'GOOGLE', 'sub-audit')",
+            member.getId());
 
         ScopedValue.where(UserScopedValues.USER_AUTH_INFO, new UserAuthInfo("sub-audit", null, null))
                    .run(() -> auditLog.record("test :: op", AuditPayload.of("memberId", member.getId())

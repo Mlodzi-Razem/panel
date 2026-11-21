@@ -19,6 +19,14 @@ package org.mlodzirazem.panel.services.panelapi.core.user;
 
 import org.jspecify.annotations.Nullable;
 
+/**
+ * The signed-in user as panel-web reports it.
+ *
+ * @param userId   the provider's immutable subject: the Google {@code sub} or the Entra object ID
+ * @param email    the sign-in e-mail, used only to link a Google account on its first sign-in
+ * @param name     display name, informational only
+ * @param provider the provider that issued {@code userId}
+ */
 public record UserAuthInfo(
     String userId,
 
@@ -26,6 +34,11 @@ public record UserAuthInfo(
     String email,
 
     @Nullable
-    String name
+    String name,
+
+    IdentityProvider provider
 ) {
+    public UserAuthInfo(String userId, @Nullable String email, @Nullable String name) {
+        this(userId, email, name, IdentityProvider.GOOGLE);
+    }
 }

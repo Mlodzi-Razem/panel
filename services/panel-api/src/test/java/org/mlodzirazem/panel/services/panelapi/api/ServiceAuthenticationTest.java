@@ -82,7 +82,8 @@ class ServiceAuthenticationTest {
         var response = get(serverPort, "/auth-test", bearer(token("panel-web", "panel-api", secret, 60)));
 
         assertThat(response.status()).isEqualTo(200);
-        assertThat(response.body()).isEqualTo("UserAuthInfo[userId=SUB, email=user@example.com, name=Jan Kowalski]");
+        assertThat(response.body()).isEqualTo(
+            "UserAuthInfo[userId=SUB, email=user@example.com, name=Jan Kowalski, provider=GOOGLE]");
     }
 
     @Test

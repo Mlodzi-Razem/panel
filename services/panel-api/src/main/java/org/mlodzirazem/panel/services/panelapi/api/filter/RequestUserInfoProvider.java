@@ -17,6 +17,7 @@
 
 package org.mlodzirazem.panel.services.panelapi.api.filter;
 
+import org.mlodzirazem.panel.services.panelapi.core.user.IdentityProvider;
 import org.mlodzirazem.panel.services.panelapi.core.user.UserAuthInfo;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -27,6 +28,11 @@ import java.util.Optional;
 
 @Component
 public class RequestUserInfoProvider {
+    /**
+     * Service-token claim naming the identity provider that signed the user in ({@code google} or {@code entra}).
+     */
+    public static final String IDENTITY_PROVIDER_CLAIM = "idp";
+
     public Optional<UserAuthInfo> resolve() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
@@ -43,10 +49,12 @@ public class RequestUserInfoProvider {
             return Optional.empty();
         }
 
-        return Optional.of(new UserAuthInfo(
-            userId,
-            jwt.getClaimAsString("email"),
-            jwt.getClaimAsString("name")
-        ));
+        return IdentityProvider.fromClaim(jwt.getClaimAsString(IDENTITY_PROVIDER_CLAIM))
+            .map(provider -> new UserAuthInfo(
+                userId,
+                jwt.getClaimAsString("email"),
+                jwt.getClaimAsString("name"),
+                provider
+            ));
     }
 }

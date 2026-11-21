@@ -73,7 +73,8 @@ public abstract class ApiTestSupport extends DomainTestSupport {
     }
 
     protected TMember linked(TMember member) {
-        jdbc.update("UPDATE members SET directory_user_id = ? WHERE id = ?", sub(member), member.getId());
+        jdbc.update("INSERT INTO member_identities (member_id, provider, subject) VALUES (?, 'GOOGLE', ?)",
+            member.getId(), sub(member));
         return member;
     }
 

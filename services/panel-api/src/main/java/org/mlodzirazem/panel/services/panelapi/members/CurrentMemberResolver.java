@@ -24,9 +24,14 @@ import java.util.Optional;
 
 public interface CurrentMemberResolver {
     /**
-     * Linking rule: a member with {@code directory_user_id = sub}; otherwise the member whose {@code domain_email}
-     * equals the token e-mail (case-insensitive) is linked by setting {@code directory_user_id} (audited as
-     * {@code members :: link-user}); otherwise empty.
+     * Linking rule: the member that holds an identity with the user's provider and subject. Without one, a first
+     * sign-in is linked by adding an identity (audited as {@code members :: link-user}):
+     * <ul>
+     *     <li>Google: the member whose {@code domain_email} equals the token e-mail (case-insensitive);</li>
+     *     <li>Entra: the member whose member number equals the enabled account's {@code employeeId}, read from
+     *     Microsoft Graph by object ID, leading zeros ignored.</li>
+     * </ul>
+     * A member is linked to at most one identity per provider. Otherwise empty.
      */
     Optional<TMember> resolve(UserAuthInfo userAuthInfo);
 

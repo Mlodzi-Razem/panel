@@ -59,7 +59,8 @@ class MeApiTest extends ApiTestSupport {
         assertThat(me.status()).isEqualTo(200);
         assertThat(me.body().path("linked").asBoolean()).isTrue();
         assertThat(me.body().path("member").path("id").asLong()).isEqualTo(member.getId());
-        assertThat(jdbc.queryForObject("SELECT directory_user_id FROM members WHERE id = ?", String.class,
+        assertThat(jdbc.queryForObject(
+            "SELECT subject FROM member_identities WHERE member_id = ? AND provider = 'GOOGLE'", String.class,
             member.getId())).isEqualTo("google-sub-1");
         assertThat(auditCount("members :: link-user")).isEqualTo(1);
 

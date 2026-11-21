@@ -17,6 +17,7 @@
 
 package org.mlodzirazem.panel.services.panelapi.persistence.entity.member;
 
+import org.mlodzirazem.panel.services.panelapi.core.user.IdentityProvider;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -29,9 +30,22 @@ import java.util.Optional;
 
 @Repository
 public interface TMemberRepository extends JpaRepository<TMember, Long> {
-    Optional<TMember> findByDirectoryUserId(String directoryUserId);
+    @Query("select i.member from TMemberIdentity i where i.provider = :provider and i.subject = :subject")
+    Optional<TMember> findByIdentity(@Param("provider") IdentityProvider provider, @Param("subject") String subject);
 
     Optional<TMember> findByMemberId(String memberId);
+
+    /**
+     * Members whose numeric member number equals {@code number} once leading zeros are ignored on both sides,
+     * so the Entra {@code employeeId} {@code 000205} matches the register's {@code 205}.
+     *
+     * @param number the member number without leading zeros
+     */
+    @Query(
+        value = "select * from members where member_id ~ '^[0-9]+$' and ltrim(member_id, '0') = :number",
+        nativeQuery = true
+    )
+    List<TMember> findByMemberNumber(@Param("number") String number);
 
     Optional<TMember> findByFormalIdentifier(String formalIdentifier);
 
