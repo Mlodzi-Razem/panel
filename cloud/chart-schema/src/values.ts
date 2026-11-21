@@ -198,6 +198,12 @@ const Secrets = z.object({
     cloudflare: z.object({
         apiKey: z.string(),
     }),
+    // The Panel MR app registration in Microsoft Entra. Empty values disable Microsoft 365 sign-in and the Teams app.
+    entra: z.object({
+        tenantId: z.string(),
+        clientId: z.string(),
+        clientSecret: z.string(),
+    }).optional(),
     panel: z.object({
         web: z.object({
             metricsToken: z.string(),
