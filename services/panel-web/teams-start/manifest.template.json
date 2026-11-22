@@ -1,0 +1,44 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.19/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.19",
+  "version": "1.0.1",
+  "id": "ee5d02ca-08ce-4f42-bcc6-1fd9a42a82d9",
+  "localizationInfo": {
+    "defaultLanguageTag": "pl-pl"
+  },
+  "developer": {
+    "name": "Stowarzyszenie Młodzi Razem",
+    "websiteUrl": "https://mlodzirazem.org",
+    "privacyUrl": "https://mlodzirazem.org/",
+    "termsOfUseUrl": "https://mlodzirazem.org/"
+  },
+  "name": {
+    "short": "Start",
+    "full": "MR — Start"
+  },
+  "description": {
+    "short": "Strona startowa Stowarzyszenia Młodzi Razem wprost w Microsoft Teams.",
+    "full": "Strona domowa Stowarzyszenia Młodzi Razem z serwisu SharePoint (mloderazemki.sharepoint.com), osadzona jako karta w Microsoft Teams: aktualności, dokumenty i najważniejsze skróty bez wychodzenia z Teams."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#720546",
+  "staticTabs": [
+    {
+      "entityId": "start",
+      "name": "Start",
+      "contentUrl": "https://mloderazemki.sharepoint.com/_layouts/15/teamslogon.aspx?SPFX=true&dest=%2F",
+      "websiteUrl": "https://mloderazemki.sharepoint.com/",
+      "scopes": ["personal"]
+    }
+  ],
+  "permissions": ["identity"],
+  "validDomains": ["mloderazemki.sharepoint.com"],
+  "webApplicationInfo": {
+    "id": "00000003-0000-0ff1-ce00-000000000000",
+    "resource": "https://mloderazemki.sharepoint.com"
+  },
+  "showLoadingIndicator": false
+}

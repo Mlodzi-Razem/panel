@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <!-- House badge for the MR "Start" Teams app: a plum rounded square with a white house (roof + body + door hole). -->
+  <rect width="192" height="192" rx="40" ry="40" fill="#720546"/>
+  <path fill="#ffffff" fill-rule="evenodd" d="M96 42L168 108L168 150L24 150L24 108ZM78 108L78 150L114 150L114 108Z"/>
+</svg>
