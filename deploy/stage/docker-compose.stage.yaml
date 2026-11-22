@@ -1,0 +1,128 @@
+# docker-compose.stage.yaml — STAGE environment of the MR Panel on the owner's VPS.
+#
+# Shipped by ci/release-local.sh to /opt/panel-stage (runbook: deploy/stage/RUNBOOK.md).
+# Run it through deploy/stage/Makefile (`make -C deploy/stage up`), which pins
+# --env-file; the compose file needs .env.stage next to it for ${...}
+# substitution AND as the services' env_file.
+#
+# Layout: the only public ports are Caddy's 80/443. panel-web (3000) and
+# panel-api (8080, actuator 9080) are reachable inside the internal network
+# only; postgres is not published at all. Migrations are applied by panel-api
+# itself (Flyway at boot, needs PostgreSQL >= 18 — a VIRTUAL generated column
+# is used by V0.0.1.03).
+
+name: panel-stage
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:18.1-alpine  # VIRTUAL generated columns require PostgreSQL 18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-panel}
+      POSTGRES_USER: ${POSTGRES_USER:-panel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.stage}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - apps
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 10s
+    mem_limit: 1g
+    logging: *default-logging
+
+  panel-api:
+    # Mutable "stage" tag by default; the release script retags it to the
+    # released short git hash (rollback = retag back, see scripts/rollback.sh).
+    image: ${PANEL_API_IMAGE:-panel-api:stage}
+    restart: unless-stopped
+    env_file:
+      - path: ${STAGE_ENV_FILE:-.env.stage}
+        required: true
+    environment:
+      # DB coordinates are fixed by this stack (service name "postgres");
+      # .env.stage does not need to carry JDBC_URL.
+      JDBC_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-panel}
+      JDBC_USER: ${POSTGRES_USER:-panel}
+      JDBC_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.stage}
+      # No OTLP collector on stage; silence the export noise.
+      MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: ${MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED:-false}
+      MANAGEMENT_OTLP_TRACING_EXPORT_ENABLED: ${MANAGEMENT_OTLP_TRACING_EXPORT_ENABLED:-false}
+    volumes:
+      # Optional owner-only config (Entra certificates for SSO). The directory
+      # is empty until the SSO checklist (RUNBOOK §8); PANEL_CONFIG_FILE_PATH
+      # points at /panel-config/panel-config.yaml inside the container.
+      - ./panel-config:/panel-config:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - apps
+    stop_grace_period: 30s   # server.shutdown: graceful
+    mem_limit: 1g            # launch.sh caps the heap at 80% of it
+    logging: *default-logging
+
+  panel-web:
+    image: ${PANEL_WEB_IMAGE:-panel-web:stage}
+    restart: unless-stopped
+    env_file:
+      - path: ${STAGE_ENV_FILE:-.env.stage}
+        required: true
+    environment:
+      PANEL_API_URL: http://panel-api:8080
+    depends_on:
+      panel-api:
+        condition: service_started
+    networks:
+      - apps   # server-side calls to panel-api
+      - edge   # served by caddy; egress in case SSO tokens are needed later
+    mem_limit: 768m
+    logging: *default-logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    # ACME/TLS: Caddy obsługuje HTTP-01 (port 80) i TLS-ALPN-01 (port 443);
+    # oba są opublikowane niżej, więc wystawienie certyfikatu działa
+    # bez dodatkowej konfiguracji (DNS A → VPS musi istnieć).
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3 (QUIC)
+    environment:
+      STAGE_HOST: ${STAGE_HOST:?Set STAGE_HOST in .env.stage}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env.stage}
+      ACME_CA: ${ACME_CA:-https://acme-v02.api.letsencrypt.org/directory}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data       # ACME account + certificates (keep!)
+      - caddy-config:/config
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:2019/config/"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    mem_limit: 256m
+    logging: *default-logging
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  edge: {}
+  apps:
+    internal: true

@@ -1,3 +1,7 @@
+{{- /* PodMonitor requires the monitoring.coreos.com CRDs; the chart-wide
+       panel.k8s.prometheus.podMonitors.enabled switch keeps installs working
+       on clusters without the prometheus operator. */ -}}
+{{- if .Values.panel.k8s.prometheus.podMonitors.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
@@ -13,3 +17,4 @@ spec:
       enableHttp2: true
   selector:
     matchLabels: {{ include "panel-api.labels" . | nindent 6 }}
+{{- end }}

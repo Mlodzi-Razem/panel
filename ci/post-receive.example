@@ -1,0 +1,70 @@
+#!/bin/sh
+# ci/post-receive.example — APPENDIX: GitHub-less release option (not the
+# default path!). Kept here for the day the owner wants pushes to go straight
+# to the VPS without GitHub. The default path is .github/workflows/stage.yml
+# (GitHub private repo + GHCR + ssh deploy); the manual fallback is
+# ci/release-local.sh.
+#
+# Installation (owner, on the VPS):
+#   git init --bare /home/nepose/git/panel.git
+#   cp ci/post-receive.example /home/nepose/git/panel.git/hooks/post-receive
+#   chmod +x /home/nepose/git/panel.git/hooks/post-receive
+#   git configfile hooks.stage_dir defaults to /opt/panel-stage:
+#     git --git-dir=/home/nepose/git/panel.git config hooks.stage_dir /opt/panel-stage
+#   On the dev machine:
+#     git remote add vps nepose@<VPS_HOST>:git/panel.git
+#     git push vps release/stage        (or a tag)
+#
+# What it does: on every push of refs/heads/release/stage (or a tag sha-*)
+# the hook checks the pushed tree out to a bare-worktree dir and rsyncs the
+# deploy/stage bundle into place. If DOCKER_BUILD_ON_VPS is enabled in the
+# bare repo config AND the VPS has the resources (~4 GB RAM free for the
+# Maven build), it also builds both images ON the VPS and switches the stack
+# the same way ci/deploy-on-vps.sh does — otherwise it only syncs files and
+# prints a reminder that the release still needs images (from Mac/GHCR).
+#
+# NOTE: do NOT use git push to a branch named main/master on the VPS for
+# deploys — deploys are driven by release/stage only, mirroring the GitHub
+# path's explicitness.
+set -eu
+
+GIT_DIR_ABS="$(cd "$(dirname "$0")/.." && pwd)"
+STAGE_DIR="$(git --git-dir="$GIT_DIR_ABS" config hooks.stage_dir 2>/dev/null || echo /opt/panel-stage)"
+CHECKOUT_DIR="$(git --git-dir="$GIT_DIR_ABS" config hooks.checkout_dir 2>/dev/null || echo /tmp/panel-checkouts)"
+
+while read -r OLDREV NEWREV REFNAME; do
+    case "$REFNAME" in
+        refs/heads/release/stage) ;;
+        refs/tags/*) ;;
+        *) continue ;;
+    esac
+
+    echo "== post-receive: $REFNAME ($NEWREV) =="
+
+    mkdir -p "$CHECKOUT_DIR"
+    # Check the pushed tree out (detached) to the receipts dir.
+    git --git-dir="$GIT_DIR_ABS" --work-tree="$CHECKOUT_DIR" checkout -f "$NEWREV"
+
+    # Sync the stage bundle (compose, Caddyfile, scripts — never the owner's
+    # .env.stage / panel-config / backups / release pointers).
+    rsync -rlptD \
+        --exclude .env.stage --exclude release.env --exclude releases.txt \
+        --exclude last-stable.txt --exclude panel-config/ --exclude backups/ \
+        "${CHECKOUT_DIR}/deploy/stage/" "${STAGE_DIR}/"
+    mkdir -p "${STAGE_DIR}/ci"
+    cp "${CHECKOUT_DIR}/ci/deploy-on-vps.sh" "${STAGE_DIR}/ci/"
+
+    if [ "$(git --git-dir="$GIT_DIR_ABS" config hooks.docker_build_on_vps 2>/dev/null || echo false)" = "true" ]; then
+        echo "== post-receive: build na VPS (kompilacja ~RAM intensywna!) =="
+        TAG="$(echo "$NEWREV" | cut -c1-7)"
+        docker build --build-arg "GIT_TAG=$TAG" \
+            -t "panel-api:${TAG}" -f services/panel-api/Dockerfile "$CHECKOUT_DIR"
+        docker build --build-arg "GIT_TAG=$TAG" \
+            -t "panel-web:${TAG}" -f services/panel-web/Dockerfile "$CHECKOUT_DIR/services/panel-web"
+        "${STAGE_DIR}/ci/deploy-on-vps.sh" \
+            --api-image "panel-api:${TAG}" --web-image "panel-web:${TAG}" --skip-pull
+    else
+        echo "== post-receive: pliki zsynchronizowane; obrazy NIE zbudowane na VPS. =="
+        echo "    dokończ release: ./ci/release-local.sh z Maca albo GHCR (default path)."
+    fi
+done

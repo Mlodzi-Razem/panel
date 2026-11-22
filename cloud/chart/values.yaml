@@ -2,6 +2,11 @@ panel:
   k8s:
     prometheus:
       release: kube-prometheus-stack #make sure that it matches the release name used during installation
+      # PodMonitors require the monitoring.coreos.com CRDs (kube-prometheus-stack
+      # or the prometheus-operator-crd bundle). On clusters without them — e.g. a
+      # plain MicroK8s — turn this off; the services then run without scrape objects.
+      podMonitors:
+        enabled: true
   # ----------------------------------
   # version: 1.35.0
   # ----------------------------------
@@ -41,6 +46,9 @@ panel:
       maximumMemoryMb: 2048
       requestedCpuCores: 2
     image: ghcr.io/mlodzi-razem/panel-api:0.0.0-MRPANEL-SNAPSHOT
+    # Name of a pre-created docker-registry Secret (dockerconfigjson) for
+    # pulling private images; unset = no imagePullSecrets.
+    imagePullSecret: ''
     service:
       type: ClusterIP
     hpa:
@@ -73,6 +81,9 @@ panel:
       maximumMemoryMb: 768
       requestedCpuCores: 0.5
     image: ghcr.io/mlodzi-razem/panel-web:0.0.0-MRPANEL-SNAPSHOT
+    # Name of a pre-created docker-registry Secret (dockerconfigjson) for
+    # pulling private images; unset = no imagePullSecrets.
+    imagePullSecret: ''
     service:
       type: ClusterIP
     hpa:
@@ -107,6 +118,18 @@ panel:
     gatewayClass: istio
     domains:
       - panel.mlodzirazem.org
+    tls:
+      # Which issuer provisions panel-ssl-cert. "origin-ca" keeps the Cloudflare
+      # Origin CA flow this chart was built with (origin-ca-issuer controller +
+      # an API token; the zone is proxy=orange in Cloudflare). "letsencrypt"
+      # switches to a cert-manager ACME ClusterIssuer whose HTTP-01 challenge is
+      # solved through the extra port-80 listener on the panel Gateway — use it
+      # when the domain resolves straight to this cluster without Cloudflare's
+      # proxy; it needs cert-manager >= 1.16 with Gateway API support enabled.
+      issuer: origin-ca
+      # ACME account e-mail for the Lets Encrypt issuer (required when issuer
+      # is "letsencrypt"; a public value, not a secret).
+      acmeEmail: ''
 
   #For autocompletion and linting purposes only. Define your secrets in a separate file.
   secrets:

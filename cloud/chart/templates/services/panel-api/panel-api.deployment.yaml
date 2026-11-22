@@ -25,6 +25,11 @@ spec:
       annotations:
         instrumentation.opentelemetry.io/inject-java: "panel-otel-instrumentation"
     spec:
+      {{- /* Optional pre-created docker-registry Secret for private images. */ -}}
+      {{- with .Values.panel.api.imagePullSecret }}
+      imagePullSecrets:
+        - name: {{ tpl . $ | quote }}
+      {{- end }}
       volumes:
         - name: config
           secret:

@@ -1,0 +1,95 @@
+# values.stage-microk8s.yaml — overlay STAGE dla wariantu K (microk8s, AD-9).
+#
+# Tylko wartości NIE-tajne; sekrety idą osobno przez values.stage-secrets.yaml
+# (szablon: values.stage-secrets.example.yaml). Konsument: ci/deploy-helm-on-vps.sh
+#   helm upgrade --install panel-stage cloud/chart -n stage --create-namespace \
+#     -f values.stage-microk8s.yaml -f values.stage-secrets.yaml \
+#     --set panel.api.image=... --set panel.web.image=...
+#
+# Założenia zweryfikowane na klastrze (inwentarz właściciela, raport „Sekcja K"):
+# GatewayClass istio (Installed=True), cert-manager, CNPG operator,
+# kube-prometheus-stack (CRD PodMonitor istnieją), origin-ca-issuer, MetalLB.
+# Baza CNPG: postgresql:18.1 (przypięte w chart) → spełnia wymóg PG18
+# (VIRTUAL generated columns w migracjach).
+#
+# Ekspozycja publiczna 80/443 przez istio-ingressgateway nie jest częścią
+# overlay — to decyzja infra (raport: „Ekspozycja publiczna", RUNBOOK §11).
+
+panel:
+  # Tracing: chart domyślnie stawia jaeger-all-in-one; na stage wyłączone
+  # (klaster ma tempo+loki w observability — podpięcie to przyszła zmiana
+  # chartu; ślady na dzień 1 zbierane nie są — patrz raport).
+  # UWAGA: helm scal ąmapy głęboko — trzeba wyłączyć także jaeger.gateway,
+  # inaczej wyrenderuje się osierocony gateway kolektora (port 8081).
+  jaeger:
+    enabled: false
+    gateway:
+      enabled: false
+
+  postgres:
+    cnpg:
+      install: true
+      volumes:
+        data:
+          storageLimitGigabytes: 10
+          cnpgPvcTemplate:
+            volumeName: null
+            # MicroK8s hostpath storage (domyślna klasa na tym klastrze);
+            # prod używała "manual" (ręczne PV).
+            storageClassName: microk8s-hostpath
+
+  # PodMonitory: CRD istnieją na klastrze (kube-prometheus-stack w ns
+  # observability). Upewnij się, że release prometheusa nazywa się tam
+  # "kube-prometheus-stack" (panel.k8s.prometheus.release) — RUNBOOK §11.3.
+  k8s:
+    prometheus:
+      release: kube-prometheus-stack
+      podMonitors:
+        enabled: true
+
+  api:
+    # Wdrażane z GHCR przez ci/deploy-helm-on-vps.sh (--set panel.api.image).
+    image: ghcr.io/Mlodzi-Razem/panel-api:stage
+    #dockerconfigjson z sekretem GHCR tworzy właściciel (RUNBOOK §11.4).
+    imagePullSecret: ""
+    replicaResources:
+      # Stage na 8 vCPU: minimum z chart-schema (api: 1 CPU, web: 0.5 CPU).
+      maximumMemoryMb: 1024
+      requestedCpuCores: 1
+    # NetworkPolicy zostaje włączona: ingress do panel-api tylko z panel-web
+    # (ten sam ns) i scrapowanie 9080 z observability.
+    networkPolicy:
+      enabled: true
+      monitoringNamespace: observability
+
+  web:
+    url: https://dev.panel.mlodzirazem.org
+    image: ghcr.io/Mlodzi-Razem/panel-web:stage
+    imagePullSecret: ""
+    hpa:
+      enabled: false
+    # panel.web.replicas jest wymagane, gdy hpa.enabled=false (szablon
+    # deploymentu czyta je przez tpl — musi być string).
+    replicas: "1"
+    rollingUpdates:
+      enabled: false
+    replicaResources:
+      maximumMemoryMb: 768
+      requestedCpuCores: 0.5
+
+  gateway:
+    install: true
+    # GatewayClass "istio" istnieje na tym klastrze (Installed=True).
+    gatewayClass: istio
+    domains:
+      - dev.panel.mlodzirazem.org
+    tls:
+      # REKOMENDACJA na stage (raport „Sekcja K"): letsencrypt przez HTTP-01
+      # na gatewayu (bez proxowania Cloudflare; zero tokenów CF). Wariant
+      # "origin-ca" też działa (kontroler origin-ca-issuer jest w klastrze)
+      # — wymaga wtedy wartości cloudflare.apiKey w pliku sekretów i
+      # proxowania DNS dev.panel w Cloudflare.
+      issuer: letsencrypt
+      # Publiczny e-mail ACME (nie sekret) — właściciel uzupełnia w kopii
+      # tego pliku na VPS (albo przełącza na origin-ca i czyści pole).
+      acmeEmail: bartosz.baginski@proton.me
