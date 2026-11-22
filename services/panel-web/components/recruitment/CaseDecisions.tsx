@@ -30,7 +30,7 @@ import { FormattedCaseDate } from "@/components/recruitment/format";
  * The collegial resolutions of the admission: ZK approval (the global RECRUITMENT_APPROVE role records
  * it) and the ZO admission resolution (the district RECRUITMENT_MANAGE role records it, after the ZK
  * approval exists). Both are only writable in ZK_VOTING and never flip the status by themselves —
- * they are the conditions the future ACCEPTED allocation checks. The kind is pinned by which
+ * they are the conditions the ACCEPTED admission checks. The kind is pinned by which
  * form the operator is allowed to see; the deciding body is implied by the kind.
  */
 export default function CaseDecisions({

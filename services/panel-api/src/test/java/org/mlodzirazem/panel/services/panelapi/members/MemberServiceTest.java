@@ -99,6 +99,30 @@ class MemberServiceTest extends DomainTestSupport {
     }
 
     @Test
+    void createStartsTheAffiliationOnTheGivenDateButNeverInTheFuture() {
+        Map<MemberField, Object> values = new EnumMap<>(MemberField.class);
+        values.put(MemberField.PREFERRED_NAME_FIRST, "Data");
+        values.put(MemberField.PREFERRED_NAME_LAST, "Afiliacji");
+        values.put(MemberField.FORMAL_NAME_FIRST, "Data");
+        values.put(MemberField.FORMAL_NAME_LAST, "Afiliacji");
+        values.put(MemberField.BIRTH_DATE, LocalDate.of(2003, 3, 3));
+
+        LocalDate past = LocalDate.now().minusDays(5);
+        TMember created = memberService.create(
+            new NewMember(values, district("mazowieckie").getId(), false, past));
+
+        assertThat(jdbc.queryForObject(
+            "SELECT valid_from FROM member_district_affiliations WHERE member_id = ? AND kind = 'PRIMARY'",
+            LocalDate.class, created.getId())).isEqualTo(past);
+
+        LocalDate future = LocalDate.now().plusDays(1);
+        assertThatThrownBy(() -> memberService.create(
+            new NewMember(values, district("mazowieckie").getId(), false, future)))
+            .isInstanceOf(RuleViolationException.class)
+            .extracting("code").isEqualTo("AFFILIATION_DATE_IN_FUTURE");
+    }
+
+    @Test
     void createEnforcesAdmissionAge() {
         Map<MemberField, Object> values = new EnumMap<>(MemberField.class);
         values.put(MemberField.PREFERRED_NAME_FIRST, "Old");

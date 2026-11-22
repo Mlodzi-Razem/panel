@@ -133,7 +133,8 @@ class DefaultMemberService implements MemberService {
             throw ConstraintConflicts.translate(conflict, UNIQUE_KEY_CONFLICTS);
         }
 
-        affiliations.setPrimaryDistrict(member.getId(), newMember.primaryDistrictId(), false);
+        affiliations.setPrimaryDistrict(member.getId(), newMember.primaryDistrictId(), false,
+            newMember.affiliationValidFrom());
 
         auditLog.record("members :: create", AuditPayload.of("memberId", member.getId())
                                                          .withFields(names(newMember.values().keySet())));

@@ -20,6 +20,9 @@ package org.mlodzirazem.panel.services.panelapi.members;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBody;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMemberDistrictAffiliation;
 
+import org.jspecify.annotations.Nullable;
+
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,6 +44,18 @@ public interface AffiliationService {
      * (or nothing) held it. A supporting affiliation to the target district is promoted.
      */
     TMemberDistrictAffiliation setPrimaryDistrict(long memberId, long districtId, boolean keepPreviousAsSupporting);
+
+    /**
+     * As {@link #setPrimaryDistrict(long, long, boolean)}, but the new affiliation starts on {@code validFrom}
+     * ({@code null} means today). Meant for a member's first affiliation (admission); a date in the future is
+     * refused with {@code AFFILIATION_DATE_IN_FUTURE}.
+     */
+    TMemberDistrictAffiliation setPrimaryDistrict(
+        long memberId,
+        long districtId,
+        boolean keepPreviousAsSupporting,
+        @Nullable LocalDate validFrom
+    );
 
     TMemberDistrictAffiliation addSupportingDistrict(long memberId, long districtId, boolean votesHere);
 

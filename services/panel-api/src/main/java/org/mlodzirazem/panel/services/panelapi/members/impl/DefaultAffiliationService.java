@@ -126,6 +126,22 @@ class DefaultAffiliationService implements AffiliationService {
         long districtId,
         boolean keepPreviousAsSupporting
     ) {
+        return setPrimaryDistrict(memberId, districtId, keepPreviousAsSupporting, null);
+    }
+
+    @Override
+    @Transactional
+    public TMemberDistrictAffiliation setPrimaryDistrict(
+        long memberId,
+        long districtId,
+        boolean keepPreviousAsSupporting,
+        @Nullable LocalDate validFrom
+    ) {
+        if (validFrom != null && validFrom.isAfter(today())) {
+            throw new RuleViolationException("AFFILIATION_DATE_IN_FUTURE",
+                "The affiliation cannot start in the future");
+        }
+
         TMember member = member(memberId);
         TBody district = district(districtId);
         List<TMemberDistrictAffiliation> open = affiliations.findOpenByMemberId(memberId);
@@ -162,7 +178,8 @@ class DefaultAffiliationService implements AffiliationService {
             }
         }
 
-        TMemberDistrictAffiliation created = create(member, district, AffiliationKind.PRIMARY, votesHere);
+        TMemberDistrictAffiliation created = create(member, district, AffiliationKind.PRIMARY, votesHere,
+            validFrom == null ? today() : validFrom);
 
         auditLog.record(OPERATION_PRIMARY, payload(memberId, districtId));
 
@@ -281,12 +298,22 @@ class DefaultAffiliationService implements AffiliationService {
         AffiliationKind kind,
         boolean votesHere
     ) {
+        return create(member, district, kind, votesHere, today());
+    }
+
+    private TMemberDistrictAffiliation create(
+        TMember member,
+        TBody district,
+        AffiliationKind kind,
+        boolean votesHere,
+        LocalDate validFrom
+    ) {
         TMemberDistrictAffiliation affiliation = new TMemberDistrictAffiliation();
         affiliation.setMember(member);
         affiliation.setDistrict(district);
         affiliation.setKind(kind);
         affiliation.setVotesHere(votesHere);
-        affiliation.setValidFrom(today());
+        affiliation.setValidFrom(validFrom);
         affiliation.setCreatedBy(actor());
 
         return write(affiliation);

@@ -183,6 +183,14 @@ public final class RecruitmentRules {
      * the association's own governance breach and is NOT blocked by the engine — the case would have
      * no exit otherwise; see the M3 report.
      */
+    /** A collegial decision is recorded on or after the day it was taken, never ahead of the calendar. */
+    public static void assertDecisionNotInFuture(LocalDate decidedOn, LocalDate today) {
+        if (decidedOn.isAfter(today)) {
+            throw new RuleViolationException("DECISION_DATE_IN_FUTURE",
+                "The decision date cannot be in the future");
+        }
+    }
+
     public static void assertAssessmentNotTooEarly(LocalDate decidedOn, LocalDate assessmentNotBeforeOn) {
         if (decidedOn.isBefore(assessmentNotBeforeOn)) {
             throw new RuleViolationException("ASSESSMENT_TOO_EARLY",

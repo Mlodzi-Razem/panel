@@ -463,6 +463,8 @@ class DefaultRecruitmentWorkflowService implements RecruitmentWorkflowService {
         String signature,
         @Nullable String note
     ) {
+        RecruitmentRules.assertDecisionNotInFuture(decidedOn, LocalDate.now(clock));
+
         if (decisionRepository.findByRecruitmentCaseIdAndDecisionKind(recruitmentCase.getId(), kind).isPresent()) {
             throw new ConflictException("DECISION_ALREADY_RECORDED",
                 "The case already has a %s decision".formatted(kind));

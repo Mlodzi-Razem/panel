@@ -49,6 +49,7 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TR
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TRecruitmentDecisionRepository;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType;
 import org.mlodzirazem.panel.services.panelapi.recruitment.NewRecruitmentCase;
+import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentAdmissionService;
 import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentCaseService;
 import org.mlodzirazem.panel.services.panelapi.recruitment.workflow.RecruitmentRules;
 import org.mlodzirazem.panel.services.panelapi.recruitment.workflow.RecruitmentWorkflowService;
@@ -88,6 +89,7 @@ public class RecruitmentCasesController {
     private final CallerResolver callers;
     private final RecruitmentCaseService recruitment;
     private final RecruitmentWorkflowService workflow;
+    private final RecruitmentAdmissionService admission;
     private final RecruitmentCaseSearch search;
     private final RecruitmentCandidateParser parser;
     private final TRecruitmentCaseRepository cases;
@@ -231,7 +233,10 @@ public class RecruitmentCasesController {
         requireReachable(candidateCase, request.target());
         requireNotReserved(request.target());
 
-        if (postDeclaration) {
+        if (request.target() == RecruitmentCaseStatus.ACCEPTED) {
+            // M6a: the admission (number allocation + members row + status flip) in one transaction.
+            admission.admit(id, caller.id());
+        } else if (postDeclaration) {
             transitionPostDeclaration(candidateCase, caller.id(), request);
         } else {
             recruitment.transition(id, request.target(), request.rejectionReason(), caller.id());
@@ -245,7 +250,7 @@ public class RecruitmentCasesController {
      * {@code ZK_APPROVAL} (global RECRUITMENT_APPROVE, decided by the Zarząd Krajowy) or
      * {@code ZO_ADMISSION_RESOLUTION} (RECRUITMENT_MANAGE of the case's district, decided by its
      * Zarząd Okręgu). The deciding body is resolved server-side; a second decision of the same kind
-     * answers 409 DECISION_ALREADY_RECORDED. The status flip to ACCEPTED stays with M6.
+     * answers 409 DECISION_ALREADY_RECORDED. The status flip to ACCEPTED is the admission transition (M6a).
      */
     @PostMapping("/{id}/decisions")
     public CaseDetailResponse recordDecision(@PathVariable("id") long id, @RequestBody DecisionRequest request) {
@@ -275,19 +280,13 @@ public class RecruitmentCasesController {
     }
 
     /**
-     * The two flows owned by other milestones refuse with the exact code the transitions helper
-     * shows, whatever the caller's permissions are: the declaration arrival (M4a, artifact-gated
-     * e-declaration) and the ACCEPTED flip (M6, member-number allocation in one transaction).
+     * The declaration arrival (M4a, artifact-gated e-declaration) refuses with the exact code the
+     * transitions helper shows, whatever the caller's permissions are.
      */
     private static void requireNotReserved(RecruitmentCaseStatus target) {
         if (target == RecruitmentCaseStatus.DECLARATION_RECEIVED) {
             throw new ConflictException("DECLARATION_ARTIFACT_REQUIRED",
                 "The declaration arrives with its artifact in the M4a e-declaration flow");
-        }
-
-        if (target == RecruitmentCaseStatus.ACCEPTED) {
-            throw new ConflictException("MEMBER_ALLOCATION_PENDING",
-                "ACCEPTED is reserved for the M6 admission flow (member number + members row)");
         }
     }
 
@@ -468,6 +467,9 @@ public class RecruitmentCasesController {
             candidateCase.getSecondAssessmentNotLaterOn(),
             candidateCase.getZoRecommendedOn(),
             candidateCase.getAdmissionResolutionNotLaterOn(),
+            candidateCase.getAcceptedOn(),
+            candidateCase.getAcceptedMember() == null ? null : candidateCase.getAcceptedMember().getId(),
+            candidateCase.getAcceptedMember() == null ? null : candidateCase.getAcceptedMember().getMemberId(),
             decisions.findAllByRecruitmentCaseId(candidateCase.getId()).stream()
                 .sorted(Comparator.comparing(TRecruitmentDecision::getDecidedOn)
                     .thenComparing(TRecruitmentDecision::getId))

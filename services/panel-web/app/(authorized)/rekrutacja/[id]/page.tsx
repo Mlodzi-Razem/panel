@@ -16,6 +16,7 @@
  */
 
 import React from "react";
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { updateRecruitmentCaseAction, sendCaseReminderAction, addCaseNoteAction } from "@/app/actions/recruitment";
 import ActionButton from "@/components/form/ActionButton";
@@ -107,6 +108,19 @@ export default async function RecruitmentCasePage({params}: { params: Promise<{ 
                 <div><dt>{t("fields.phone")}</dt><dd>{candidateCase.candidatePhone ?? "—"}</dd></div>
                 <div><dt>{t("fields.profile")}</dt><dd>{candidateCase.candidateSocialProfileUrl ?? "—"}</dd></div>
                 <div><dt>{t("fields.birthDate")}</dt><dd>{candidateCase.candidateBirthDate ?? "—"}</dd></div>
+                {candidateCase.acceptedMemberId != null && <div>
+                    <dt>{t("admittedMember")}</dt>
+                    <dd>
+                        <Link href={`/members/${candidateCase.acceptedMemberId}`}
+                              aria-label={t("openMemberRecord")}>
+                            {candidateCase.acceptedMemberNumber ?? candidateCase.acceptedMemberId}
+                        </Link>
+                    </dd>
+                </div>}
+                {candidateCase.acceptedOn && <div>
+                    <dt>{t("admittedOn")}</dt>
+                    <dd><FormattedCaseDate value={candidateCase.acceptedOn}/></dd>
+                </div>}
                 <div><dt>{t("openedAt")}</dt><dd><FormattedCaseDate value={candidateCase.createdAt}/></dd></div>
                 <div><dt>{t("updatedAt")}</dt><dd><FormattedCaseDate value={candidateCase.updatedAt}/></dd></div>
             </DescriptionList>

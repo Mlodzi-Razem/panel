@@ -87,8 +87,9 @@ public interface RecruitmentCaseService {
     /**
      * The statutory targets of the current status, each with the verdict the transition endpoint
      * would give right now: allowed through the whole state machine, blocked with the matching
-     * error code for closed cases and the two flows owned by other milestones — the declaration
-     * arrival (artifact-gated, M4a) and the ACCEPTED flip (member-number allocation, M6). The
+     * error code for closed cases and the declaration arrival (artifact-gated, M4a); the ACCEPTED
+     * flip (the member admission, M6a) is enabled once both collegial decisions are recorded and
+     * blocked with {@code BOTH_DECISIONS_REQUIRED} before. The
      * single source is {@link RecruitmentRules}, so the front end never keeps a local copy of the
      * state map.
      *

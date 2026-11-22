@@ -22,6 +22,9 @@ import org.junit.jupiter.api.Test;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.DeclarationForm;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentAssessmentTrack;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TRecruitmentCase;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TRecruitmentCaseRepository;
+import org.mlodzirazem.panel.services.panelapi.recruitment.eform.SyntheticPesel;
 import org.mlodzirazem.panel.services.panelapi.recruitment.workflow.RecruitmentWorkflowService;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -35,6 +38,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RecruitmentApiTest extends ApiTestSupport {
     @Autowired
     RecruitmentWorkflowService workflow;
+
+    @Autowired
+    TRecruitmentCaseRepository caseRepository;
 
     TMember zoA;
     TMember zoB;
@@ -538,22 +544,94 @@ class RecruitmentApiTest extends ApiTestSupport {
 
         assertThat(kinds(resolution))
             .contains("ZO_ASSESSMENT_POSITIVE", "ZK_APPROVAL", "ZO_ADMISSION_RESOLUTION");
-
-        Res accepted = post(zk, "/recruitment-cases/" + caseId + "/transitions",
-            Map.of("target", "ACCEPTED"));
-        assertThat(accepted.status()).isEqualTo(409);
-        assertThat(accepted.code()).isEqualTo("MEMBER_ALLOCATION_PENDING");
     }
 
     @Test
-    void acceptedFlipIsExplicitlyBlockedInTheHelperToo() {
+    void acceptedTransitionAdmitsTheMemberAndReturnsTheNumber() {
+        long caseId = votingCase("przyjmowana@example.org");
+
+        // Without both decisions the engine refuses and the helper says so.
+        Res early = post(zk, "/recruitment-cases/" + caseId + "/transitions", Map.of("target", "ACCEPTED"));
+        assertThat(early.status()).isEqualTo(409);
+        assertThat(early.code()).isEqualTo("BOTH_DECISIONS_REQUIRED");
+
+        recordBothDecisions(caseId);
+        giveAdmissionData(caseId);
+
+        Res options = get(zk, "/recruitment-cases/" + caseId + "/transitions");
+        assertThat(options.body().path("transitions").get(0).path("allowed").asBoolean()).isTrue();
+
+        assertThat(post(zoA, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "ACCEPTED")).status()).isEqualTo(403);
+        assertThat(post(zoB, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "ACCEPTED")).status()).isEqualTo(403);
+
+        Res accepted = post(zk, "/recruitment-cases/" + caseId + "/transitions", Map.of("target", "ACCEPTED"));
+        assertThat(accepted.status()).isEqualTo(200);
+        assertThat(accepted.body().path("status").asString()).isEqualTo("ACCEPTED");
+        assertThat(accepted.body().path("acceptedOn").asString()).isEqualTo(LocalDate.now().toString());
+        assertThat(accepted.body().path("closedAt").asString()).isEqualTo(LocalDate.now().toString());
+
+        long memberId = accepted.body().path("acceptedMemberId").asLong();
+        String number = accepted.body().path("acceptedMemberNumber").asString();
+        assertThat(memberId).isPositive();
+        assertThat(number).matches("\\d{6}");
+        assertThat(Integer.parseInt(number)).isLessThan(950_000);
+        assertThat(memberRepository.findById(memberId).orElseThrow().getMemberId()).isEqualTo(number);
+
+        // The case now reads the same, and a closed case is read-only.
+        Res again = get(zk, "/recruitment-cases/" + caseId);
+        assertThat(again.body().path("acceptedMemberNumber").asString()).isEqualTo(number);
+        assertThat(post(zk, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "ACCEPTED")).code()).isEqualTo("CASE_NOT_OPEN");
+    }
+
+    @Test
+    void acceptedTransitionRefusesAnExistingMemberGenerically() {
+        long caseId = votingCase("zdublowana@example.org");
+        recordBothDecisions(caseId);
+        giveAdmissionData(caseId);
+
+        TRecruitmentCase candidateCase = caseRepository.findById(caseId).orElseThrow();
+        TMember existing = newMember("Istniejacy", "Czlonek", "slaskie");
+        existing.setFormalIdentifier(candidateCase.getCandidateFormalIdentifier());
+        memberRepository.saveAndFlush(existing);
+
+        Res refused = post(zk, "/recruitment-cases/" + caseId + "/transitions", Map.of("target", "ACCEPTED"));
+        assertThat(refused.status()).isEqualTo(409);
+        assertThat(refused.code()).isEqualTo("MEMBER_ALREADY_EXISTS");
+        assertThat(refused.body().toString()).doesNotContain("Istniejacy").doesNotContain("Czlonek");
+        assertThat(get(zk, "/recruitment-cases/" + caseId).body().path("status").asString())
+            .isEqualTo("ZK_VOTING");
+    }
+
+    private void recordBothDecisions(long caseId) {
+        assertThat(post(zk, "/recruitment-cases/" + caseId + "/decisions",
+            Map.of("kind", "ZK_APPROVAL", "decidedOn", LocalDate.now().toString(),
+                "signature", "ZK/80/2026")).status()).isEqualTo(200);
+        assertThat(post(zoA, "/recruitment-cases/" + caseId + "/decisions",
+            Map.of("kind", "ZO_ADMISSION_RESOLUTION", "decidedOn", LocalDate.now().toString(),
+                "signature", "ZO/MZ/81/2026")).status()).isEqualTo(200);
+    }
+
+    /** What the e-declaration fills on the case: formal names and the (synthetic) identifier. */
+    private void giveAdmissionData(long caseId) {
+        TRecruitmentCase candidateCase = caseRepository.findById(caseId).orElseThrow();
+        candidateCase.setCandidateFormalFirstName("Persefona");
+        candidateCase.setCandidateFormalLastName("Procesowa");
+        candidateCase.setCandidateFormalIdentifier(SyntheticPesel.of(LocalDate.of(2007, 4, 1), 4242));
+        caseRepository.saveAndFlush(candidateCase);
+    }
+
+    @Test
+    void acceptedFlipIsBlockedInTheHelperUntilBothDecisionsExist() {
         long caseId = votingCase("rezerva@example.org");
 
         Res options = get(zk, "/recruitment-cases/" + caseId + "/transitions");
         assertThat(fieldValues(options, "target")).containsExactly("ACCEPTED", "REJECTED");
         assertThat(options.body().path("transitions").get(0).path("allowed").asBoolean()).isFalse();
         assertThat(options.body().path("transitions").get(0).path("blockedReason").asText())
-            .isEqualTo("MEMBER_ALLOCATION_PENDING");
+            .isEqualTo("BOTH_DECISIONS_REQUIRED");
 
         List<String> reasons = new ArrayList<>();
         options.body().path("transitions").get(1).path("rejectionReasons")

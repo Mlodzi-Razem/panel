@@ -240,6 +240,39 @@ class RecruitmentWorkflowServiceTest extends DomainTestSupport {
     }
 
     @Test
+    void decisionsDatedInTheFutureAreRefusedAndTodayIsAccepted() {
+        long zkActor = zkActor();
+        TRecruitmentCase recommended = recommendedCase("przyszla@example.org", LocalDate.now().minusDays(70));
+        long caseId = recommended.getId();
+        workflowService.startZkVoting(caseId, zkActor);
+
+        assertThatThrownBy(() -> workflowService.recordZkApproval(caseId, zkActor, body("national-board").getId(),
+            LocalDate.now().plusDays(1), "ZK/99/26", null))
+            .isInstanceOf(RuleViolationException.class)
+            .extracting("code").isEqualTo("DECISION_DATE_IN_FUTURE");
+        assertThat(hasDecision(caseId, RecruitmentDecisionKind.ZK_APPROVAL)).isFalse();
+
+        workflowService.recordZkApproval(caseId, zkActor, body("national-board").getId(),
+            LocalDate.now(), "ZK/99/26", null);
+
+        assertThatThrownBy(() -> workflowService.recordAdmissionResolution(caseId, zkActor,
+            board("mazowieckie").getId(), LocalDate.now().plusDays(1), "ZO/MZ/99/26", null))
+            .isInstanceOf(RuleViolationException.class)
+            .extracting("code").isEqualTo("DECISION_DATE_IN_FUTURE");
+        assertThat(hasDecision(caseId, RecruitmentDecisionKind.ZO_ADMISSION_RESOLUTION)).isFalse();
+
+        assertThatThrownBy(() -> workflowService.reject(caseId, zkActor, board("mazowieckie").getId(),
+            LocalDate.now().plusDays(2), RecruitmentRejectionReason.VOTE_FAILED, "ZO/MZ/98/26", null))
+            .isInstanceOf(RuleViolationException.class)
+            .extracting("code").isEqualTo("DECISION_DATE_IN_FUTURE");
+        assertThat(caseRepository.findById(caseId).orElseThrow().getClosedAt()).isNull();
+
+        workflowService.recordAdmissionResolution(caseId, zkActor, board("mazowieckie").getId(),
+            LocalDate.now(), "ZO/MZ/99/26", null);
+        assertThat(hasDecision(caseId, RecruitmentDecisionKind.ZO_ADMISSION_RESOLUTION)).isTrue();
+    }
+
+    @Test
     void admissionResolutionRequiresThePriorZkApproval() {
         long zkActor = zkActor();
         TRecruitmentCase recommended = recommendedCase("bezopinii@example.org", LocalDate.now().minusDays(70));

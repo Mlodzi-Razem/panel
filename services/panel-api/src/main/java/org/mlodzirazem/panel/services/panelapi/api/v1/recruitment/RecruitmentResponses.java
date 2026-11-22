@@ -84,6 +84,9 @@ public final class RecruitmentResponses {
         @Nullable LocalDate secondAssessmentNotLaterOn,
         @Nullable LocalDate zoRecommendedOn,
         @Nullable LocalDate admissionResolutionNotLaterOn,
+        @Nullable LocalDate acceptedOn,
+        @Nullable Long acceptedMemberId,
+        @Nullable String acceptedMemberNumber,
         List<CaseDecisionResponse> decisions,
         List<CaseEventResponse> events
     ) {

@@ -144,9 +144,9 @@ public interface RecruitmentWorkflowService {
     /**
      * ZK_VOTING → ACCEPTED: closes the case as PRZYJĘTA. Requires both the ZK approval and the ZO
      * admission resolution (the DB trigger of V0.0.6.00 backs this at the schema level); decisions are
-     * recorded first, the status flip last. The member row is linked here with its id — the automatic
-     * member-number allocation and the INSERT into {@code members} in the same transaction is the M6
-     * admission flow.
+     * recorded first, the status flip last. The member row is linked here with its id — callers go through
+     * {@link org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentAdmissionService}, which
+     * allocates the member number and INSERTs into {@code members} in the same transaction.
      *
      * @throws org.mlodzirazem.panel.services.panelapi.core.error.ConflictException code {@code BOTH_DECISIONS_REQUIRED} when a decision is still missing
      */

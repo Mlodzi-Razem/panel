@@ -415,11 +415,25 @@ class RecruitmentCaseServiceTest extends DomainTestSupport {
         assertThat(fromVoting).extracting(RecruitmentCaseTransitionOption::target)
             .containsExactly(RecruitmentCaseStatus.ACCEPTED, RecruitmentCaseStatus.REJECTED);
         assertThat(fromVoting.getFirst().allowed()).isFalse();
-        assertThat(fromVoting.getFirst().blockedReason()).isEqualTo("MEMBER_ALLOCATION_PENDING");
+        assertThat(fromVoting.getFirst().blockedReason()).isEqualTo("BOTH_DECISIONS_REQUIRED");
         assertThat(fromVoting.getFirst().rejectionReasons()).isNull();
         assertThat(fromVoting.get(1).allowed()).isTrue();
         assertThat(fromVoting.get(1).rejectionReasons())
             .containsExactly(RecruitmentRejectionReason.VOTE_FAILED, RecruitmentRejectionReason.ZK_BAN);
+
+        // One decision is not enough; with both recorded the admission (M6a) opens.
+        TMember zk = newMember("Bogna", "Krajowa", "mazowieckie");
+        grant(zk, body("national-board"), "CO_CHAIR");
+        workflow.recordZkApproval(voting.getId(), zk.getId(), body("national-board").getId(),
+            recommended.getZoRecommendedOn().plusDays(1), "ZK/45/2026", null);
+        assertThat(recruitmentCases.availableTransitions(voting.getId()).getFirst().allowed()).isFalse();
+
+        workflow.recordAdmissionResolution(voting.getId(), zk.getId(), board("mazowieckie").getId(),
+            recommended.getZoRecommendedOn().plusDays(2), "ZO/MZ/46/2026", null);
+        RecruitmentCaseTransitionOption accepted = recruitmentCases.availableTransitions(voting.getId()).getFirst();
+        assertThat(accepted.target()).isEqualTo(RecruitmentCaseStatus.ACCEPTED);
+        assertThat(accepted.allowed()).isTrue();
+        assertThat(accepted.blockedReason()).isNull();
     }
 
     private long districtActor() {

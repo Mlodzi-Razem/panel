@@ -127,6 +127,9 @@ export const caseDetailSchema = z.object({
     secondAssessmentNotLaterOn: z.string().nullish(),
     zoRecommendedOn: z.string().nullish(),
     admissionResolutionNotLaterOn: z.string().nullish(),
+    acceptedOn: z.string().nullish(),
+    acceptedMemberId: z.number().nullish(),
+    acceptedMemberNumber: z.string().nullish(),
     decisions: z.array(caseDecisionSchema),
     events: z.array(caseEventSchema),
 });

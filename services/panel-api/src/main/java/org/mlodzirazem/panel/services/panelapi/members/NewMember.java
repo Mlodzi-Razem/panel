@@ -19,14 +19,20 @@ package org.mlodzirazem.panel.services.panelapi.members;
 
 import org.jspecify.annotations.Nullable;
 
+import java.time.LocalDate;
 import java.util.Map;
 
 public record NewMember(
     Map<MemberField, @Nullable Object> values,
     long primaryDistrictId,
-    boolean enforceAdmissionAge
+    boolean enforceAdmissionAge,
+    @Nullable LocalDate affiliationValidFrom
 ) {
+    public NewMember(Map<MemberField, @Nullable Object> values, long primaryDistrictId, boolean enforceAdmissionAge) {
+        this(values, primaryDistrictId, enforceAdmissionAge, null);
+    }
+
     public NewMember(Map<MemberField, @Nullable Object> values, long primaryDistrictId) {
-        this(values, primaryDistrictId, true);
+        this(values, primaryDistrictId, true, null);
     }
 }

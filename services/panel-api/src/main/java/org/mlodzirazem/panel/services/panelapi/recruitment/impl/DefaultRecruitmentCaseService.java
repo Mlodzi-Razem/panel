@@ -31,6 +31,8 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.Members
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMemberRepository;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentCaseEventType;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentCaseStatus;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentDecisionKind;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TRecruitmentDecisionRepository;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentRejectionReason;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentSource;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TRecruitmentCase;
@@ -78,6 +80,7 @@ class DefaultRecruitmentCaseService implements RecruitmentCaseService {
     private final TRecruitmentCaseEventRepository events;
     private final TBodyRepository bodies;
     private final TMemberRepository members;
+    private final TRecruitmentDecisionRepository decisions;
     private final AuditLog auditLog;
     private final Clock clock;
 
@@ -262,15 +265,20 @@ class DefaultRecruitmentCaseService implements RecruitmentCaseService {
                     return new RecruitmentCaseTransitionOption(target, false, null, "CASE_NOT_OPEN");
                 }
 
-                // The two flows owned by other milestones stay visible but explicitly blocked:
-                // the declaration arrival is artifact-gated (M4a), ACCEPTED allocates the member
-                // number and the members row in one transaction (M6).
+                // The declaration arrival stays visible but explicitly blocked: it is artifact-gated
+                // (M4a). ACCEPTED is the member admission (M6a): enabled once both collegial
+                // decisions are on record, otherwise blocked with the code the engine would answer.
                 if (from == RecruitmentCaseStatus.AWAITING_DECLARATION
                     && target == RecruitmentCaseStatus.DECLARATION_RECEIVED) {
                     return new RecruitmentCaseTransitionOption(target, false, null, "DECLARATION_ARTIFACT_REQUIRED");
                 }
                 if (target == RecruitmentCaseStatus.ACCEPTED) {
-                    return new RecruitmentCaseTransitionOption(target, false, null, "MEMBER_ALLOCATION_PENDING");
+                    boolean bothDecisions = decisions.findByRecruitmentCaseIdAndDecisionKind(caseId,
+                        RecruitmentDecisionKind.ZK_APPROVAL).isPresent()
+                        && decisions.findByRecruitmentCaseIdAndDecisionKind(caseId,
+                        RecruitmentDecisionKind.ZO_ADMISSION_RESOLUTION).isPresent();
+                    return new RecruitmentCaseTransitionOption(target, bothDecisions, null,
+                        bothDecisions ? null : "BOTH_DECISIONS_REQUIRED");
                 }
 
                 if (target == RecruitmentCaseStatus.REJECTED) {
