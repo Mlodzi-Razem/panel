@@ -1,0 +1,34 @@
+# Caddyfile for the STAGE environment.
+#
+# {$VAR} is Caddy's environment syntax; docker-compose injects STAGE_HOST,
+# ACME_EMAIL and ACME_CA from .env.stage (service "caddy" in
+# docker-compose.stage.yaml). Automatic TLS: Caddy obtains a certificate from
+# Let's Encrypt for STAGE_HOST at first start (the DNS A record must already
+# point at the VPS). To test issuance without hitting rate limits, set
+# ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory in .env.stage.
+
+{
+	email {$ACME_EMAIL}
+	acme_ca {$ACME_CA}
+}
+
+{$STAGE_HOST} {
+	encode zstd gzip
+
+	# Everything goes to panel-web (Next.js standalone, port 3000).
+	# panel-web calls panel-api server-side, so no API vhost is published.
+	reverse_proxy panel-web:3000
+
+	header {
+		# Framing policy is set by the app itself (next.config.ts emits a
+		# per-route CSP frame-ancestors that also covers the Teams tabs);
+		# Caddy only adds transport security headers.
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

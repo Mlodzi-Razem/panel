@@ -1,0 +1,276 @@
+# .github/workflows/stage.yml — DEFAULT release path for the STAGE environment
+# (owner's VPS, dev.panel.mlodzirazem.org).
+#
+# Flow: push to `release/stage` (or tag v*) →
+#   verify panel-api (full `mvn verify`, Testcontainers on the runner Docker) →
+#   build both stage images for linux/amd64 and push to GHCR (short-sha tag,
+#   immutable, + branch tag + mutable `stage` pointer) →
+#   ssh to the VPS, rsync the deploy/stage bundle, run ci/deploy-on-vps.sh
+#   (pull + up -d --wait + healthcheck + last-stable for rollback).
+#
+# Manual rollback: Actions → this workflow → "Run workflow" on `main` with a
+# previously released tag (see the rollback-stage job).
+#
+# Required repository secrets (created by the owner, RUNBOOK §6 — the workflow
+# never needs registry credentials; the VPS pulls GHCR with the owner's own
+# deploy token): SSH_PRIVATE_KEY, VPS_HOST, VPS_USER, VPS_KNOWN_HOSTS.
+# Deploy directory: STAGE_DIR job env below (default /opt/panel-stage).
+
+name: Stage release
+
+on:
+  push:
+    branches:
+      - release/stage
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - release/stage
+      - main
+  workflow_dispatch:
+    inputs:
+      rollback_to:
+        description: 'Rollback: obraz tag (np. sha-6a9b6ff), pusty = nic'
+        required: false
+        default: ''
+
+concurrency:
+  group: stage-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  GHCR_PREFIX: ghcr.io/${{ github.repository_owner }}
+  STAGE_DIR: /opt/panel-stage
+  # Which deployment this workflow drives: "compose" (docker compose beside
+  # microk8s) or "helm" (chart cloud/ installed into microk8s, see RUNBOOK §11).
+  # Job-level `if` cannot read env on push events, so the variant gates STEPS.
+  # Default remains compose until the owner decides on the K variant.
+  DEPLOY_VARIANT: compose
+
+jobs:
+  # --------------------------------------------------------------------------
+  # 1. panel-api: full verify (Testcontainers uses the runner's Docker).
+  #    junit-platform.properties has parallel enabled with same_thread default,
+  #    which is CI-safe; runners have enough RAM, so no argLine overrides.
+  # --------------------------------------------------------------------------
+  verify-panel-api:
+    name: panel-api verify
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: temurin
+          architecture: x64
+          cache: maven
+      - name: Validate the stage compose file
+        working-directory: deploy/stage
+        env:
+          STAGE_ENV_FILE: .env.stage.example
+        run: docker compose -f docker-compose.stage.yaml --env-file .env.stage.example config -q
+      - name: Maven verify (panel-api with upstream modules)
+        run: mvn --batch-mode --update-snapshots -pl services/panel-api -am verify
+
+  # --------------------------------------------------------------------------
+  # 2. Build + push both images to GHCR. Tags per docker/metadata-action:
+  #      sha-<short>          immutable, used by the deploy job and rollback
+  #      <branch-or-tag>      e.g. release-stage or v0.1.2
+  #      stage                mutable pointer, only from release/stage
+  #    platform: linux/amd64 only (the VPS is x86_64).
+  # --------------------------------------------------------------------------
+  build-images:
+    name: Build and push images
+    runs-on: ubuntu-24.04
+    needs: verify-panel-api
+    if: github.event_name == 'push'
+    strategy:
+      matrix:
+        include:
+          - service: panel-api
+            context: .
+            file: services/panel-api/Dockerfile
+          - service: panel-web
+            context: services/panel-web
+            file: services/panel-web/Dockerfile
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.GHCR_PREFIX }}/${{ matrix.service }}
+          flavor: latest=false
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=ref,event=branch
+            type=ref,event=tag
+            type=raw,value=stage,enable=${{ github.ref == 'refs/heads/release/stage' }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          build-args: GIT_TAG=${{ steps.meta.outputs.version }}
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=stage-${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=stage-${{ matrix.service }}
+
+  # --------------------------------------------------------------------------
+  # 3. Deploy to the VPS (only pushes to release/stage or v* tags).
+  #    TWO VARIANTS, gated per-step by env.DEPLOY_VARIANT:
+  #      compose — rsync deploy/stage bundle, run ci/deploy-on-vps.sh (default);
+  #      helm    — additionally rsync cloud/chart + deploy/stage/microk8s and
+  #                run ci/deploy-helm-on-vps.sh (chart cloud/ into microk8s,
+  #                RUNBOOK §11). Flip env.DEPLOY_VARIANT when K is chosen.
+  # --------------------------------------------------------------------------
+  deploy-stage:
+    name: Deploy to the VPS (compose)
+    runs-on: ubuntu-24.04
+    needs: build-images
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/release/stage' || startsWith(github.ref, 'refs/tags/v'))
+    environment: stage
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install the deploy key
+        run: |
+          install -m 600 /dev/null "${RUNNER_TEMP}/stage_key"
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > "${RUNNER_TEMP}/stage_key"
+          printf '%s\n' "${{ secrets.VPS_KNOWN_HOSTS }}" > "${RUNNER_TEMP}/known_hosts"
+          # GHCR rejects uppercase repository names; metadata-action lowercases
+          # on push, so the deploy refs must be lowercase as well.
+          echo "GHCR_PREFIX_LC=$(printf '%s' "$GHCR_PREFIX" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+      - name: (skip) not the active variant
+        if: env.DEPLOY_VARIANT != 'compose'
+        run: echo "DEPLOY_VARIANT=${DEPLOY_VARIANT} — nic nie robię."
+      - name: Sync the stage bundle
+        if: env.DEPLOY_VARIANT == 'compose'
+        run: |
+          rsync -rlptD \
+            -e "ssh -i ${RUNNER_TEMP}/stage_key -o UserKnownHostsFile=${RUNNER_TEMP}/known_hosts -o IdentitiesOnly=yes" \
+            --exclude .env.stage --exclude release.env --exclude releases.txt --exclude last-stable.txt \
+            --exclude panel-config/ --exclude backups/ \
+            deploy/stage/ "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.STAGE_DIR }}/"
+          ssh -i "${RUNNER_TEMP}/stage_key" \
+            -o UserKnownHostsFile="${RUNNER_TEMP}/known_hosts" -o IdentitiesOnly=yes \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "mkdir -p '${{ env.STAGE_DIR }}/ci' '${{ env.STAGE_DIR }}/panel-config' '${{ env.STAGE_DIR }}/backups'"
+          rsync -q \
+            -e "ssh -i ${RUNNER_TEMP}/stage_key -o UserKnownHostsFile=${RUNNER_TEMP}/known_hosts -o IdentitiesOnly=yes" \
+            ci/deploy-on-vps.sh "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.STAGE_DIR }}/ci/"
+      - name: Pull, switch, healthcheck
+        if: env.DEPLOY_VARIANT == 'compose'
+        run: |
+          ssh -i "${RUNNER_TEMP}/stage_key" \
+            -o UserKnownHostsFile="${RUNNER_TEMP}/known_hosts" -o IdentitiesOnly=yes \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "cd '${{ env.STAGE_DIR }}' && \
+             ./ci/deploy-on-vps.sh \
+               --api-image '${{ env.GHCR_PREFIX_LC }}/panel-api:sha-${GITHUB_SHA::7}' \
+               --web-image '${{ env.GHCR_PREFIX_LC }}/panel-web:sha-${GITHUB_SHA::7}'"
+
+  deploy-stage-helm:
+    name: Deploy to the VPS (helm / microk8s)
+    runs-on: ubuntu-24.04
+    needs: build-images
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/release/stage' || startsWith(github.ref, 'refs/tags/v'))
+    environment: stage
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install the deploy key
+        run: |
+          install -m 600 /dev/null "${RUNNER_TEMP}/stage_key"
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > "${RUNNER_TEMP}/stage_key"
+          printf '%s\n' "${{ secrets.VPS_KNOWN_HOSTS }}" > "${RUNNER_TEMP}/known_hosts"
+          echo "GHCR_PREFIX_LC=$(printf '%s' "$GHCR_PREFIX" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+      - name: (skip) not the active variant
+        if: env.DEPLOY_VARIANT != 'helm'
+        run: echo "DEPLOY_VARIANT=${DEPLOY_VARIANT} — nic nie robię."
+      - name: Sync the chart and the stage overlay
+        if: env.DEPLOY_VARIANT == 'helm'
+        run: |
+          ssh -i "${RUNNER_TEMP}/stage_key" \
+            -o UserKnownHostsFile="${RUNNER_TEMP}/known_hosts" -o IdentitiesOnly=yes \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "mkdir -p '${{ env.STAGE_DIR }}/ci' '${{ env.STAGE_DIR }}/microk8s'"
+          # Chart + overlay (never the owner's values.stage-secrets.yaml — it lives
+          # only on the VPS; rsync does not touch it on the far side either).
+          rsync -rlptD --delete \
+            -e "ssh -i ${RUNNER_TEMP}/stage_key -o UserKnownHostsFile=${RUNNER_TEMP}/known_hosts -o IdentitiesOnly=yes" \
+            cloud/chart/ "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.STAGE_DIR }}/cloud/chart/"
+          rsync -rlptD \
+            -e "ssh -i ${RUNNER_TEMP}/stage_key -o UserKnownHostsFile=${RUNNER_TEMP}/known_hosts -o IdentitiesOnly=yes" \
+            --exclude values.stage-secrets.yaml \
+            deploy/stage/microk8s/ "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.STAGE_DIR }}/microk8s/"
+          rsync -q \
+            -e "ssh -i ${RUNNER_TEMP}/stage_key -o UserKnownHostsFile=${RUNNER_TEMP}/known_hosts -o IdentitiesOnly=yes" \
+            ci/deploy-helm-on-vps.sh "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.STAGE_DIR }}/ci/"
+      - name: Helm upgrade, rollout, healthcheck
+        if: env.DEPLOY_VARIANT == 'helm'
+        run: |
+          ssh -i "${RUNNER_TEMP}/stage_key" \
+            -o UserKnownHostsFile="${RUNNER_TEMP}/known_hosts" -o IdentitiesOnly=yes \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "cd '${{ env.STAGE_DIR }}' && \
+             ./ci/deploy-helm-on-vps.sh \
+               --api-image '${{ env.GHCR_PREFIX_LC }}/panel-api:sha-${GITHUB_SHA::7}' \
+               --web-image '${{ env.GHCR_PREFIX_LC }}/panel-web:sha-${GITHUB_SHA::7}'"
+
+  # --------------------------------------------------------------------------
+  # 4. Manual rollback: workflow_dispatch with the previously released tag.
+  #    e.g. "Run workflow" with rollback_to = sha-6a9b6ff restores that release
+  #    (compose: retag; helm: re-upgrade with the given images). An empty
+  #    rollback_to with the helm variant means "helm rollback" to the previous
+  #    revision.
+  # --------------------------------------------------------------------------
+  rollback-stage:
+    name: Rollback to an earlier release
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'workflow_dispatch'
+    environment: stage
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install the deploy key
+        run: |
+          install -m 600 /dev/null "${RUNNER_TEMP}/stage_key"
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > "${RUNNER_TEMP}/stage_key"
+          printf '%s\n' "${{ secrets.VPS_KNOWN_HOSTS }}" > "${RUNNER_TEMP}/known_hosts"
+          echo "GHCR_PREFIX_LC=$(printf '%s' "$GHCR_PREFIX" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+      - name: Rollback (compose)
+        if: env.DEPLOY_VARIANT == 'compose' && inputs.rollback_to != ''
+        run: |
+          ssh -i "${RUNNER_TEMP}/stage_key" \
+            -o UserKnownHostsFile="${RUNNER_TEMP}/known_hosts" -o IdentitiesOnly=yes \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "cd '${{ env.STAGE_DIR }}' && ./scripts/rollback.sh --to '${{ inputs.rollback_to }}' --yes"
+      - name: Rollback (helm, previous revision)
+        if: env.DEPLOY_VARIANT == 'helm' && inputs.rollback_to == ''
+        run: |
+          ssh -i "${RUNNER_TEMP}/stage_key" \
+            -o UserKnownHostsFile="${RUNNER_TEMP}/known_hosts" -o IdentitiesOnly=yes \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "microk8s helm rollback panel-stage -n stage && \
+             microk8s kubectl -n stage rollout status deploy/panel-api --timeout=300s"
+      - name: Rollback (helm, explicit tag)
+        if: env.DEPLOY_VARIANT == 'helm' && inputs.rollback_to != ''
+        run: |
+          ssh -i "${RUNNER_TEMP}/stage_key" \
+            -o UserKnownHostsFile="${RUNNER_TEMP}/known_hosts" -o IdentitiesOnly=yes \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "cd '${{ env.STAGE_DIR }}' && ./ci/deploy-helm-on-vps.sh \
+               --api-image '${{ env.GHCR_PREFIX_LC }}/panel-api:${{ inputs.rollback_to }}' \
+               --web-image '${{ env.GHCR_PREFIX_LC }}/panel-web:${{ inputs.rollback_to }}'"

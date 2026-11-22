@@ -1,0 +1,8 @@
+# Never commit the real stage environment, owner-supplied configs or backups.
+.env.stage
+panel-config/
+backups/
+last-stable.txt
+releases.txt
+release.env
+microk8s/values.stage-secrets.yaml

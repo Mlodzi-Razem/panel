@@ -1,0 +1,7 @@
+# Build context of services/panel-web/Dockerfile (context = this directory).
+# Keeps local dev artifacts out of the image build; the root .dockerignore
+# does not apply, because the context is the service directory itself.
+node_modules
+.next
+.git
+.DS_Store
