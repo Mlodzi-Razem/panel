@@ -55,6 +55,12 @@ panel:
       # See `services/panel-api/src/main/resources/panel.yaml` for reference
       panel: {}
       #------------------------------
+  # Transactional e-mail through Microsoft Graph (needs Mail.Send on the Entra app, see panel.secrets.entra).
+  # Off by default; the sender must be a mailbox in the association's own domain, never *.onmicrosoft.com.
+  mail:
+    enabled: false
+    sender: ''
+    dailyExternalLimit: 300
   web:
     url: https://panel.mlodzirazem.org
     auth:

@@ -133,6 +133,13 @@ const PanelApi = z.object({
     }),
 })
 
+const PanelMail = z.object({
+    enabled: z.boolean(),
+    // Mailbox in the association's own domain; empty while mail is disabled.
+    sender: z.string(),
+    dailyExternalLimit: z.number().int().min(0),
+})
+
 const PanelWeb = z.object({
     url: z.url(),
     metricsToken: z.string().optional(),
@@ -222,6 +229,7 @@ const PanelValues = z.object({
         jaeger: Jaeger,
         postgres: Postgres,
         api: PanelApi,
+        mail: PanelMail.optional(),
         web: PanelWeb,
         gateway: Gateway,
         secrets: Secrets,

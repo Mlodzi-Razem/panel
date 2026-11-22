@@ -84,6 +84,19 @@ spec:
                   name: panel-api-auth
                   optional: true
             {{- end }}
+            {{- with .Values.panel.mail }}
+            # transactional mail (M5): off unless panel.mail.enabled; the sender must be in the association's own domain
+            - name: PANEL_MAIL_ENABLED
+              value: {{ .enabled | default false | quote }}
+            {{- if .sender }}
+            - name: PANEL_MAIL_SENDER
+              value: {{ .sender | quote }}
+            {{- end }}
+            {{- if .dailyExternalLimit }}
+            - name: PANEL_MAIL_DAILY_EXTERNAL_LIMIT
+              value: {{ .dailyExternalLimit | toString | quote }}
+            {{- end }}
+            {{- end }}
             - name: management.observations.key-values.environment
               value: {{ .Release.Namespace }}
             - name: management.observations.key-values.version
