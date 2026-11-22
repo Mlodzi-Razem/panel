@@ -81,7 +81,7 @@ spec:
               value: {{ tpl .Values.panel.web.auth.google.workspaceDomain . | quote }}
             - name: NEXTAUTH_URL
               value: {{ tpl .Values.panel.web.url . | quote }}
-            {{- range $env, $key := dict "PANEL_ENTRA_TENANT_ID" "panel-web-entra-tenant-id" "PANEL_ENTRA_CLIENT_ID" "panel-web-entra-client-id" "PANEL_ENTRA_CLIENT_SECRET" "panel-web-entra-client-secret" }}
+            {{- range $env, $key := dict "PANEL_ENTRA_TENANT_ID" "panel-web-entra-tenant-id" "PANEL_ENTRA_CLIENT_ID" "panel-web-entra-client-id" "PANEL_ENTRA_CLIENT_SECRET" "panel-web-entra-client-secret" "PANEL_ENTRA_CLIENT_CERTIFICATE" "panel-web-entra-client-certificate" "PANEL_ENTRA_CLIENT_CERTIFICATE_KEY" "panel-web-entra-client-certificate-key" }}
             - name: {{ $env }}
               valueFrom:
                 secretKeyRef:

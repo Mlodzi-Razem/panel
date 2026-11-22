@@ -24,6 +24,7 @@ import env, { entraConfig } from "@/config/env";
 import { verifyTeamsSsoToken } from "@/auth/teamsSso";
 import { ENTRA_PROVIDER, GOOGLE_PROVIDER, TEAMS_SSO_PROVIDER } from "@/auth/providers";
 import { DEV_LOGIN_PROVIDER, devLoginProvider } from "@/auth/devLogin";
+import { CLIENT_ASSERTION_TYPE, entraClientAssertion } from "@/auth/entraClientAssertion";
 
 const googleClientId = env.PANEL_GOOGLE_CLIENT_ID;
 const googleClientSecret = env.PANEL_GOOGLE_CLIENT_SECRET;
@@ -42,7 +43,49 @@ export function isWorkspaceAccount(profile: Partial<GoogleProfile> | undefined):
 }
 
 export function isEntraSignInEnabled(): boolean {
-    return !!entra?.clientSecret;
+    return !!(entra?.clientCertificate || entra?.clientSecret);
+}
+
+/**
+ * Browser sign-in with Microsoft 365. A certificate (the tenant blocks client secrets) authenticates the code
+ * exchange with a signed client assertion sent in the token request body; otherwise the client secret is used.
+ */
+function entraBrowserProvider(config: NonNullable<typeof entra>): Provider | undefined {
+    const authorization = {params: {scope: 'openid profile email', prompt: 'select_account'}};
+    const certificate = config.clientCertificate;
+
+    if (certificate) {
+        return AzureADProvider({
+            clientId: config.clientId,
+            clientSecret: '',
+            tenantId: config.tenantId,
+            authorization,
+            client: {token_endpoint_auth_method: 'none'},
+            token: {
+                async request({client, params, checks, provider}) {
+                    const exchangeBody = {
+                        client_assertion_type: CLIENT_ASSERTION_TYPE,
+                        client_assertion: await entraClientAssertion(config.tenantId, config.clientId, certificate),
+                    };
+                    const tokens = provider.idToken
+                        ? await client.callback(provider.callbackUrl, params, checks, {exchangeBody})
+                        : await client.oauthCallback(provider.callbackUrl, params, checks, {exchangeBody});
+                    return {tokens};
+                },
+            },
+        });
+    }
+
+    if (config.clientSecret) {
+        return AzureADProvider({
+            clientId: config.clientId,
+            clientSecret: config.clientSecret,
+            tenantId: config.tenantId,
+            authorization,
+        });
+    }
+
+    return undefined;
 }
 
 function providers(): Provider[] {
@@ -59,13 +102,9 @@ function providers(): Provider[] {
         }),
     ];
 
-    if (entra?.clientSecret) {
-        list.push(AzureADProvider({
-            clientId: entra.clientId,
-            clientSecret: entra.clientSecret,
-            tenantId: entra.tenantId,
-            authorization: {params: {scope: 'openid profile email', prompt: 'select_account'}},
-        }));
+    const entraBrowser = entra ? entraBrowserProvider(entra) : undefined;
+    if (entraBrowser) {
+        list.push(entraBrowser);
     }
 
     if (entra) {

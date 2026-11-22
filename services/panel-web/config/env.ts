@@ -56,7 +56,9 @@ export default PanelEnv;
 const OPTIONAL_ENV_VARS = {
     PANEL_ENTRA_TENANT_ID: 'The Microsoft Entra tenant ID; enables Microsoft 365 sign-in and the Teams app',
     PANEL_ENTRA_CLIENT_ID: 'The client ID of the Panel MR app registration in Microsoft Entra',
-    PANEL_ENTRA_CLIENT_SECRET: 'The client secret of the Panel MR app registration; needed only for sign-in in the browser',
+    PANEL_ENTRA_CLIENT_SECRET: 'The client secret of the Panel MR app registration; one way to enable sign-in in the browser',
+    PANEL_ENTRA_CLIENT_CERTIFICATE: 'The PEM certificate of the Panel MR app registration; with its key, enables sign-in in the browser without a client secret',
+    PANEL_ENTRA_CLIENT_CERTIFICATE_KEY: 'The PKCS#8 PEM private key of PANEL_ENTRA_CLIENT_CERTIFICATE',
 } as const;
 export type PanelOptionalEnvKeyName = keyof typeof OPTIONAL_ENV_VARS;
 
@@ -68,13 +70,23 @@ function optional(name: PanelOptionalEnvKeyName): string | undefined {
 export type EntraConfig = {
     tenantId: string;
     clientId: string;
-    /** Present only when browser sign-in with Microsoft 365 is enabled. */
+    /** Browser sign-in credential (client secret); used when no certificate is configured. */
     clientSecret?: string;
+    /**
+     * Browser sign-in credential (certificate + PKCS#8 key, PEM); signs an OAuth 2.0 client assertion and takes
+     * precedence over the client secret, as in panel-api.
+     */
+    clientCertificate?: { certificate: string; key: string };
 };
+
+/** PEM from an env value: Kubernetes passes real newlines, .env files often carry literal "\n". */
+function pem(name: PanelOptionalEnvKeyName): string | undefined {
+    return optional(name)?.replace(/\\n/g, '\n');
+}
 
 /**
  * Microsoft Entra settings, or undefined when Entra is not configured. Teams SSO needs the tenant and client IDs;
- * browser sign-in additionally needs the client secret.
+ * browser sign-in additionally needs a credential: a certificate with its key, or a client secret.
  */
 export function entraConfig(): EntraConfig | undefined {
     const tenantId = optional('PANEL_ENTRA_TENANT_ID');
@@ -84,7 +96,15 @@ export function entraConfig(): EntraConfig | undefined {
         return undefined;
     }
 
-    return {tenantId, clientId, clientSecret: optional('PANEL_ENTRA_CLIENT_SECRET')};
+    const certificate = pem('PANEL_ENTRA_CLIENT_CERTIFICATE');
+    const key = pem('PANEL_ENTRA_CLIENT_CERTIFICATE_KEY');
+
+    return {
+        tenantId,
+        clientId,
+        clientSecret: optional('PANEL_ENTRA_CLIENT_SECRET'),
+        clientCertificate: certificate && key ? {certificate, key} : undefined,
+    };
 }
 
 const RECRUITMENT_DECLARATION_MOCK_ENV_VAR = 'PANEL_RECRUITMENT_DECLARATION_MOCK';
