@@ -51,12 +51,36 @@ class MemberRulesTest {
     }
 
     @Test
-    void supportingMembershipRequiresAgeFourteenAndHonoraryHasNoLimit() {
-        assertThatCode(() -> MemberRules.validateAdmissionAge(LocalDate.of(2012, 6, 1), MembershipType.SUPPORTING, admission))
+    void supportingMembershipRequiresAgeSixteenAndHonoraryHasNoLimit() {
+        assertThatCode(() -> MemberRules.validateAdmissionAge(LocalDate.of(2010, 6, 1), MembershipType.SUPPORTING, admission))
             .doesNotThrowAnyException();
-        assertThatThrownBy(() -> MemberRules.validateAdmissionAge(LocalDate.of(2012, 6, 2), MembershipType.SUPPORTING, admission))
+        assertThatThrownBy(() -> MemberRules.validateAdmissionAge(LocalDate.of(2010, 6, 2), MembershipType.SUPPORTING, admission))
+            .isInstanceOf(RuleViolationException.class);
+        assertThatThrownBy(() -> MemberRules.validateAdmissionAge(LocalDate.of(2012, 6, 1), MembershipType.SUPPORTING, admission))
             .isInstanceOf(RuleViolationException.class);
         assertThatCode(() -> MemberRules.validateAdmissionAge(LocalDate.of(1950, 1, 1), MembershipType.HONORARY, admission))
             .doesNotThrowAnyException();
+    }
+
+    @Test
+    void recognisesReservedTestBandMemberNumbers() {
+        assertThat(MemberRules.isReservedTestMemberNumber("950000")).isTrue();
+        assertThat(MemberRules.isReservedTestMemberNumber("999999")).isTrue();
+        assertThat(MemberRules.isReservedTestMemberNumber("975001")).isTrue();
+        assertThat(MemberRules.isReservedTestMemberNumber("0950000")).isTrue();
+
+        assertThat(MemberRules.isReservedTestMemberNumber("949999")).isFalse();
+        assertThat(MemberRules.isReservedTestMemberNumber("1000000")).isFalse();
+        assertThat(MemberRules.isReservedTestMemberNumber("000205")).isFalse();
+        assertThat(MemberRules.isReservedTestMemberNumber("1")).isFalse();
+        assertThat(MemberRules.isReservedTestMemberNumber("MR-950123")).isFalse();
+        assertThat(MemberRules.isReservedTestMemberNumber("")).isFalse();
+        assertThat(MemberRules.isReservedTestMemberNumber(null)).isFalse();
+
+        assertThatThrownBy(() -> MemberRules.assertMemberNumberNotReserved("999999"))
+            .isInstanceOf(RuleViolationException.class)
+            .extracting("code").isEqualTo("MEMBER_ID_RESERVED");
+        assertThatCode(() -> MemberRules.assertMemberNumberNotReserved("000205")).doesNotThrowAnyException();
+        assertThatCode(() -> MemberRules.assertMemberNumberNotReserved(null)).doesNotThrowAnyException();
     }
 }

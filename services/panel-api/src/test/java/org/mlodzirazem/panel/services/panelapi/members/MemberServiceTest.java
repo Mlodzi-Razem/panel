@@ -122,6 +122,32 @@ class MemberServiceTest extends DomainTestSupport {
     }
 
     @Test
+    void createRejectsMemberNumbersFromTheReservedTestBand() {
+        Map<MemberField, Object> values = new EnumMap<>(MemberField.class);
+        values.put(MemberField.PREFERRED_NAME_FIRST, "Reza");
+        values.put(MemberField.PREFERRED_NAME_LAST, "Rezerw");
+        values.put(MemberField.FORMAL_NAME_FIRST, "Reza");
+        values.put(MemberField.FORMAL_NAME_LAST, "Rezerw");
+        values.put(MemberField.BIRTH_DATE, LocalDate.of(2003, 3, 3));
+        values.put(MemberField.MEMBER_ID, "950123");
+
+        assertThatThrownBy(() -> memberService.create(new NewMember(values, district("mazowieckie").getId())))
+            .isInstanceOf(RuleViolationException.class)
+            .extracting("code").isEqualTo("MEMBER_ID_RESERVED");
+    }
+
+    @Test
+    void updateRejectsMemberNumbersFromTheReservedTestBand() {
+        TMember member = newMember("Nina", "Numer", "mazowieckie");
+
+        assertThatThrownBy(() -> memberService.update(member.getId(), Map.of(MemberField.MEMBER_ID, "975000")))
+            .isInstanceOf(RuleViolationException.class)
+            .extracting("code").isEqualTo("MEMBER_ID_RESERVED");
+
+        assertThat(memberRepository.findById(member.getId()).orElseThrow().getMemberId()).isNull();
+    }
+
+    @Test
     void createAlsoCreatesThePrimaryAffiliationVotingThere() {
         TMember member = newMember("Pia", "Primary", "slaskie");
 

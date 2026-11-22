@@ -66,12 +66,17 @@ public abstract class DomainTestSupport {
 
     @BeforeEach
     protected void cleanDomainData() {
+        jdbc.execute("DELETE FROM recruitment_case_events");
+        jdbc.execute("DELETE FROM recruitment_decisions");
+        jdbc.execute("DELETE FROM admission_bans");
+        jdbc.execute("DELETE FROM recruitment_cases");
         jdbc.execute("DELETE FROM audited_operations");
         jdbc.execute("DELETE FROM member_change_requests");
         jdbc.execute("DELETE FROM member_district_affiliations");
         jdbc.execute("DELETE FROM body_memberships");
         jdbc.execute("DELETE FROM suspensions");
         jdbc.execute("DELETE FROM bodies WHERE code IS NULL OR code LIKE 'test-%'");
+        jdbc.execute("DELETE FROM member_identities");
         jdbc.execute("DELETE FROM members");
     }
 

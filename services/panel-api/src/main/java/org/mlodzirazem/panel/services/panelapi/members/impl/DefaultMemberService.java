@@ -169,6 +169,10 @@ class DefaultMemberService implements MemberService {
                 throw new RuleViolationException("FIELD_REQUIRED", field.propertyName() + " is required");
             }
 
+            if (field == MemberField.MEMBER_ID && value != null) {
+                MemberRules.assertMemberNumberNotReserved((String) value);
+            }
+
             Object current = field.get(member);
 
             if (!Objects.equals(current, value) && !(isEmptyList(current) && value == null)) {

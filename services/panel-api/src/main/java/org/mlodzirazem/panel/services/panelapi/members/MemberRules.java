@@ -17,6 +17,7 @@
 
 package org.mlodzirazem.panel.services.panelapi.members;
 
+import org.jspecify.annotations.Nullable;
 import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.MembershipType;
 
@@ -24,10 +25,18 @@ import java.time.LocalDate;
 import java.time.Period;
 
 public final class MemberRules {
+    /** Statute jednolity 2026, art. 7 ust. 1 pkt 1. */
     public static final int ORDINARY_MIN_AGE = 16;
+    /** Statute jednolity 2026, art. 7 ust. 1 pkt 2 — admission before the year of the 26th birthday ends. */
     public static final int ORDINARY_MAX_AGE = 26;
-    public static final int SUPPORTING_MIN_AGE = 14;
+    /** Statute jednolity 2026, art. 8 ust. 1 pkt 1 (under-16 supporting memberships are only transitional, art. 48 ust. 1). */
+    public static final int SUPPORTING_MIN_AGE = 16;
+    /** Statute jednolity 2026, art. 11 ust. 1 pkt 5. */
     public static final int MEMBERSHIP_END_AGE = 26;
+
+    /** Reserved for test fixtures only (PO-7); the number allocator never produces values in this band. */
+    public static final int RESERVED_TEST_MEMBER_NUMBER_FROM = 950_000;
+    public static final int RESERVED_TEST_MEMBER_NUMBER_TO = 999_999;
 
     private MemberRules() {
     }
@@ -42,6 +51,40 @@ public final class MemberRules {
 
     public static boolean membershipEndsIn(LocalDate birthDate, int year) {
         return birthDate.getYear() + MEMBERSHIP_END_AGE == year;
+    }
+
+    public static boolean isReservedTestMemberNumber(@Nullable String memberId) {
+        if (memberId == null || memberId.isBlank()) {
+            return false;
+        }
+
+        String digits = memberId.strip();
+
+        if (digits.chars().anyMatch(ch -> !Character.isDigit(ch))) {
+            return false;
+        }
+
+        String normalized = digits.replaceFirst("^0+", "");
+
+        if (normalized.isEmpty()) {
+            return false;
+        }
+
+        try {
+            long number = Long.parseLong(normalized);
+
+            return number >= RESERVED_TEST_MEMBER_NUMBER_FROM && number <= RESERVED_TEST_MEMBER_NUMBER_TO;
+        } catch (NumberFormatException tooLong) {
+            return false;
+        }
+    }
+
+    public static void assertMemberNumberNotReserved(@Nullable String memberId) {
+        if (isReservedTestMemberNumber(memberId)) {
+            throw new RuleViolationException("MEMBER_ID_RESERVED",
+                "Member number %s is in the reserved test band %d-%d".formatted(memberId,
+                    RESERVED_TEST_MEMBER_NUMBER_FROM, RESERVED_TEST_MEMBER_NUMBER_TO));
+        }
     }
 
     public static void validateAdmissionAge(LocalDate birthDate, MembershipType type, LocalDate admissionDate) {

@@ -38,6 +38,7 @@ import static org.mlodzirazem.panel.services.panelapi.persistence.entity.permiss
 import static org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType.FEES_READ;
 import static org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType.FORMAL_PERSONAL_DATA_MANAGE;
 import static org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType.FORMAL_PERSONAL_DATA_READ;
+import static org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType.RECRUITMENT_READ;
 
 @SpringBootTest
 @PostgresTest
@@ -122,7 +123,7 @@ class PermissionServiceTest extends DomainTestSupport {
     }
 
     @Test
-    void districtTreasurerReadsContactDataAndFeesOnly() {
+    void districtTreasurerReadsContactDataFeesAndRecruitment() {
         TMember treasurer = newMember("Tina", "Cash", "podlaskie");
         TMember target = newMember("Tad", "Target", "podlaskie");
         grant(treasurer, body("district-podlaskie-treasurer"), "TREASURER");
@@ -130,7 +131,7 @@ class PermissionServiceTest extends DomainTestSupport {
         EffectivePermissions permissions = permissionService.of(treasurer.getId());
 
         assertThat(permissions.inDistrict(district("podlaskie").getId()))
-            .containsExactlyInAnyOrder(CONTACT_PERSONAL_DATA_READ, FEES_READ);
+            .containsExactlyInAnyOrder(CONTACT_PERSONAL_DATA_READ, FEES_READ, RECRUITMENT_READ);
         assertThat(permissionService.can(treasurer.getId(), CONTACT_PERSONAL_DATA_READ, target.getId())).isTrue();
         assertThat(permissionService.can(treasurer.getId(), FORMAL_PERSONAL_DATA_READ, target.getId())).isFalse();
         assertThat(permissions.inDistrict(district("slaskie").getId())).isEmpty();
