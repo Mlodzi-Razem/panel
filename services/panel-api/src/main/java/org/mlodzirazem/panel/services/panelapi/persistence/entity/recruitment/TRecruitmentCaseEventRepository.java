@@ -20,6 +20,9 @@ package org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public interface TRecruitmentCaseEventRepository extends JpaRepository<TRecruitmentCaseEvent, Long> {
+    List<TRecruitmentCaseEvent> findAllByRecruitmentCaseIdOrderByCreatedAtAscIdAsc(long recruitmentCaseId);
 }
