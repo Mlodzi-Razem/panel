@@ -1,4 +1,5 @@
 {{- if .Values.panel.gateway.install -}}
+{{- $issuer := default "origin-ca" (dig "tls" "issuer" "" .Values.panel.gateway) -}}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -6,12 +7,23 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels: {{ include "gateway.labels" . | nindent 4 }}
 spec:
+  {{- if eq $issuer "letsencrypt" }}
+  issuerRef:
+    name: panel-le-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
+  # Let's Encrypt profile: 90-day certificates.
+  duration: 2160h
+  renewBefore: 720h
+  {{- else }}
   issuerRef:
     name: panel-cert-issuer
     kind: OriginIssuer
     group: cert-manager.k8s.cloudflare.com
-  secretName: panel-ssl-cert
-  dnsNames: {{ tpl (.Values.panel.gateway.domains | toJson) . }}
+  # Cloudflare Origin CA profile: short-lived certificates.
   duration: 168h
   renewBefore: 24h
+  {{- end }}
+  secretName: panel-ssl-cert
+  dnsNames: {{ tpl (.Values.panel.gateway.domains | toJson) . }}
 {{- end -}}

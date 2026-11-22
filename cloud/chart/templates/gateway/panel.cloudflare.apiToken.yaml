@@ -1,4 +1,7 @@
-{{- if .Values.panel.gateway.install -}}
+{{- /* Cloudflare API token for the Origin CA issuer; only rendered for the
+       origin-ca TLS flow. With tls.issuer=letsencrypt this secret is not
+       needed (and no Cloudflare credentials exist in the cluster). */ -}}
+{{- if and .Values.panel.gateway.install (eq (default "origin-ca" (dig "tls" "issuer" "" .Values.panel.gateway)) "origin-ca") -}}
 apiVersion: v1
 kind: Secret
 metadata:

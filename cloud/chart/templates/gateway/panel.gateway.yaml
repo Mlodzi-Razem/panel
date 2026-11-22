@@ -1,3 +1,6 @@
+{{- /* Gateway API v1. For the letsencrypt TLS flow an extra HTTP:80 listener
+       serves ACME HTTP-01 challenges (cert-manager gatewayHTTP01 solver);
+       the origin-ca flow keeps the single HTTPS listener. */ -}}
 {{- if .Values.panel.gateway.install -}}
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
@@ -17,4 +20,9 @@ spec:
           - name: panel-ssl-cert
             namespace: {{ .Release.Namespace }}
             group: ""
+    {{- if eq (default "origin-ca" (dig "tls" "issuer" "" .Values.panel.gateway)) "letsencrypt" }}
+    - name: panel-acme
+      port: 80
+      protocol: HTTP
+    {{- end }}
 {{- end -}}

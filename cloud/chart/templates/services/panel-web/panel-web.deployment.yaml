@@ -28,6 +28,11 @@ spec:
         instrumentation.opentelemetry.io/inject-nodejs: "panel-otel-instrumentation"
     spec:
       hostname: {{ .Release.Namespace }}-panel-web
+      {{- /* Optional pre-created docker-registry Secret for private images. */ -}}
+      {{- with .Values.panel.web.imagePullSecret }}
+      imagePullSecrets:
+        - name: {{ tpl . $ | quote }}
+      {{- end }}
       affinity: {{ tpl (toYaml .Values.panel.web.affinity) . | nindent 8 }}
       containers:
         - name: panel-web

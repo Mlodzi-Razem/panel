@@ -54,6 +54,12 @@ const K8S = z.object({
             + "As kube-prometheus-stack is expected to be available in the cluster, "
             + "this setting is placed under the 'k8s' key.",
         ),
+        podMonitors: z.object({
+            enabled: z.boolean().describe(
+                "Whether to render the PodMonitor resources. Requires the monitoring.coreos.com CRDs; "
+                + "turn off on clusters without the prometheus operator.",
+            ),
+        }),
     }),
 }).describe("Configuration specific to the running Kubernetes cluster.");
 const Jaeger = z.discriminatedUnion('enabled', [
@@ -117,6 +123,10 @@ const PanelApi = z.object({
     affinity: z.json(),
     replicaResources: ReplicaResources(1024, 1),
     image: z.string(),
+    imagePullSecret: z.string().optional().describe(
+        "Name of a pre-created docker-registry Secret (dockerconfigjson) for private images. "
+        + "Unset = no imagePullSecrets are attached.",
+    ),
     service: z.object({
         type: ServiceType,
     }),
@@ -144,6 +154,14 @@ const PanelWeb = z.object({
     affinity: z.json(),
     replicaResources: ReplicaResources(512, 0.5),
     image: z.string(),
+    imagePullSecret: z.string().optional().describe(
+        "Name of a pre-created docker-registry Secret (dockerconfigjson) for private images. "
+        + "Unset = no imagePullSecrets are attached.",
+    ),
+    replicas: z.string().optional().describe(
+        "Replica count used when hpa.enabled is false. Required in that case, and as a string "
+        + "(the deployment template passes it through tpl).",
+    ),
     service: z.object({
         type: ServiceType,
     }),
@@ -165,6 +183,16 @@ const Gateway = z.discriminatedUnion('install', [
         install: True,
         gatewayClass: z.string(),
         domains: z.string().array(),
+        tls: z.object({
+            issuer: z.enum(['origin-ca', 'letsencrypt']).describe(
+                "Certificate issuer for panel-ssl-cert. 'origin-ca' keeps the Cloudflare Origin CA flow; "
+                + "'letsencrypt' switches to a cert-manager ACME ClusterIssuer solved through an extra "
+                + "HTTP:80 listener on the panel Gateway (cert-manager >= 1.16 with Gateway API support).",
+            ),
+            acmeEmail: z.string().describe(
+                "ACME account e-mail for the letsencrypt issuer (required then; a public value).",
+            ),
+        }),
     }),
 ]);
 

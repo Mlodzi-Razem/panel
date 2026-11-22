@@ -1,4 +1,7 @@
-{{- if .Values.panel.postgres.cnpg.install -}}
+{{- /* PodMonitor requires the monitoring.coreos.com CRDs; the chart-wide
+       panel.k8s.prometheus.podMonitors.enabled switch keeps installs working
+       on clusters without the prometheus operator. */ -}}
+{{- if and .Values.panel.postgres.cnpg.install .Values.panel.k8s.prometheus.podMonitors.enabled -}}
 
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
