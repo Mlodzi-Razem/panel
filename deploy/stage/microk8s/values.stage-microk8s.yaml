@@ -51,7 +51,7 @@ panel:
     # Wdrażane z GHCR przez ci/deploy-helm-on-vps.sh (--set panel.api.image).
     image: ghcr.io/Mlodzi-Razem/panel-api:stage
     #dockerconfigjson z sekretem GHCR tworzy właściciel (RUNBOOK §11.4).
-    imagePullSecret: ""
+    imagePullSecret: ghcr-pull
     replicaResources:
       # Stage na 8 vCPU: minimum z chart-schema (api: 1 CPU, web: 0.5 CPU).
       maximumMemoryMb: 1024
@@ -65,7 +65,7 @@ panel:
   web:
     url: https://dev.panel.mlodzirazem.org
     image: ghcr.io/Mlodzi-Razem/panel-web:stage
-    imagePullSecret: ""
+    imagePullSecret: ghcr-pull
     hpa:
       enabled: false
     # panel.web.replicas jest wymagane, gdy hpa.enabled=false (szablon

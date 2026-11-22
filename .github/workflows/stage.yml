@@ -50,7 +50,7 @@ env:
   # microk8s) or "helm" (chart cloud/ installed into microk8s, see RUNBOOK §11).
   # Job-level `if` cannot read env on push events, so the variant gates STEPS.
   # Default remains compose until the owner decides on the K variant.
-  DEPLOY_VARIANT: compose
+  DEPLOY_VARIANT: helm
 
 jobs:
   # --------------------------------------------------------------------------
