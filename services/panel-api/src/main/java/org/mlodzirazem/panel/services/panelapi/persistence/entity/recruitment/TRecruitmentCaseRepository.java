@@ -17,9 +17,18 @@
 
 package org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
 
 @Repository
 public interface TRecruitmentCaseRepository extends JpaRepository<TRecruitmentCase, Long> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from TRecruitmentCase c where c.id = :id")
+    Optional<TRecruitmentCase> findByIdForUpdate(@Param("id") Long id);
 }

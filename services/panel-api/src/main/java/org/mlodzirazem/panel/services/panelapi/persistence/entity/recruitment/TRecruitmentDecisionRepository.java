@@ -20,6 +20,14 @@ package org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+import java.util.Optional;
+
 @Repository
 public interface TRecruitmentDecisionRepository extends JpaRepository<TRecruitmentDecision, Long> {
+    /** Decisions are unique per case and kind (UNIQUE (case_id, decision_kind) at the schema level). */
+    Optional<TRecruitmentDecision> findByRecruitmentCaseIdAndDecisionKind(Long caseId,
+                                                                           RecruitmentDecisionKind decisionKind);
+
+    List<TRecruitmentDecision> findAllByRecruitmentCaseId(Long caseId);
 }
