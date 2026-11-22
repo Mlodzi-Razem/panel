@@ -63,11 +63,19 @@ class DefaultTransactionalMail implements TransactionalMail {
     }
 
     @Override
-    public MailDispatch sendAfterCommit(MailMessage message) {
+    public MailDispatch sendAfterCommit(MailMessage original) {
+        MailMessage message = original;
         if (!properties.enabled() || !token.configured()) {
             warnDisabledOnce();
             return MailDispatch.DISABLED;
         }
+
+        if (message.replyTo() != null && domainOf(message.replyTo()) == null) {
+            log.warn("mail purpose={} reference={}: invalid reply-to dropped", message.purpose(), message.reference());
+            message = new MailMessage(message.recipient(), message.subject(), message.textBody(),
+                message.purpose(), message.reference(), null);
+        }
+        MailMessage toSend = message;
 
         String domain = domainOf(message.recipient());
         String senderAddress = properties.sender();
@@ -96,11 +104,11 @@ class DefaultTransactionalMail implements TransactionalMail {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    deliver(senderAddress, message, domain, external);
+                    deliver(senderAddress, toSend, domain, external);
                 }
             });
         } else {
-            deliver(senderAddress, message, domain, external);
+            deliver(senderAddress, toSend, domain, external);
         }
 
         return MailDispatch.SCHEDULED;

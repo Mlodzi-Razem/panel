@@ -30,6 +30,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -66,14 +67,14 @@ class GraphMailSender {
     }
 
     Result send(String sender, MailMessage message) {
-        Map<String, Object> body = Map.of(
-            "message", Map.of(
-                "subject", message.subject(),
-                "body", Map.of("contentType", "Text", "content", message.textBody()),
-                "toRecipients", List.of(Map.of("emailAddress", Map.of("address", message.recipient())))
-            ),
-            "saveToSentItems", false
-        );
+        Map<String, Object> content = new LinkedHashMap<>();
+        content.put("subject", message.subject());
+        content.put("body", Map.of("contentType", "Text", "content", message.textBody()));
+        content.put("toRecipients", List.of(Map.of("emailAddress", Map.of("address", message.recipient()))));
+        if (message.replyTo() != null) {
+            content.put("replyTo", List.of(Map.of("emailAddress", Map.of("address", message.replyTo()))));
+        }
+        Map<String, Object> body = Map.of("message", content, "saveToSentItems", false);
 
         try {
             String bearer = token.bearer();

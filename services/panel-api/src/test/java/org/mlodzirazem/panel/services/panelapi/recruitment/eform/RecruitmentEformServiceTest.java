@@ -194,6 +194,52 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
     }
 
     @Test
+    void linkMailRepliesToTheDistrictWhenItHasAnAddress() {
+        long actor = districtActor();
+        TRecruitmentCase candidateCase = awaitingCase("kandydatka@example.org");
+        var district = candidateCase.getDistrict();
+        String original = district.getEmail();
+        district.setEmail("mazowieckie@example.org");
+        bodyRepository.saveAndFlush(district);
+
+        try {
+            eform.createDeclarationLink(candidateCase.getId(), actor);
+        } finally {
+            district.setEmail(original);
+            bodyRepository.saveAndFlush(district);
+        }
+
+        ArgumentCaptor<MailMessage> sent = ArgumentCaptor.forClass(MailMessage.class);
+        verify(transactionalMail).sendAfterCommit(sent.capture());
+        assertThat(sent.getValue().replyTo()).isEqualTo("mazowieckie@example.org");
+        assertThat(sent.getValue().textBody()).contains("Odpowiedz na tę wiadomość")
+            .doesNotContain("nie odpowiadaj na nią");
+    }
+
+    @Test
+    void linkMailAsksNotToReplyWhenTheDistrictHasNoAddress() {
+        long actor = districtActor();
+        TRecruitmentCase candidateCase = awaitingCase("kandydatka@example.org");
+        var district = candidateCase.getDistrict();
+        String original = district.getEmail();
+        district.setEmail(null);
+        bodyRepository.saveAndFlush(district);
+
+        try {
+            eform.createDeclarationLink(candidateCase.getId(), actor);
+        } finally {
+            district.setEmail(original);
+            bodyRepository.saveAndFlush(district);
+        }
+
+        ArgumentCaptor<MailMessage> sent = ArgumentCaptor.forClass(MailMessage.class);
+        verify(transactionalMail).sendAfterCommit(sent.capture());
+        assertThat(sent.getValue().replyTo()).isNull();
+        assertThat(sent.getValue().textBody()).contains("nie odpowiadaj na nią")
+            .doesNotContain("Odpowiedz na tę wiadomość");
+    }
+
+    @Test
     void linkWithoutCandidateAddressSendsNothing() {
         long actor = districtActor();
         TRecruitmentCase candidateCase = awaitingCase(null);

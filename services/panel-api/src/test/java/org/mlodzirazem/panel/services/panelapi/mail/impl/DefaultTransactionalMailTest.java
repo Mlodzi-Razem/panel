@@ -40,6 +40,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.ExpectedCount.never;
 import static org.springframework.test.web.client.ExpectedCount.once;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
@@ -178,6 +179,22 @@ class DefaultTransactionalMailTest {
             assertThat(row.domain).isEqualTo("mlodzirazem.org");
         });
         assertThat(deliveries.countedSince).isNull();
+        server.verify();
+    }
+
+    @Test
+    void dropsAnInvalidReplyToAndStillSends() {
+        server.expect(once(), requestTo(SEND_URL))
+              .andExpect(jsonPath("$.message.replyTo").doesNotExist())
+              .andRespond(withStatus(HttpStatus.ACCEPTED));
+
+        MailMessage message = new MailMessage("a@example.org", "Subject line", "Body text", "test-purpose",
+            "case:7", "not an address");
+
+        assertThat(mail(enabled()).sendAfterCommit(message)).isEqualTo(MailDispatch.SCHEDULED);
+
+        assertThat(deliveries.rows).singleElement()
+            .satisfies(row -> assertThat(row.status).isEqualTo(MailDeliveryStatus.SENT));
         server.verify();
     }
 

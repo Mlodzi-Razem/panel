@@ -27,16 +27,22 @@ import org.jspecify.annotations.Nullable;
  * @param textBody  the plain-text body; may carry one-time secrets
  * @param purpose   a short key such as {@code recruitment-declaration-link}, logged and stored
  * @param reference a pointer to the business object such as {@code recruitment-case:123}, logged and stored
+ * @param replyTo   optional Reply-To address; never logged
  */
 public record MailMessage(
     String recipient,
     String subject,
     String textBody,
     String purpose,
-    @Nullable String reference
+    @Nullable String reference,
+    @Nullable String replyTo
 ) {
+    public MailMessage(String recipient, String subject, String textBody, String purpose, @Nullable String reference) {
+        this(recipient, subject, textBody, purpose, reference, null);
+    }
+
     /**
-     * Address, subject and body never appear rendered.
+     * Addresses, subject and body never appear rendered.
      */
     @Override
     public String toString() {

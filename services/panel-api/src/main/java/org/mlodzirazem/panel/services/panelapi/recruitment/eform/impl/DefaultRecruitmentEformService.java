@@ -175,13 +175,24 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
             return DeclarationLink.NO_EMAIL;
         }
 
+        String replyTo = candidateCase.getDistrict().getEmail();
+        if (replyTo != null && replyTo.isBlank()) {
+            replyTo = null;
+        }
+
         MailDispatch dispatch = transactionalMail.sendAfterCommit(new MailMessage(email, LINK_MAIL_SUBJECT,
-            linkMailBody(formUrl, expiresAt), LINK_MAIL_PURPOSE, "recruitment-case:" + candidateCase.getId()));
+            linkMailBody(formUrl, expiresAt, replyTo != null), LINK_MAIL_PURPOSE,
+            "recruitment-case:" + candidateCase.getId(), replyTo));
 
         return dispatch.name();
     }
 
-    private static String linkMailBody(String formUrl, ZonedDateTime expiresAt) {
+    private static String linkMailBody(String formUrl, ZonedDateTime expiresAt, boolean canReply) {
+        String contact = canReply
+            ? "Masz pytania? Odpowiedz na tę wiadomość — trafi do zarządu Twojego okręgu."
+            : "Ta wiadomość została wysłana automatycznie — nie odpowiadaj na nią. "
+                + "W sprawie rekrutacji skontaktuj się z zarządem swojego okręgu.";
+
         return """
             Dzień dobry,
 
@@ -195,8 +206,10 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
 
             Jeżeli nie ubiegasz się o członkostwo w Młodych Razem, zignoruj tę wiadomość.
 
+            %s
+
             Młodzi Razem
-            """.formatted(formUrl, MAIL_EXPIRY_FORMAT.format(expiresAt.withZoneSameInstant(MAIL_ZONE)));
+            """.formatted(formUrl, MAIL_EXPIRY_FORMAT.format(expiresAt.withZoneSameInstant(MAIL_ZONE)), contact);
     }
 
     @Override

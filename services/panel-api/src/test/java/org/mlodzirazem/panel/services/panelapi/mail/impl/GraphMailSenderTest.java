@@ -68,6 +68,27 @@ class GraphMailSenderTest {
     }
 
     @Test
+    void addsReplyToOnlyWhenSet() {
+        server.expect(requestTo(SEND_URL))
+              .andExpect(jsonPath("$.message.replyTo.length()").value(1))
+              .andExpect(jsonPath("$.message.replyTo[0].emailAddress.address").value("district@example.org"))
+              .andRespond(withStatus(HttpStatus.ACCEPTED));
+
+        MailMessage withReplyTo = new MailMessage("candidate@example.org", "S", "B", "test-purpose", "case:1",
+            "district@example.org");
+        assertThat(sender.send("panel@mlodzirazem.org", withReplyTo).sent()).isTrue();
+        server.verify();
+        server.reset();
+
+        server.expect(requestTo(SEND_URL))
+              .andExpect(jsonPath("$.message.replyTo").doesNotExist())
+              .andRespond(withStatus(HttpStatus.ACCEPTED));
+
+        assertThat(sender.send("panel@mlodzirazem.org", MESSAGE).sent()).isTrue();
+        server.verify();
+    }
+
+    @Test
     void capturesTheGraphErrorCode() {
         server.expect(requestTo(SEND_URL))
               .andRespond(withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
@@ -111,6 +132,8 @@ class GraphMailSenderTest {
         assertThat(MESSAGE.toString())
             .contains("test-purpose", "case:1")
             .doesNotContain("example.org", "declaration", "secret-token");
+        assertThat(new MailMessage("a@example.org", "S", "B", "p", "r", "reply@example.org").toString())
+            .doesNotContain("example.org");
     }
 
     record FixedToken(String value) implements GraphAppToken {
