@@ -1,0 +1,39 @@
+# Local development database for the Panel API.
+#
+# Project name "panel-dev" makes every resource this file creates use the
+# panel-dev-* prefix (panel-dev-db, network/volume panel-dev_*), which is
+# deliberately distinct from the ad-hoc "panel-pg" container that serves a live
+# test session on host port 5432. This stack publishes host port 5433 instead.
+#
+# The database starts EMPTY. The schema (Flyway migrations 0.0.1 -> 0.0.5,
+# bodies seed included) is created by the panel-api application itself on its
+# first boot — NOT by this compose file. See dev/README.md.
+
+name: panel-dev
+
+services:
+  db:
+    image: postgres:18.1-alpine # PostgreSQL 18 is required: migrations use VIRTUAL generated columns
+    container_name: panel-dev-db
+    environment:
+      POSTGRES_DB: panel
+      POSTGRES_USER: panel
+      POSTGRES_PASSWORD: panel # dummy, local development only
+    ports:
+      # 5433 on the host / 5432 inside the container, so the live panel-pg on 5432 is untouched.
+      # Do not narrow the bind to 127.0.0.1: containers reach this DB via the
+      # host's docker bridge (host.docker.internal), which only works when the
+      # port is published on the VM's bridge interface too (colima).
+      - "5433:5432"
+    volumes:
+      - panel-dev-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U panel -d panel"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  panel-dev-db-data:
