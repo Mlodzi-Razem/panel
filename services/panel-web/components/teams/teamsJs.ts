@@ -26,10 +26,17 @@ let initialization: Promise<boolean> | undefined;
 /**
  * Initializes TeamsJS once per page. Resolves false outside a Microsoft 365 host (a plain browser tab),
  * where TeamsJS would otherwise wait for a host that never answers.
+ *
+ * The Teams desktop and web clients embed tabs in an iframe, but the mobile clients load them frameless:
+ * the page is the top-level document of a native WebView, and TeamsJS reaches the host through
+ * the {@code nativeInterface} bridge the client injects on {@code window}. A top-level window without
+ * that bridge is a plain browser tab; with it, it is a Microsoft 365 host.
  */
 export function initializeTeams(): Promise<boolean> {
     if (!initialization) {
-        initialization = window.parent === window
+        const topLevel = window.parent === window;
+        const nativeBridge = typeof (window as { nativeInterface?: unknown }).nativeInterface !== "undefined";
+        initialization = topLevel && !nativeBridge
             ? Promise.resolve(false)
             : Promise.race([
                 app.initialize().then(() => true, () => false),
