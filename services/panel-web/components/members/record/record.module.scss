@@ -133,11 +133,13 @@
 }
 
 .yes {
-    color: var(--color-success);
+    /* Prawa wyborcze — znaczący tekst; #1e8e4e = 4.17:1 na bieli (FAIL AA), strong = 7.02:1 (SPEC §2.3). */
+    color: var(--success-strong);
 }
 
 .no {
-    color: var(--gray-400);
+    /* #b3abb6 = ~2.15:1 — zbyt słabe dla znaczącego tekstu; gray-600 = 5.82:1. */
+    color: var(--gray-600);
 }
 
 .srOnly {

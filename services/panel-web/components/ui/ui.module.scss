@@ -462,13 +462,13 @@
     }
 
     &[data-tone="warning"] {
-        background: var(--color-orange-bg);
-        color: var(--color-orange);
+        background: var(--color-warning-bg);
+        color: var(--color-warning);
     }
 
     &[data-tone="success"] {
         background: var(--color-success-bg);
-        color: var(--color-success);
+        color: var(--success-strong);
     }
 }
 

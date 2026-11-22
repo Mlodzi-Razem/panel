@@ -21,15 +21,30 @@
     --font-normal: 'GeneralSans-Variable';
     --font-mono: 'SourceCodePro-VariableFont';
 
-    --plum-950: #2a0619;
-    --plum-900: #3d0a27;
-    --plum-800: #540838;
-    --plum-700: #720546;
-    --plum-600: #8c0d58;
-    --plum-500: #a8216f;
-    --plum-200: #efc9de;
-    --plum-100: #f7e3ee;
-    --plum-50: #fcf3f8;
+    /* Brand (maroon) — SPEC design/SPEC.md §2.1 (kanon makiety „Teams-Panel”, akcent #7A0E3E).
+       Stare --plum-* zostają jako aliasi (SPEC §7.1), żeby istniejące komponenty nie wymagały zmian. */
+    --brand-950: #2a0619;
+    --brand-900: #4a0725;
+    --brand-800: #680c35;
+    --brand-700: #7a0e3e;
+    --brand-600: #93275d;
+    --brand-500: #a8216f;
+    --brand-300: #d886ac;
+    --brand-200: #efc9de;
+    --brand-100: #f6e3ed;
+    --brand-50: #faf0f6;
+
+    /* Aliasy legacy (cleanup po scaleniu M2b/M3b/M4b). Wartości zgodne ze SPEC §2.1:
+       900/800/700/600/100/50 podniesione do brand, 950/500/200 bez zmian (zero regresji gradientów). */
+    --plum-950: var(--brand-950);
+    --plum-900: var(--brand-900);
+    --plum-800: var(--brand-800);
+    --plum-700: var(--brand-700);
+    --plum-600: var(--brand-600);
+    --plum-500: var(--brand-500);
+    --plum-200: var(--brand-200);
+    --plum-100: var(--brand-100);
+    --plum-50: var(--brand-50);
 
     --gray-950: #18131a;
     --gray-900: #241d27;
@@ -59,7 +74,18 @@
     --color-shadow: rgba(36, 29, 39, 0.08);
     --color-hover-layer: black;
     --color-table-head: var(--gray-900);
-    --color-focus: color-mix(in srgb, var(--plum-600) 35%, transparent);
+    /* Focus ring pełnobarwny (SPEC §6.2): był color-mix 35% = #d7aac5 nad bielą = 2.01:1,
+       łamał WCAG 1.4.11; --brand-600 #93275d = 7.81:1 na bieli, 7.17:1 na #f5f5f7. */
+    --color-focus: var(--brand-600);
+    /* Mocny wariant ringu dla własnych outline'ów (typing kandydata używa go na jasnych
+       przekązkach): ta sama wartość co ring globalny — 7.81:1 na bieli, 7.17:1 na #f5f5f7;
+       w dark przechodzi na biel (14.25:1 na #1c1016). Kończy zależność od fallbacku
+       var(--color-focus-strong, #93275d) w treści publicznej. */
+    --color-focus-strong: var(--brand-600);
+    /* Wyciszona płaszczyzna dla chipów/wypustek kodu (formUrl, cytaty): #f5f5f7 = gray-50,
+       tekst gray-950 = 15.66:1, muted gray-600 = 5.82:1. Kończy zależność od fallbacku
+       var(--color-surface-muted, #f5f5f7) w module rekrutacji. */
+    --color-surface-muted: #f5f5f7;
 
     --color-danger: #c62a3b;
     --color-danger-bg: #fdecee;
@@ -72,6 +98,13 @@
     --color-orange: #e8590c;
     --color-orange-bg: #fff0e6;
     --color-muted: var(--gray-600);
+
+    /* Semantyka „strong” — tekst/ikony informacyjne (SPEC §2.3). --color-success #1e8e4e daje
+       jako tekst 3.73:1 na tincie i 4.17:1 na bieli (łamiąc AA); #14663a: 6.29 / 7.02. */
+    --success-strong: #14663a;
+    --warning-strong: var(--color-warning);
+    --danger-strong: var(--color-danger);
+    --info-strong: var(--color-info);
 
     --size-font-size: 0.9375rem;
     --size-spacing: 0.5rem;
@@ -88,6 +121,7 @@
     --space-4: 1rem;
     --space-5: 1.25rem;
     --space-6: 1.5rem;
+    --space-7: 1.75rem;
     --space-8: 2rem;
     --control-height: 2.5rem;
 
@@ -141,6 +175,61 @@ button, input, select, textarea {
 :focus-visible {
     outline: 3px solid var(--color-focus);
     outline-offset: 2px;
+}
+
+/* Na ciemnych pasach (nagłówki tabel) akcent nie osiąga 3:1 (≈2.07:1 na gray-900) — ring biel (SPEC §6.2). */
+thead th :focus-visible {
+    outline-color: #ffffff;
+}
+
+/* ---------- Urządzenia (SPEC §2.6/§2.7) ----------
+   Uwaga konwencyjna (checklista A11): media queries nie mogą czytać custom properties,
+   więc jedyny breakpoint to deklaracja: wszystkie NOWE zapytania — (max-width: 900px).
+   Istniejące strony z innymi wartościami (login 800px, ui 600px, Dashboard 1000px,
+   Requests 1100px) to legacy — do sprowadzenia do 900px przy generalnym sprzątaniu. */
+
+/* Dotyk ≥44px przy ≤900px (SPEC §2.6/§7.2-5, checklista C3). Desktop bez zmian (2.5rem). */
+@media (max-width: 900px) {
+    :root {
+        --control-height: 2.75rem;
+    }
+}
+
+/* Honorowanie prefers-reduced-motion: przejścia i animacje zatrzymane (SPEC §2.7, checklista A10). */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* ---------- Dark mode (forward, SPEC §2.8) — Teams ustawia data-teams-theme="dark" na <html> ----------
+   Kontrasty policzone: tekst 15.66:1 na tle / 14.25:1 na powierzchni; muted 8.72:1;
+   akcent-on-dark 8.07:1; biały na primary(#93275d) 7.81:1; ring #fff na powierzchni 14.25:1. */
+:root[data-teams-theme="dark"] {
+    --color-text: #f2eaee;
+    --color-text-muted: #c5b7bd;
+    --color-surface: #271921;
+    --color-background: #1c1016;
+    --color-background-deep: #1c1016;
+    --color-border: #4a3b44;
+    --color-border-strong: #6b5762;
+    --color-primary: var(--brand-600);
+    --color-primary-soft: #3a1e2c;
+    --color-focus: #ffffff;
+    --color-focus-strong: #ffffff;
+    --color-surface-muted: #2e2129;
+    --accent-on-dark: #e4a0be;
+    --gray-50: #221822;
+    --gray-100: #2e2129;
+    --gray-200: #3a2b34;
+    --gray-300: #4a3b44;
+    --gray-500: #71616b;
+    --gray-600: #c5b7bd;
 }
 
 h1, h2, h3, h4 {

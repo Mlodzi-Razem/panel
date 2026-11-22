@@ -91,6 +91,14 @@ select.input {
     background-size: 0.9rem;
 }
 
+/* iOS Safari na dotyku: pole <16px wywołuje auto-zoom przy focus. Więc przy ≤900px — 1rem
+   (SPEC §2.5b, checklista C4). Wysokość pól biegnie przez --control-height (44px, theme ≤900px). */
+@media (max-width: 900px) {
+    .input {
+        font-size: 1rem;
+    }
+}
+
 textarea.input {
     min-height: 6rem;
     resize: vertical;
@@ -144,7 +152,7 @@ textarea.input {
 
     &[data-tone="success"] {
         background-color: var(--color-success-bg);
-        color: var(--color-success);
+        color: var(--success-strong);
     }
 
     ul {
