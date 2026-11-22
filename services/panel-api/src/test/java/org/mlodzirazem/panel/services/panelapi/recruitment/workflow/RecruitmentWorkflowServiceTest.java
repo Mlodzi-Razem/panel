@@ -459,14 +459,14 @@ class RecruitmentWorkflowServiceTest extends DomainTestSupport {
     }
 
     private List<String> eventTypes(long caseId) {
-        return caseEventRepository.findAllByRecruitmentCaseIdOrderByIdAsc(caseId)
+        return caseEventRepository.findAllByRecruitmentCaseIdOrderByCreatedAtAscIdAsc(caseId)
             .stream()
             .map(event -> event.getEventType().name())
             .toList();
     }
 
     private String payloads(long caseId) {
-        return caseEventRepository.findAllByRecruitmentCaseIdOrderByIdAsc(caseId)
+        return caseEventRepository.findAllByRecruitmentCaseIdOrderByCreatedAtAscIdAsc(caseId)
             .stream()
             .map(event -> event.getPayload() == null ? "" : event.getPayload())
             .reduce("", (all, payload) -> all + payload);

@@ -24,5 +24,5 @@ import java.util.List;
 
 @Repository
 public interface TRecruitmentCaseEventRepository extends JpaRepository<TRecruitmentCaseEvent, Long> {
-    List<TRecruitmentCaseEvent> findAllByRecruitmentCaseIdOrderByIdAsc(Long caseId);
+    List<TRecruitmentCaseEvent> findAllByRecruitmentCaseIdOrderByCreatedAtAscIdAsc(long recruitmentCaseId);
 }
