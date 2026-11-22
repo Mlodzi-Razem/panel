@@ -178,6 +178,8 @@ export const declarationLinkSchema = z.object({
     token: z.string(),
     formUrl: z.string(),
     expiresAt: z.string(),
+    /** MailDispatch name (SCHEDULED, DISABLED, REFUSED_*, INVALID_RECIPIENT) or NO_EMAIL; never the address. */
+    emailDispatch: z.string(),
 });
 
 export type DeclarationLink = z.infer<typeof declarationLinkSchema>;

@@ -18,7 +18,7 @@
 @NullMarked
 @ApplicationModule(
     displayName = "Recruitment",
-    allowedDependencies = {"persistence::*", "audit", "members", "core::error"}
+    allowedDependencies = {"persistence::*", "audit", "members", "core::error", "mail::api"}
 )
 package org.mlodzirazem.panel.services.panelapi.recruitment;
 

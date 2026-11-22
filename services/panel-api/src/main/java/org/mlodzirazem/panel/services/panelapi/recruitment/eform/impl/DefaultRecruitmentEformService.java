@@ -26,6 +26,9 @@ import org.mlodzirazem.panel.services.panelapi.core.error.ConflictException;
 import org.mlodzirazem.panel.services.panelapi.core.error.ForbiddenException;
 import org.mlodzirazem.panel.services.panelapi.core.error.NotFoundException;
 import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
+import org.mlodzirazem.panel.services.panelapi.mail.api.MailDispatch;
+import org.mlodzirazem.panel.services.panelapi.mail.api.MailMessage;
+import org.mlodzirazem.panel.services.panelapi.mail.api.TransactionalMail;
 import org.mlodzirazem.panel.services.panelapi.members.PermissionService;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.DeclarationArtifactKind;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.DeclarationFormSessionStatus;
@@ -64,9 +67,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * The e-declaration flow behind the magic link (M4a). One live session per case: issuing a new
@@ -92,6 +98,12 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
     private static final String CODE_TOKEN_EXPIRED = "TOKEN_EXPIRED";
     private static final String CODE_CASE_CLOSED = "CASE_CLOSED";
 
+    private static final String LINK_MAIL_PURPOSE = "recruitment-declaration-link";
+    private static final String LINK_MAIL_SUBJECT = "Młodzi Razem — Twoja deklaracja członkowska";
+    private static final ZoneId MAIL_ZONE = ZoneId.of("Europe/Warsaw");
+    private static final DateTimeFormatter MAIL_EXPIRY_FORMAT =
+        DateTimeFormatter.ofPattern("d MMMM yyyy, HH:mm", Locale.forLanguageTag("pl-PL"));
+
     private final TRecruitmentCaseRepository cases;
     private final TDeclarationFormSessionRepository sessions;
     private final TDeclarationArtifactRepository artifacts;
@@ -105,6 +117,7 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
     private final DeclarationPdfRenderer pdfRenderer;
     private final DeclarationArtifactStore artifactStore;
     private final DeclarationProperties properties;
+    private final TransactionalMail transactionalMail;
     private final AuditLog auditLog;
     private final JsonMapper jsonMapper;
     private final Clock clock;
@@ -142,13 +155,48 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
         emit(candidateCase, actorMemberId, RecruitmentCaseEventType.DECLARATION_LINK_CREATED,
             List.of("token_hash", "expires_at"));
 
+        String formUrl = properties.getPublicBaseUrl() + token;
+        String emailDispatch = mailLink(candidateCase, formUrl, expiresAt);
+
         auditLog.record("recruitment :: declaration-link",
             AuditPayload.of("caseId", candidateCase.getId())
                 .withId("actorId", actorMemberId)
                 .withFields(List.of("token_hash", "expires_at", "status"))
-                .withOutcome(session.getStatus().name()));
+                .withOutcome(session.getStatus().name() + "/" + emailDispatch));
 
-        return new DeclarationLink(token, properties.getPublicBaseUrl() + token, expiresAt);
+        return new DeclarationLink(token, formUrl, expiresAt, emailDispatch);
+    }
+
+    /** E-mails the link after the commit; the candidate's address and the token are never logged or stored. */
+    private String mailLink(TRecruitmentCase candidateCase, String formUrl, ZonedDateTime expiresAt) {
+        String email = candidateCase.getCandidateEmail();
+
+        if (email == null || email.isBlank()) {
+            return DeclarationLink.NO_EMAIL;
+        }
+
+        MailDispatch dispatch = transactionalMail.sendAfterCommit(new MailMessage(email, LINK_MAIL_SUBJECT,
+            linkMailBody(formUrl, expiresAt), LINK_MAIL_PURPOSE, "recruitment-case:" + candidateCase.getId()));
+
+        return dispatch.name();
+    }
+
+    private static String linkMailBody(String formUrl, ZonedDateTime expiresAt) {
+        return """
+            Dzień dobry,
+
+            w Stowarzyszeniu Młodzi Razem przygotowaliśmy dla Ciebie elektroniczną deklarację członkowską. \
+            Wypełnisz ją pod tym adresem:
+
+            %s
+
+            Link jest ważny do %s (czas polski). Jest przeznaczony wyłącznie dla Ciebie — nie przekazuj go \
+            nikomu. Wystawienie nowego linku unieważnia wszystkie wcześniejsze.
+
+            Jeżeli nie ubiegasz się o członkostwo w Młodych Razem, zignoruj tę wiadomość.
+
+            Młodzi Razem
+            """.formatted(formUrl, MAIL_EXPIRY_FORMAT.format(expiresAt.withZoneSameInstant(MAIL_ZONE)));
     }
 
     @Override

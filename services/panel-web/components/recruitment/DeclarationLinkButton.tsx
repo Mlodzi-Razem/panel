@@ -30,12 +30,21 @@ import { FormattedCaseDate } from "@/components/recruitment/format";
 
 /**
  * "Generate the declaration link" for a case awaiting the declaration. The M4a endpoint mints
- * a one-off form URL with an expiry; the dialog only shows it with a copy affordance — the back
- * office sends it to the candidate over their own channel, the panel never sends anything itself.
- * Until the M4a milestone lands the API answers this POST with an error; it is surfaced as-is.
+ * a one-off form URL with an expiry and e-mails it to the candidate when the case has an address
+ * and mail is on (M5b). The dialog keeps the link visible and copyable and adds one status line
+ * saying what happened to the e-mail; the address itself is never shown.
  */
 // Rendered only for MANAGE in the case district — the page hides the button entirely without
 // the permission (STATES 4.4), so the component itself stays permission-free.
+const DISPATCH_KEYS = ["SCHEDULED", "DISABLED", "NO_EMAIL", "REFUSED_LIMIT"] as const;
+
+/** REFUSED_SENDER, INVALID_RECIPIENT and anything unknown share the generic failure line. */
+function dispatchKey(emailDispatch: string): (typeof DISPATCH_KEYS)[number] | "FAILED" {
+    return (DISPATCH_KEYS as readonly string[]).includes(emailDispatch)
+        ? emailDispatch as (typeof DISPATCH_KEYS)[number]
+        : "FAILED";
+}
+
 export default function DeclarationLinkButton({ caseId }: { caseId: number }) {
     const t = useTranslations("recruitment");
     const [link, setLink] = useState<DeclarationLink | null>(null);
@@ -67,6 +76,9 @@ export default function DeclarationLinkButton({ caseId }: { caseId: number }) {
             {link && <div className={styles.declarationLink}>
                 <p>{t("declarationLink.intro")}</p>
                 <p className={styles.formUrl}>{link.formUrl}</p>
+                <p role="status" data-testid="declaration-link-dispatch">
+                    {t(`declarationLink.emailDispatch.${dispatchKey(link.emailDispatch)}`)}
+                </p>
                 <p>
                     <Muted>{t("declarationLink.expiresAt")} <FormattedCaseDate value={link.expiresAt}/></Muted>
                 </p>

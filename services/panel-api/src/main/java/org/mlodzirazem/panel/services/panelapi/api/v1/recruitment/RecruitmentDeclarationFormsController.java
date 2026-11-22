@@ -51,7 +51,8 @@ public class RecruitmentDeclarationFormsController {
     private final CallerResolver callers;
     private final RecruitmentEformService eform;
 
-    public record DeclarationLinkResponse(String token, String formUrl, ZonedDateTime expiresAt) {
+    public record DeclarationLinkResponse(String token, String formUrl, ZonedDateTime expiresAt,
+                                          String emailDispatch) {
     }
 
     public record DeclarationFormRequest(
@@ -74,7 +75,7 @@ public class RecruitmentDeclarationFormsController {
         long caller = callers.require().id();
         RecruitmentEformService.DeclarationLink link = eform.createDeclarationLink(caseId, caller);
 
-        return new DeclarationLinkResponse(link.token(), link.formUrl(), link.expiresAt());
+        return new DeclarationLinkResponse(link.token(), link.formUrl(), link.expiresAt(), link.emailDispatch());
     }
 
     @GetMapping("/public/declaration-form/{token}")

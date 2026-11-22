@@ -96,6 +96,23 @@ class RecruitmentEformApiTest extends ApiTestSupport {
         return caseId;
     }
 
+    @Test
+    void linkResponseCarriesTheEmailDispatchWithoutTheAddress() {
+        long withEmail = awaitingCase("kandydat@example.org");
+        Res mailOff = createLink(201, zoA, withEmail);
+
+        // mail is switched off by default: nothing is sent, the back office is told to pass the link on
+        assertThat(mailOff.body().path("emailDispatch").asString()).isEqualTo("DISABLED");
+        assertThat(mailOff.body().toString()).doesNotContain("kandydat@example.org");
+
+        long withoutEmail = awaitingCase("brak@example.org");
+        jdbc.update("UPDATE recruitment_cases SET candidate_email = NULL WHERE id = ?", withoutEmail);
+        Res noEmail = createLink(201, zoA, withoutEmail);
+
+        assertThat(noEmail.body().path("emailDispatch").asString()).isEqualTo("NO_EMAIL");
+        assertThat(noEmail.body().path("formUrl").asString()).contains(noEmail.body().path("token").asString());
+    }
+
     private Res createLink(int expectedStatus, TMember as, long caseId) {
         Res link = post(as, "/recruitment-cases/" + caseId + "/declaration-link", Map.of());
         assertThat(link.status()).isEqualTo(expectedStatus);

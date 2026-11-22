@@ -72,7 +72,13 @@ public interface RecruitmentEformService {
     /** Paper fallback for the back office: stores the scan and records the declaration. */
     DeclarationForm attachScan(long caseId, long actorMemberId, byte[] pdfBytes);
 
-    record DeclarationLink(String token, String formUrl, ZonedDateTime expiresAt) {
+    /**
+     * @param emailDispatch a {@code MailDispatch} name for the e-mail carrying the link, or {@code NO_EMAIL}
+     *                      when the case has no candidate address
+     */
+    record DeclarationLink(String token, String formUrl, ZonedDateTime expiresAt, String emailDispatch) {
+        /** The dispatch value for a case without a candidate address. */
+        public static final String NO_EMAIL = "NO_EMAIL";
     }
 
     record DeclarationForm(String status, @Nullable ZonedDateTime expiresAt, @Nullable String greeting,

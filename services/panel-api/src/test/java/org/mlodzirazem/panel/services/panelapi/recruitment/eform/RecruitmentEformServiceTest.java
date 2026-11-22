@@ -17,7 +17,12 @@
 
 package org.mlodzirazem.panel.services.panelapi.recruitment.eform;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mlodzirazem.panel.services.panelapi.mail.api.MailDispatch;
+import org.mlodzirazem.panel.services.panelapi.mail.api.MailMessage;
+import org.mlodzirazem.panel.services.panelapi.mail.api.TransactionalMail;
+import org.mockito.ArgumentCaptor;
 import org.mlodzirazem.panel.services.panelapi.core.error.ConflictException;
 import org.mlodzirazem.panel.services.panelapi.core.error.ForbiddenException;
 import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
@@ -33,6 +38,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -42,6 +48,11 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest
 @PostgresTest
@@ -56,6 +67,15 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
 
     @Autowired
     TRecruitmentCaseEventRepository caseEvents;
+
+    @MockitoBean
+    TransactionalMail transactionalMail;
+
+    @BeforeEach
+    void mailAccepts() {
+        reset(transactionalMail);
+        when(transactionalMail.sendAfterCommit(any())).thenReturn(MailDispatch.SCHEDULED);
+    }
 
     @DynamicPropertySource
     static void declarationStorage(DynamicPropertyRegistry registry) throws IOException {
@@ -138,6 +158,62 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
         assertThat(auditPayloads("recruitment :: declaration-link"))
             .contains("token_hash")
             .doesNotContain(second.token());
+    }
+
+    @Test
+    void linkIsMailedToTheCandidateWithoutNameOrAddressInTheAudit() {
+        long actor = districtActor();
+        TRecruitmentCase candidateCase = awaitingCase("kandydatka@example.org");
+
+        RecruitmentEformService.DeclarationLink link =
+            eform.createDeclarationLink(candidateCase.getId(), actor);
+
+        assertThat(link.emailDispatch()).isEqualTo("SCHEDULED");
+
+        ArgumentCaptor<MailMessage> sent = ArgumentCaptor.forClass(MailMessage.class);
+        verify(transactionalMail).sendAfterCommit(sent.capture());
+        MailMessage message = sent.getValue();
+
+        assertThat(message.recipient()).isEqualTo("kandydatka@example.org");
+        assertThat(message.purpose()).isEqualTo("recruitment-declaration-link");
+        assertThat(message.reference()).isEqualTo("recruitment-case:" + candidateCase.getId());
+        assertThat(message.subject()).isEqualTo("Młodzi Razem — Twoja deklaracja członkowska");
+        assertThat(message.textBody())
+            .contains(link.formUrl())
+            .contains("nie przekazuj go")
+            .contains("zignoruj tę wiadomość")
+            .contains("unieważnia")
+            .doesNotContain("Kolendra")
+            .doesNotContain("Kowalska");
+        assertThat(message.textBody()).containsPattern("ważny do \\d{1,2} \\p{L}+ \\d{4}, \\d{2}:\\d{2}");
+
+        String payloads = auditPayloads("recruitment :: declaration-link");
+        assertThat(payloads).contains("SCHEDULED")
+            .doesNotContain("kandydatka@example.org")
+            .doesNotContain(link.token());
+    }
+
+    @Test
+    void linkWithoutCandidateAddressSendsNothing() {
+        long actor = districtActor();
+        TRecruitmentCase candidateCase = awaitingCase(null);
+
+        RecruitmentEformService.DeclarationLink link =
+            eform.createDeclarationLink(candidateCase.getId(), actor);
+
+        assertThat(link.emailDispatch()).isEqualTo("NO_EMAIL");
+        assertThat(link.token()).isNotBlank();
+        verify(transactionalMail, never()).sendAfterCommit(any());
+    }
+
+    @Test
+    void linkReportsTheMailGuardOutcome() {
+        when(transactionalMail.sendAfterCommit(any())).thenReturn(MailDispatch.REFUSED_LIMIT);
+
+        RecruitmentEformService.DeclarationLink link = eform.createDeclarationLink(
+            awaitingCase("limit@example.org").getId(), districtActor());
+
+        assertThat(link.emailDispatch()).isEqualTo("REFUSED_LIMIT");
     }
 
     @Test
