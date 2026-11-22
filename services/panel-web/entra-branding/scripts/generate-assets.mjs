@@ -93,16 +93,45 @@ async function main() {
   await sharp(svg).resize(32, 32, { fit: 'fill' }).png(smallPng).toFile(faviconPng);
 
   // ------------------------------------------------------- banner / header logo
-  // 245x36 transparent strip, badge centred at its full 36px height. Microsoft
-  // recommends transparent PNG without padding. Same artwork for both slots;
-  // the header slot has the tighter 10 KB cap.
-  const badge36 = await sharp(svg).resize(36, 36, { fit: 'fill' }).png(smallPng).toBuffer();
-  const left = Math.round((245 - 36) / 2);
-  async function wideLogo(file, cap) {
+  // 245x36 transparent strip. First incarnation used the 36x36 badge — too
+  // small to read ("banner is really invisible"). Instead we use the "mr"
+  // letterform monogram: the same letterforms the Teams app icon set uses
+  // (teams/outline.svg), extracted from the favicon SVG (background path
+  // removed, remaining paths flattened to a single plum-700 ink), so the
+  // mark fills the full 36px height of the Entra slot (~82x36) instead of
+  // riding inside a 36px badge. Microsoft recommends transparent PNG
+  // without padding. Same artwork for both slots; the header slot has the
+  // tighter 10 KB cap.
+  const { readFile } = await import('node:fs/promises');
+  const faviconSource = (await readFile(svg)).toString();
+  const lettersSvg = faviconSource
+    .split('\n')
+    .filter((line) => !line.includes('fill="#6F1046"')) // drop the badge background path
+    .map((line) => line.replace(/fill="#[0-9A-Fa-f]{6}"/g, 'fill="#720546"')) // single plum ink
+    .join('\n');
+  const letterSpacingPx = 0; // no padding around the logo (Microsoft's own recommendation)
+  const letters = await sharp(Buffer.from(lettersSvg))
+    .resize(1000, 1000, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toBuffer();
+  const trimmed = await sharp(letters).trim({ threshold: 1 }).toBuffer({ resolveWithObject: true });
+  const inkW = trimmed.info.width;
+  const inkH = trimmed.info.height;
+  // scale ink to fit the 245x36 slot edge to edge
+  const fitW = 245 - 2 * letterSpacingPx;
+  const fitH = 36 - 2 * letterSpacingPx;
+  const scale = Math.min(fitW / inkW, fitH / inkH);
+  const scaled = await sharp(trimmed.data)
+    .resize(Math.round(inkW * scale), Math.round(inkH * scale), { fit: 'fill' })
+    .png()
+    .toBuffer();
+  const compositeLeft = Math.round((245 - Math.round(inkW * scale)) / 2);
+  const compositeTop = Math.round((36 - Math.round(inkH * scale)) / 2);
+  async function wideLogo(file, cap,_pngOpts) {
     let buffer = await sharp({
       create: { width: 245, height: 36, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
     })
-      .composite([{ input: badge36, left, top: 0 }])
+      .composite([{ input: scaled, left: compositeLeft, top: compositeTop }])
       .png(smallPng)
       .toBuffer();
     if (buffer.length > cap) {
@@ -110,12 +139,12 @@ async function main() {
       buffer = await sharp({
         create: { width: 245, height: 36, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
       })
-        .composite([{ input: badge36, left, top: 0 }])
+        .composite([{ input: scaled, left: compositeLeft, top: compositeTop }])
         .png({ compressionLevel: 9 })
         .toBuffer();
     }
-    const { writeFile } = await import('node:fs/promises');
-    await writeFile(file, buffer);
+    const { writeFile: wf } = await import('node:fs/promises');
+    await wf(file, buffer);
   }
   await wideLogo(path.join(BUILD, 'banner-logo-245x36.png'), CAPS.banner);
   await wideLogo(path.join(BUILD, 'header-logo-245x36.png'), CAPS.header);

@@ -200,3 +200,54 @@ the design tokens mirrored, and where full fidelity is impossible.
 - **The gradient asset vs the browser's own CSS:** Entra renders a static image, so
   the brand panel does not re-flow with the actual login's box geometry; the recipe
   was transposed at the standard 1920×1080 instead.
+
+## 11. Revision 3 (2026-11-21) — visible banner; "can't we just use CSS?"
+
+**User review:** the 245×36 badge banner was "really invisible"; question raised
+whether custom buttons/fonts/icons could be added via the CSS ("it's literally
+custom CSS - CSS").
+
+### Banner fix
+
+`build/banner-logo-245x36.png` + `build/header-logo-245x36.png` were rebuilt in
+`scripts/generate-assets.mjs`: the "mr" **letterform monogram** is extracted from
+the favicon SVG (background path dropped, remaining paths flattened to a single
+`#720546` ink), trimmed to ink and scaled to fill the full 36 px slot height
+(ink ≈ 71×36, centred, no padding — "We recommend using a transparent image with
+no padding around the logo", Graph docs). This matches the repo's own icon
+language (`teams/outline.svg` = white "mr" on transparent). Measured ink
+coverage/colour verified programmatically. Increment cost: 3.0 KB per file
+(banner ≤ 50 KB, header ≤ 10 KB caps hold).
+Rejected alternatives: the `assets/mr-logo.svg` wordmark (two-line stacked
+lockup, ink aspect ≈ 2:1 → each line ~14 px at the 36 px slot ceiling — even
+less legible) and badge+wordmark composites (a new lockup = inventing
+composition, out of scope).
+Hard platform fact: the banner/header **slot itself is 245×36** — no artwork
+can render taller than 36 px there; the image file is the only lever
+(CSS cannot resize the banner element; none of the enumerated selectors
+addresses the in-card banner image anyway).
+
+### "Why not just custom CSS everything?" — verified cap frame (re §6)
+
+Entra company-branding CSS is a **constrained theming surface, not a CSS
+sheet**: (1) selector whitelist — `body`, link states, and the enumerated
+`.ext-*` elements only; no other node on the page is targetable, so no new
+"custom buttons" and no restyling of arbitrary Microsoft UI; (2) property
+blacklist — the 58 deprecated layout/positioning properties are blocked
+(position/margin/transform/opacity/display/filter/mask/pointer-events/…),
+leaving paint-level properties; (3) **no content** — `::before`/`::after`/`content`
+are not part of the offered selector set, so icons/logos/text cannot be
+injected; (4) **no external resources** — font-face/`@import` aren't offered,
+so General Sans cannot be loaded and the system stack is the only option
+(fonts an OS ships by default; the old Azure AD preview used a short local
+font list, current docs keep fonts un-documented); (5) the feature is
+**retiring** (§6/§8: 2026 cutover already passed; layout/positioning blocks
+follow; full retirement announced) — announced rationale is phishing
+resistance: a real CSS sheet on a branded login page is exactly what
+attackers would use to forge convincing fake login pages. Identity therefore
+belongs in the asset/text slots (as this package does); CSS only tints,
+rounds, shadows and re-types the elements Microsoft already renders.
+
+No changes to texts, square logos, favicon, backgrounds or custom.css in this
+revision (custom.css already styles Microsoft's own primary/secondary buttons,
+inputs and links to the Panel tokens).

@@ -38,10 +38,10 @@ because it renders these SVGs at the wrong scale — see `teams/README.md`).
 | Basics → **Background image** — **option B, default (Panel login replica)** | `build/background-plum-gradient-1920x1080.png` | 1920×1080 | 251.3 KB | ≤ 300 KB |
 | Basics → **Background image** — option A (alternative, warmth) | `build/background-1920x1080.jpg` | 1920×1080 | 259.3 KB | ≤ 300 KB |
 | Basics → **Page background color** | — value: `#3d0a27` (gradient) / `#720546` (photo) — | — | — | hex color |
-| Sign-in form → **Banner logo** | `build/banner-logo-245x36.png` | 245×36 | 1.1 KB | ≤ 50 KB |
+| Sign-in form → **Banner logo** | `build/banner-logo-245x36.png` | 245×36 | 3.0 KB | ≤ 50 KB |
 | Sign-in form → **Square logo (light theme)** | `build/square-logo-light-240x240.png` | 240×240 | 8.0 KB | ≤ 50 KB |
 | Sign-in form → **Square logo (dark theme)** | `build/square-logo-dark-240x240.png` | 240×240 | 8.0 KB | ≤ 50 KB |
-| Header (optional strip) → **Header logo** | `build/header-logo-245x36.png` | 245×36 | 1.1 KB | ≤ 10 KB |
+| Header (optional strip) → **Header logo** | `build/header-logo-245x36.png` | 245×36 | 3.0 KB | ≤ 10 KB |
 | Layout → **Custom CSS** (optional — see below) | `custom.css` | — | 11.6 KB | ≤ 25 KB, `.css` only |
 
 **Background choice — the two options.** The default **`background-plum-gradient-1920x1080.png`**
@@ -59,11 +59,27 @@ dark overlay — task text sits on opaque surfaces, so the photo stays fully
 recognisable). Choose it if you later prefer warmth over fidelity (GDPR note §D
 applies only to this option).
 
-The remaining assets are rasterised from the favicon SVG as-is (identical mark for
-light and dark theme slots — the docs explicitly allow one logo for both:
-"If your logo looks good on light and dark backgrounds, there's no need to add a
-dark theme logo") and the banner/header logos are the badge centred on a
-transparent 245×36 PNG (Microsoft recommends transparent PNGs without padding).
+The remaining assets are rasterised from the organisation's logo SVGs: the square
+logo/favicon slots carry the badge (identical mark for light and dark theme —
+the docs explicitly allow one logo for both: "If your logo looks good on light
+and dark backgrounds, there's no need to add a dark theme logo"). The banner and
+header logos are the **"mr" letterform monogram** extracted from the favicon,
+flattened to a single plum-700 ink and scaled edge-to-edge inside the
+transparent 245×36 PNG (ink ≈ 71×36, no padding — Microsoft's own
+recommendation) — the same letterform treatment as the Teams app icons
+(`teams/outline.svg`), and far more readable on the white sign-in card than a
+36×36 badge. Note the 36-pixel height of Microsoft's banner/header slots is a
+hard ceiling: 245×36 is the maximum canvas, so the artwork fills its full
+height and cannot render larger than that slot.
+
+**Why no `Custom` buttons/fonts/icons via CSS?** Microsoft's company-branding
+"custom CSS" is not full CSS: it accepts only the doc-enumerated selectors
+(`body`, link states and the `.ext-*` elements), a growing blacklist of
+layout/positioning properties (see research-notes.md §6), no `::before`/`::after`
+(content injection is not offered), and no external font/image imports — General
+Sans or custom icon sets cannot be loaded. Microsoft is deliberately *removing*
+CSS flexibility (phishing resistance — full retirement announced), so all
+identity content must live in the asset/text slots this package fills.
 
 ## A. Upload path — Microsoft Entra admin centre (recommended)
 
@@ -95,7 +111,7 @@ If branding already exists you will see **Edit** instead of the initial creation
    defaults (any custom URL renders as unclickable text, and we deliberately did not
    invent MR policy URLs). Uncheck either only if you want it hidden.
 6. **Sign-in form**:
-   - Banner logo → `build/banner-logo-245x36.png`
+   - Banner logo → `build/banner-logo-245x36.png` (plum "mr" monogram, edge-to-edge in the slot)
    - Square logo (light theme) → `build/square-logo-light-240x240.png`
    - Square logo (dark theme) → `build/square-logo-dark-240x240.png`
    - Username hint text → **leave empty** (guests share the page; UPN formats are
