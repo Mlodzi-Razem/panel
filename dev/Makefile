@@ -5,7 +5,7 @@
 DEV_DIR     := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 COMPOSE     := docker compose -f $(DEV_DIR)/compose.yaml
 PSQL        := psql -U panel -d panel -v ON_ERROR_STOP=1
-SEED_FILE   := $(DEV_DIR)/seed/test-members.sql
+SEED_FILES  := $(sort $(wildcard $(DEV_DIR)/seed/*.sql))
 
 .PHONY: help db-up db-down db-psql db-seed db-reset db-logs
 
@@ -21,8 +21,11 @@ db-down: ## Stop the dev database (data volume is kept)
 db-psql: ## Interactive psql inside the dev database container
 	$(COMPOSE) exec db $(PSQL)
 
-db-seed: ## Apply dev/seed/test-members.sql (idempotent; needs the api booted once first)
-	$(COMPOSE) exec -T db $(PSQL) < $(SEED_FILE)
+db-seed: ## Apply every dev/seed/*.sql in NAME ORDER (idempotent; needs the api booted once)
+	@for f in $(SEED_FILES); do \
+	  echo "==> seeding: $$f"; \
+	  $(COMPOSE) exec -T db $(PSQL) < $$f || exit 1; \
+	done
 
 db-reset: ## Destroy the dev database (incl. data volume) and start a fresh, empty one
 	$(COMPOSE) down -v
