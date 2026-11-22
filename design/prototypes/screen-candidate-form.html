@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Panel MR — prototyp 4a: Deklaracja kandydata · krok „Twoje dane” (mobile)</title>
+    <link rel="stylesheet" href="tokens.css">
+</head>
+<body>
+<main class="page" style="align-items:center; padding-top:var(--space-8);">
+    <p class="small muted" style="text-align:center;">Prototyp statyczny · ekran 4a/6 · publiczny flow kandydata (mobile, anonimowy) <br>kroki 2 z 4: „Twoje dane” · dane fikcyjne</p>
+
+    <div class="device">
+        <div class="device-screen">
+            <header class="stack" style="gap:var(--space-3);">
+                <p class="mono small muted" style="text-align:center; letter-spacing:.08em;">MŁODZI&nbsp;RAZEM · DEKLARACJA</p>
+                <nav class="stepper" aria-label="Kroki deklaracji: krok 2 z 4">
+                    <span class="step" data-state="done"><span class="n">✓</span>Start</span>
+                    <span class="bar" aria-hidden></span>
+                    <span class="step" data-state="current"><span class="n">2</span>Twoje dane</span>
+                    <span class="bar" aria-hidden></span>
+                    <span class="step"><span class="n">3</span>Dokumenty</span>
+                    <span class="bar" aria-hidden></span>
+                    <span class="step"><span class="n">4</span>Gotowe</span>
+                </nav>
+            </header>
+
+            <section class="stack" style="margin-top:var(--space-5);">
+                <h1 style="font-size:var(--text-h1); font-weight:650;">Twoje dane</h1>
+                <p class="small muted">Wpisz dane dokładnie tak, jak w dokumencie tożsamości. Pola oznaczone <span class="req" aria-hidden>*</span> są wymagane.</p>
+
+                <p class="notice" data-tone="info" role="status">
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden width="16" height="16"><path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm-1 4h2v2H9V6zm0 4h2v5H9v-5z"/></svg>
+                    <span>Wypełnione dane zapisują się automatycznie — możesz wrócić do tego linku później.</span>
+                </p>
+
+                <form class="stack" novalidate>
+                    <div class="field">
+                        <label for="c-first">Imię i imiona urzędowe <span class="req" aria-hidden>*</span><span class="sr-only">(pole wymagane)</span></label>
+                        <input id="c-first" name="given-name" autocomplete="given-name" value="Szymon">
+                    </div>
+                    <div class="field">
+                        <label for="c-last">Nazwisko urzędowe <span class="req" aria-hidden>*</span><span class="sr-only">(pole wymagane)</span></label>
+                        <input id="c-last" name="family-name" autocomplete="family-name" value="Kandydacki">
+                    </div>
+                    <div class="row" style="align-items:flex-start;">
+                        <div class="field" style="flex:1 1 9rem;">
+                            <label for="c-pfirst">Preferowane imię</label>
+                            <input id="c-pfirst" autocomplete="off" value="Szymek">
+                            <p class="helper">Tak zwracają się do Ciebie w stowarzyszeniu.</p>
+                        </div>
+                        <div class="field" style="flex:1 1 9rem;">
+                            <label for="c-plast">Preferowane nazwisko</label>
+                            <input id="c-plast" autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="field" data-invalid="true">
+                        <label for="c-pesel">PESEL <span class="req" aria-hidden>*</span><span class="sr-only">(pole wymagane)</span></label>
+                        <input id="c-pesel" class="mono" inputmode="numeric" maxlength="11" autocomplete="off" value="92010112345" aria-required="true" aria-invalid="true" aria-describedby="c-pesel-err">
+                        <p class="error" id="c-pesel-err">
+                            <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden><path d="M8 2 1 14h14L8 2zm-.9 5h1.8v4H7.1V7zm0 5h1.8v1.9H7.1v12z"/></svg>
+                            Suma kontrolna numeru PESEL nie zgadza się — sprawdź cyfry.
+                        </p>
+                    </div>
+                    <div class="field">
+                        <label for="c-pronouns">Używane zaimki</label>
+                        <input id="c-pronouns" autocomplete="off" placeholder="np. on/jego, ona/jej">
+                        <p class="helper">Pole opcjonalne.</p>
+                    </div>
+                    <div class="field">
+                        <label for="c-phone">Telefon <span class="req" aria-hidden>*</span><span class="sr-only">(pole wymagane)</span></label>
+                        <input id="c-phone" type="tel" autocomplete="tel" value="+48 601 200 300">
+                    </div>
+                    <div class="field">
+                        <label for="c-email">E-mail <span class="req" aria-hidden>*</span><span class="sr-only">(pole wymagane)</span></label>
+                        <input id="c-email" type="email" autocomplete="email" value="szymon.kandydacki@example.com">
+                    </div>
+                    <div class="field">
+                        <label for="c-school">Uczelnia lub szkoła</label>
+                        <input id="c-school" autocomplete="off" placeholder="Jeśli pobierasz naukę">
+                    </div>
+
+                    <details class="card" style="padding:var(--space-4);">
+                        <summary style="font-size:var(--text-body); font-weight:600; cursor:pointer;">Chcę podać adres do korespondencji <span class="muted small">(opcjonalnie)</span></summary>
+                        <div class="stack" style="margin-top:var(--space-3);">
+                            <div class="field">
+                                <label for="c-street">Ulica i numer domu/lokalu</label>
+                                <input id="c-street" autocomplete="street-address">
+                            </div>
+                            <div class="row">
+                                <div class="field" style="flex:1 1 8rem;">
+                                    <label for="c-postal">Kod pocztowy</label>
+                                    <input id="c-postal" autocomplete="postal-code" placeholder="00-000">
+                                </div>
+                                <div class="field" style="flex:2 1 10rem;">
+                                    <label for="c-city">Miejscowość</label>
+                                    <input id="c-city" autocomplete="address-level2">
+                                </div>
+                            </div>
+                            <p class="helper">Adres można też podać później, po przyjęciu — to Twoja decyzja.</p>
+                        </div>
+                    </details>
+
+                    <div class="row" style="justify-content:space-between; margin-top:var(--space-2);">
+                        <a class="btn btn-ghost" href="#">Wstecz</a>
+                        <a class="btn btn-primary" aria-disabled="true" href="#">Dalej: dokumenty</a>
+                    </div>
+                    <p class="small muted">Przycisk „Dalej” jest nieaktywny, dopóki formularz zawiera błędy (tu: PESEL).</p>
+                </form>
+            </section>
+
+            <footer class="small muted" style="margin-top:var(--space-6); display:flex; gap:.4rem; align-items:center;">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden width="14" height="14"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>
+                Twoje dane są przesyłane szyfrowanym kanałem (HTTPS) i nie są widoczne publicznie.
+            </footer>
+        </div>
+    </div>
+    <p class="device-caption">390px · Safari/Chrome · zawartość przewijana w ramce</p>
+</main>
+<div class="proto-note">Prototyp · Panel MR · ekran 4a · anonimowy magic-link (bez imienia)</div>
+</body>
+</html>

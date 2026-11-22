@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Panel MR — prototyp 1: Rekrutacja · lista spraw (ZK)</title>
+    <link rel="stylesheet" href="tokens.css">
+</head>
+<body>
+<main class="page">
+    <p class="small muted">Prototyp statyczny · ekran 1/6 · back-office ZO/ZK (desktop) · dane fikcyjne (persony testowe)</p>
+
+    <header class="page-header">
+        <div>
+            <h1 style="font-size:var(--text-h1); font-weight:650;">Rekrutacja</h1>
+            <p class="sub">Lista spraw kandydatów · zakres roli: <strong>Wszystkie okręgi (Zarząd Krajowy)</strong></p>
+        </div>
+        <div class="row">
+            <span class="badge" data-group="neutral"><span class="dot"></span>RECRUITMENT_MANAGE</span>
+            <a class="btn btn-primary" href="screen-bo-new-case.html">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden><path d="M8 3v10M3 8h10"/></svg>
+                Nowa sprawa
+            </a>
+        </div>
+    </header>
+
+    <!-- Pasek filtrów (IA 2.2) -->
+    <section class="toolbar" aria-label="Filtry listy spraw">
+        <input type="search" id="q" placeholder="Szukaj: imię, nazwisko lub e-mail" aria-label="Szukaj kandydata">
+        <label class="sr-only" for="f-status">Status</label>
+        <select id="f-status">
+            <option selected>Dowolny status</option>
+            <optgroup label="Kontakt (przed deklaracją)">
+                <option>Nowa</option>
+                <option>W toku</option>
+                <option>Brak kontaktu</option>
+                <option>Oczekuje na deklarację</option>
+            </optgroup>
+            <optgroup label="Okres wstępny">
+                <option>Deklaracja odebrana</option>
+                <option>Okres wstępny</option>
+                <option>Okres przedłużony</option>
+            </optgroup>
+            <optgroup label="Decyzyjne">
+                <option>Rekomendacja ZO</option>
+                <option>Głosowanie ZK</option>
+            </optgroup>
+            <optgroup label="Terminalne">
+                <option>Przyjęta</option>
+                <option>Odrzucona</option>
+            </optgroup>
+        </select>
+        <label class="sr-only" for="f-district">Okręg</label>
+        <select id="f-district" aria-label="Okręg (tylko ZK)">
+            <option selected>Wszystkie okręgi</option>
+            <option>Okręg Mazowiecki</option>
+            <option>Okręg Dolnośląski</option>
+        </select>
+        <label class="sr-only" for="f-clock">Zegar</label>
+        <select id="f-clock">
+            <option selected>Dowolny zegar</option>
+            <option>Na czas</option>
+            <option>Zbliża się termin</option>
+            <option>Po terminie (nieblokujący)</option>
+        </select>
+        <button class="btn btn-ghost" type="button">Wyczyść wszystko</button>
+        <div class="row" style="width:100%;">
+            <span class="chip">Status: Okres wstępny <button type="button" aria-label="Usuń filtr: Status Okres wstępny">×</button></span>
+            <span class="chip">Zegar: Po terminie <button type="button" aria-label="Usuń filtr: Zegar Po terminie">×</button></span>
+            <span class="small muted" role="status" aria-live="polite">Znaleziono 47 spraw</span>
+        </div>
+    </section>
+
+    <!-- Tabela spraw (IA 2.2) -->
+    <div class="tablewrap">
+        <table class="ui">
+            <caption class="sr-only">Lista spraw rekrutacyjnych, posortowana po najpilniejszym terminie zegarowym</caption>
+            <thead>
+                <tr>
+                    <th scope="col" aria-sort="none"><a href="#">Numer</a></th>
+                    <th scope="col" aria-sort="none" style="min-width:11rem;"><a href="#">Kandydat</a></th>
+                    <th scope="col">Status</th>
+                    <th scope="col" aria-sort="ascending">Zegar <span aria-hidden="true">▲</span></th>
+                    <th scope="col">Źródło</th>
+                    <th scope="col">Ścieżka</th>
+                    <th scope="col" aria-sort="none" style="min-width:9rem;"><a href="#">Aktualizacja</a></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="mono"><a href="screen-bo-case-detail.html">S-000128</a></td>
+                    <td>Magdalena Probacyjna<br><span class="small muted">Okręg Mazowiecki</span></td>
+                    <td><span class="badge" data-group="probation"><span class="dot"></span>Okres przedłużony</span></td>
+                    <td><span class="clock" data-state="over" title="Najpilniejszy zegar: okno oceny ZO — po terminie od 20.11.2026 (nieblokujący); druga ocena po przedłużeniu: najpóźniej 17.12.2026">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/></svg>
+                        Po terminie od 20.11</span></td>
+                    <td class="small">strona</td>
+                    <td class="small">Standardowa</td>
+                    <td class="small muted">dziś 09:14 · E. T.</td>
+                </tr>
+                <tr>
+                    <td class="mono"><a href="#">S-000127</a></td>
+                    <td>Nina Dokładna<br><span class="small muted">Okręg Mazowiecki</span></td>
+                    <td><span class="badge" data-group="decision"><span class="dot"></span>Rekomendacja ZO</span></td>
+                    <td><span class="clock" data-state="soon" title="Uchwała ZO o przyjęciu: najpóźniej 24.11.2026">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/></svg>
+                        Zbliża się — 2 dni do 24.11</span></td>
+                    <td class="small">formularz</td>
+                    <td class="small">Standardowa</td>
+                    <td class="small muted">dziś 08:02 · E. T.</td>
+                </tr>
+                <tr>
+                    <td class="mono"><a href="#">S-000125</a></td>
+                    <td>Kamil Kandydacki<br><span class="small muted">Okręg Mazowiecki</span></td>
+                    <td><span class="badge" data-group="probation"><span class="dot"></span>Okres wstępny</span></td>
+                    <td><span class="clock" data-state="wait" title="Okno oceny ZO: 12.12.2026 – 26.12.2026 (62–76 dni od deklaracji)">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/></svg>
+                        Ocena możliwa od 12.12</span></td>
+                    <td class="small">formularz</td>
+                    <td class="small">Standardowa</td>
+                    <td class="small muted">wczoraj · E. T.</td>
+                </tr>
+                <tr>
+                    <td class="mono"><a href="#">S-000131</a></td>
+                    <td>Ewa Wstąpiąca<br><span class="small muted">Okręg Mazowiecki</span></td>
+                    <td><span class="badge" data-group="contact"><span class="dot"></span>W toku</span></td>
+                    <td class="small muted">—</td>
+                    <td class="small">strona</td>
+                    <td class="small muted">—</td>
+                    <td class="small muted">21.11.2026</td>
+                </tr>
+                <tr>
+                    <td class="mono"><a href="#">S-000130</a></td>
+                    <td>Urszula Przykładowa<br><span class="small muted">Okręg Mazowiecki</span></td>
+                    <td><span class="badge" data-group="contact"><span class="dot"></span>Oczekuje na deklarację</span></td>
+                    <td class="small muted">—</td>
+                    <td class="small">ręcznie</td>
+                    <td class="small muted">—</td>
+                    <td class="small muted">20.11.2026</td>
+                </tr>
+                <tr>
+                    <td class="mono"><a href="#">S-000117</a></td>
+                    <td>Tomasz Bezkontaktowy<br><span class="small muted">Okręg Dolnośląski</span></td>
+                    <td><span class="badge" data-group="contact"><span class="dot"></span>Brak kontaktu</span></td>
+                    <td class="small muted">—</td>
+                    <td class="small">formularz</td>
+                    <td class="small muted">—</td>
+                    <td class="small muted">18.11.2026</td>
+                </tr>
+                <tr>
+                    <td class="mono"><a href="#">S-000115</a></td>
+                    <td>Adam Testowy<br><span class="small muted">Okręg Mazowiecki</span></td>
+                    <td><span class="badge" data-group="decision"><span class="dot"></span>Głosowanie ZK</span></td>
+                    <td class="small muted">—</td>
+                    <td class="small">strona</td>
+                    <td class="small">Zaangażowana</td>
+                    <td class="small muted">17.11.2026</td>
+                </tr>
+                <tr>
+                    <td class="mono"><a href="#">S-000113</a></td>
+                    <td>Zofia Odrzucona<br><span class="small muted">Okręg Dolnośląski</span></td>
+                    <td><span class="badge" data-group="rejected"><span class="dot"></span>Odrzucona</span></td>
+                    <td class="small muted">—</td>
+                    <td class="small">formularz</td>
+                    <td class="small">Standardowa</td>
+                    <td class="small muted">12.11.2026</td>
+                </tr>
+                <tr>
+                    <td class="mono"><a href="#">S-000112</a></td>
+                    <td>Leon Wykreślony<br><span class="small muted">Okręg Mazowiecki</span></td>
+                    <td><span class="badge" data-group="accepted"><span class="dot"></span>Przyjęta</span></td>
+                    <td class="small muted">—</td>
+                    <td class="small">strona</td>
+                    <td class="small">Afiliowana</td>
+                    <td class="small muted">10.11.2026</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <nav class="pagination" aria-label="Paginacja listy spraw">
+        <a class="btn btn-outline" href="#" aria-disabled="true">‹ Poprzednia</a>
+        <a class="btn btn-outline" href="#" aria-current="page">1</a>
+        <a class="btn btn-outline" href="#">2</a>
+        <span class="small muted">Strona 1 z 2 · 47 spraw</span>
+        <a class="btn btn-outline" href="#">Następna ›</a>
+    </nav>
+
+    <!-- Referencja stanów tabeli (SPEC 4.5 / 5.1) -->
+    <section class="grid-2" aria-label="Stany tabeli — referencja dla implementacji">
+        <div class="card">
+            <h2>Stan: ładowanie</h2>
+            <div class="stack" aria-busy="true">
+                <span class="sr-only">Wczytywanie spraw…</span>
+                <span class="skeleton pulse" style="width:100%"></span>
+                <span class="skeleton pulse" style="width:92%"></span>
+                <span class="skeleton pulse" style="width:97%"></span>
+                <span class="skeleton pulse" style="width:88%"></span>
+            </div>
+        </div>
+        <div class="card">
+            <h2>Stany: pusty / filtry / błąd</h2>
+            <div class="empty">
+                <div class="glyph" aria-hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                </div>
+                <h3>Brak spraw dla wybranych filtrów</h3>
+                <p>Zmień filtry albo wyczyść je wszystkie.</p>
+                <button class="btn btn-ghost" type="button">Wyczyść filtry</button>
+            </div>
+            <div class="notice" data-tone="danger" role="alert">
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden><path d="M10 2 1 18h18L10 2zm0 5 6 11H4L10 7zm-1 4v3h2v-3H9zm0 4v2h2v-2H9z" transform="translate(0.3 0) scale(0.97)"/></svg>
+                <span>Nie udało się wczytać listy spraw. <a href="#">Spróbuj ponownie</a>.</span>
+            </div>
+        </div>
+    </section>
+</main>
+<div class="proto-note">Prototyp · Panel MR · ekran 1 · nie interaktywny</div>
+</body>
+</html>

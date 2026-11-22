@@ -1,0 +1,453 @@
+/* ==========================================================================
+   Panel MR — prototypy · wspólne tokeny (SPEC.md §2) + warstwa prymitywów
+   Plik statyczny: zero zależności, zero JS; otwierany przez file:// w Safari/Chrome.
+   W produkcyjnym kodzie wartości żyją w app/theme/theme.scss — nazwy zgodne 1:1.
+   ========================================================================== */
+
+/* --- Tokeny (SPEC §2) ----------------------------------------------------- */
+:root {
+    /* brand (maroon) — SPEC 2.1 */
+    --brand-900: #4A0725;
+    --brand-800: #680C35;
+    --brand-700: #7A0E3E;   /* --color-primary */
+    --brand-600: #93275D;   /* focus ring, dark primary */
+    --brand-300: #D886AC;   /* dekoracje dark; NIE tekst na jasnym */
+    --brand-100: #F6E3ED;
+    --brand-50:  #FAF0F6;   /* --color-primary-soft */
+
+    /* szarości — SPEC 2.2 (bez zmian względem theme.scss) */
+    --gray-950: #18131A;
+    --gray-900: #241D27;
+    --gray-800: #3A323D;
+    --gray-700: #4F4653;
+    --gray-600: #6B6270;    /* --color-text-muted */
+    --gray-500: #8B8290;    /* tylko disabled/dekoracje */
+    --gray-400: #B3ABB6;
+    --gray-300: #D6D0D8;
+    --gray-200: #E8E4EA;
+    --gray-100: #F2EFF3;
+    --gray-50:  #F8F7F9;    /* tło aplikacji (makieta ownera: #F5F5F7 — zamienne) */
+
+    /* semantyka — SPEC 2.3 */
+    --success-strong: #14663A;
+    --success-base:    #1E8E4E;
+    --success-tint:    #E7F6ED;
+    --warning-strong:  #B45309;
+    --warning-tint:    #FFF4E5;
+    --danger-strong:   #C62A3B;
+    --danger-tint:     #FDECEE;
+    --info-strong:     #1F2F6B;
+    --info-tint:       #E8ECF8;
+    --orange-base:     #E8590C;   /* wyłącznie non-text/dekoracja */
+    --orange-tint:     #FFF0E6;
+
+    /* role powierzchni */
+    --color-primary: var(--brand-700);
+    --color-primary-soft: var(--brand-50);
+    --color-text: var(--gray-950);
+    --color-text-muted: var(--gray-600);
+    --color-surface: #FFFFFF;
+    --color-background: #F5F5F7;
+    --color-border: var(--gray-200);
+    --color-border-strong: var(--gray-300);
+    --color-table-head: var(--gray-900);
+    --color-focus: var(--brand-600);
+
+    /* statusy rekrutacji — STATES 1 */
+    --status-contact-fg:   var(--info-strong);     --status-contact-bg:   var(--info-tint);
+    --status-probation-fg: var(--warning-strong);  --status-probation-bg: var(--warning-tint);
+    --status-decision-fg:  var(--brand-800);       --status-decision-bg:  var(--brand-100);
+    --status-accepted-fg:  var(--success-strong); --status-accepted-bg:  var(--success-tint);
+    --status-rejected-fg:   var(--danger-strong);  --status-rejected-bg:  var(--danger-tint);
+
+    /* zegary — STATES 3.2 */
+    --clock-ok-fg:   var(--success-strong); --clock-ok-bg:   var(--success-tint);
+    --clock-soon-fg: var(--warning-strong); --clock-soon-bg: var(--warning-tint);
+    --clock-over-fg: var(--danger-strong);  --clock-over-bg:  var(--danger-tint);
+    --clock-wait-fg: var(--info-strong);    --clock-wait-bg:  var(--info-tint);
+
+    /* typografia — SPEC 2.5 */
+    --font-sans: 'GeneralSans-Variable', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: 'SourceCodePro-VariableFont', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --text-display: clamp(1.625rem, 1.3rem + 1.25vw, 2.25rem);
+    --text-h1: clamp(1.375rem, 1.2rem + 0.75vw, 1.875rem);
+    --text-h2: 1.0625rem;
+    --text-body: 0.9375rem;
+    --text-small: 0.875rem;
+    --text-caption: 0.8125rem;
+    --text-micro: 0.75rem;
+
+    /* spacing 4/8 — SPEC 2.6 */
+    --space-1: .25rem; --space-2: .5rem; --space-3: .75rem; --space-4: 1rem;
+    --space-5: 1.25rem; --space-6: 1.5rem; --space-8: 2rem; --space-10: 2.5rem; --space-12: 3rem;
+
+    /* radius */
+    --radius-sm: .5rem; --radius-md: .75rem; --radius-lg: 1rem; --radius-pill: 999px;
+
+    /* cienie i warstwy — SPEC 2.7 */
+    --shadow-1: 0 1px 2px rgba(36,29,39,.06), 0 1px 3px rgba(36,29,39,.06);
+    --shadow-2: 0 4px 12px rgba(36,29,39,.08), 0 1px 3px rgba(36,29,39,.06);
+    --shadow-3: 0 12px 32px rgba(36,29,39,.16);
+    --z-sticky: 10; --z-popover: 30; --z-overlay: 50;
+
+    /* motion — SPEC 2.7 */
+    --duration: 180ms; --duration-instant: 90ms; --ease: ease-in-out;
+    --transition: all var(--duration) var(--ease);
+
+    /* kontrolki — SPEC 2.6 (dotyk ≥44px) */
+    --control-height: 2.75rem;
+    --control-height-sm: 2.5rem;
+}
+
+/* --- Dark mode (forward) — SPEC 2.8; Teams ustawia data-teams-theme ------- */
+:root[data-teams-theme="dark"] {
+    --color-text: #F2EAEE;
+    --color-text-muted: #C5B7BD;
+    --color-surface: #271921;
+    --color-background: #1C1016;
+    --color-border: #4A3B44;
+    --color-border-strong: #6B5762;
+    --color-primary: var(--brand-600);
+    --color-primary-soft: #3A1E2C;
+    --accent-on-dark: #E4A0BE;
+    --gray-50: #221822;
+    --gray-100: #2E2129;
+    --gray-200: #3A2B34;
+    --gray-300: #4A3B44;
+    --gray-500: #71616B;
+    --gray-600: #C5B7BD;
+}
+
+/* --- Baza ------------------------------------------------------------------ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: 1.5;
+    color: var(--color-text);
+    background: var(--color-background);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4 { line-height: 1.25; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+:root[data-teams-theme="dark"] :focus-visible { outline-color: #FFFFFF; }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
+
+.sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+/* --- Primitives: przyciski (SPEC 4.1) -------------------------------------- */
+.overline {
+    font-size: var(--text-micro);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--color-text-muted);
+}
+/* Nagłówki kart na powierzchni member Teams: CAPS + rozstrzelenie (kanon makiety „Teams-Panel”) */
+.card[data-teams="true"] > .card-header h2, h2.teams-title {
+    font-size: var(--text-micro);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--gray-700);
+}
+.btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+    min-height: var(--control-height);
+    padding: 0 1.1rem;
+    border-radius: var(--radius-pill);
+    border: 1px solid transparent;
+    font-weight: 550; font-size: var(--text-body);
+    text-decoration: none; white-space: nowrap; width: fit-content; cursor: pointer;
+    transition: var(--transition);
+}
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; pointer-events: none; }
+.btn-primary  { background: var(--color-primary); color: #fff; box-shadow: 0 2px 8px rgba(122,14,62,.3); }
+.btn-primary:hover  { background: var(--brand-800); }
+.btn-outline { background: var(--color-surface); border-color: var(--color-border-strong); color: var(--gray-900); }
+.btn-outline:hover { border-color: var(--gray-400); background: var(--brand-50); }
+.btn-danger  { background: var(--danger-strong); color: #fff; }
+.btn-danger:hover  { background: #A81F2D; }
+.btn-ghost   { background: transparent; color: var(--gray-800); }
+.btn-ghost:hover   { background: var(--gray-100); }
+.btn svg { width: 1.1em; height: 1.1em; flex: none; }
+
+/* --- Badge statusu (STATES 2) + zegarowy (STATES 3.2) ----------------------- */
+.badge {
+    display: inline-flex; align-items: center; gap: .35rem;
+    padding: .15rem .65rem;
+    border-radius: var(--radius-pill);
+    font-size: var(--text-caption); font-weight: 550; line-height: 1.5;
+    white-space: nowrap;
+}
+.badge .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: currentColor; }
+.badge[data-group="contact"]   { background: var(--status-contact-bg);   color: var(--status-contact-fg); }
+.badge[data-group="probation"] { background: var(--status-probation-bg); color: var(--status-probation-fg); }
+.badge[data-group="decision"]  { background: var(--status-decision-bg);  color: var(--status-decision-fg); }
+.badge[data-group="accepted"]  { background: var(--status-accepted-bg);  color: var(--status-accepted-fg); }
+.badge[data-group="rejected"]  { background: var(--status-rejected-bg); color: var(--status-rejected-fg); }
+.badge[data-group="neutral"]   { background: var(--gray-100); color: var(--gray-800); }
+
+.clock {
+    display: inline-flex; align-items: center; gap: .35rem;
+    padding: .15rem .65rem;
+    border-radius: var(--radius-pill);
+    font-size: var(--text-caption); font-weight: 550;
+    white-space: nowrap;
+}
+.clock[data-state="ok"]   { background: var(--clock-ok-bg);   color: var(--clock-ok-fg); }
+.clock[data-state="soon"] { background: var(--clock-soon-bg); color: var(--clock-soon-fg); }
+.clock[data-state="over"] { background: var(--clock-over-bg); color: var(--clock-over-fg); }
+.clock[data-state="wait"] { background: var(--clock-wait-bg); color: var(--clock-wait-fg); }
+.clock svg { width: .85rem; height: .85rem; flex: none; }
+
+/* --- Karta / notice (SPEC 4.3–4.4) ------------------------------------------ */
+.card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-1);
+    padding: var(--space-6);
+    display: flex; flex-direction: column; gap: var(--space-4);
+    min-width: 0;
+}
+.card-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.card h2, .card > .card-title { font-size: var(--text-h2); font-weight: 600; }
+.card h3 { font-size: var(--text-micro); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-muted); }
+
+.notice {
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    background: var(--gray-100);
+    border: 1px solid var(--gray-200);
+    font-size: var(--text-small);
+    display: flex; gap: var(--space-2); align-items: flex-start;
+}
+.notice[data-tone="success"] { background: var(--success-tint); border-color: rgba(20,102,58,.25); color: var(--success-strong); }
+.notice[data-tone="warning"] { background: var(--warning-tint); border-color: rgba(180,83,9,.25); color: var(--warning-strong); }
+.notice[data-tone="danger"]  { background: var(--danger-tint);  border-color: rgba(198,42,59,.25); color: var(--danger-strong); }
+.notice[data-tone="info"]    { background: var(--info-tint);    border-color: rgba(31,47,107,.2);  color: var(--info-strong); }
+.notice svg { width: 1.1rem; height: 1.1rem; flex: none; margin-top: .1rem; }
+
+/* --- Formularze (SPEC 4.7) --------------------------------------------------- */
+.field { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.field label { font-size: var(--text-caption); font-weight: 550; color: var(--gray-800); }
+.field .req { color: var(--danger-strong); }
+.field input, .field select, .field textarea {
+    min-height: var(--control-height);
+    padding: var(--space-2) var(--space-3);
+    font-size: 1rem; /* ≥16px na mobile — blokuje zoom iOS */
+    background: var(--color-surface);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+}
+.field textarea { min-height: 5rem; }
+.field input:hover, .field select:hover, .field textarea:hover { border-color: var(--gray-400); }
+.field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible {
+    outline: 2px solid var(--color-focus); outline-offset: 1px; border-color: var(--color-focus);
+}
+.field .helper { font-size: var(--text-small); color: var(--color-text-muted); }
+.field[data-invalid="true"] input, .field[data-invalid="true"] select { border-color: var(--danger-strong); }
+.field .error { display: flex; align-items: center; gap: .35rem; font-size: var(--text-small); color: var(--danger-strong); font-weight: 500; }
+.field .error svg { width: .9rem; height: .9rem; flex: none; }
+
+/* --- Tabela (SPEC 4.5) -------------------------------------------------------- */
+.tablewrap { width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+table.ui { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--text-small); }
+table.ui thead th {
+    position: sticky; top: 0;
+    background: var(--color-table-head); color: #fff;
+    font-weight: 550; font-size: var(--text-caption); text-align: left;
+    padding: .8rem var(--space-4); white-space: nowrap;
+}
+table.ui thead th:first-child { border-top-left-radius: calc(var(--radius-md) - 1px); }
+table.ui thead th:last-child  { border-top-right-radius: calc(var(--radius-md) - 1px); }
+table.ui tbody td { padding: .75rem var(--space-4); border-top: 1px solid var(--color-border); vertical-align: middle; }
+table.ui tbody tr:nth-child(even) { background: var(--brand-50); }
+table.ui tbody tr:hover { background: var(--brand-50); }
+table.ui a { color: var(--gray-950); font-weight: 500; text-decoration: none; }
+table.ui a:hover { color: var(--color-primary); }
+.mono { font-family: var(--font-mono); font-size: var(--text-small); }
+.muted { color: var(--color-text-muted); }
+.small { font-size: var(--text-small); }
+
+/* --- Filtry / chipy / paginacja (SPEC 4.6) ------------------------------------ */
+.toolbar {
+    position: sticky; top: 0; z-index: var(--z-sticky);
+    display: flex; flex-wrap: wrap; gap: var(--space-2);
+    align-items: center;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-1);
+    padding: var(--space-3);
+}
+.toolbar input[type="search"] {
+    flex: 1 1 14rem; min-height: var(--control-height);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--gray-300); border-radius: var(--radius-sm);
+    font-size: 1rem; background: var(--color-surface);
+}
+.toolbar select {
+    min-height: var(--control-height);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--gray-300); border-radius: var(--radius-sm);
+    background: var(--color-surface); font-size: 1rem;
+}
+.chip {
+    display: inline-flex; align-items: center; gap: var(--space-1);
+    background: var(--brand-100); color: var(--brand-800);
+    border-radius: var(--radius-pill);
+    padding: .3rem .4rem .3rem .65rem;
+    font-size: var(--text-caption); font-weight: 550;
+}
+.chip button {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.5rem; height: 1.5rem; min-height: 0;
+    border: none; border-radius: 50%;
+    background: transparent; color: inherit; cursor: pointer;
+    font-size: .9rem; line-height: 1;
+}
+.chip button:hover { background: rgba(74,7,37,.12); }
+.pagination { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.pagination [aria-current="page"] { font-weight: 600; color: var(--gray-950); }
+
+/* --- Dialog (SPEC 4.8; w prototypach renderowany jako stan otwarty) ----------- */
+.overlay {
+    position: fixed; inset: 0; z-index: var(--z-overlay);
+    background: rgba(24,19,26,.45);
+    display: flex; align-items: center; justify-content: center;
+    padding: var(--space-4);
+}
+.dialog {
+    width: min(32rem, 100%);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-3);
+    padding: var(--space-6);
+    display: flex; flex-direction: column; gap: var(--space-4);
+}
+.dialog h2 { font-size: var(--text-h2); }
+
+/* --- Timeline (SPEC 4.9) ---------------------------------------------------- */
+.timeline { list-style: none; display: flex; flex-direction: column; }
+.timeline li { display: grid; grid-template-columns: 2rem 1fr; gap: var(--space-2); position: relative; padding-bottom: var(--space-4); }
+.timeline li:not(:last-child)::before { content: ""; position: absolute; left: .9375rem; top: 2rem; bottom: .25rem; width: 2px; background: var(--gray-200); }
+.tl-icon {
+    width: 1.75rem; height: 1.75rem; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--brand-100); color: var(--brand-700);
+}
+.tl-icon svg { width: 1rem; height: 1rem; }
+.tl-icon.done  { background: var(--success-tint); color: var(--success-strong); }
+.tl-icon.fail  { background: var(--danger-tint);  color: var(--danger-strong); }
+.tl-body b { font-weight: 600; }
+.tl-body .meta { color: var(--color-text-muted); font-size: var(--text-small); }
+.tl-body .content { font-size: var(--text-small); margin-top: .15rem; }
+
+/* --- EmptyState (SPEC 4.10) --------------------------------------------------- */
+.empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-2); padding: var(--space-8) var(--space-4); }
+.empty .glyph { width: 3rem; height: 3rem; border-radius: var(--radius-md); background: var(--brand-100); color: var(--brand-600); display: flex; align-items: center; justify-content: center; }
+.empty .glyph svg { width: 1.5rem; height: 1.5rem; }
+.empty h3 { font-size: var(--text-body); font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--color-text); }
+.empty p { font-size: var(--text-small); color: var(--color-text-muted); max-width: 32rem; }
+
+/* --- Toast (SPEC 4.11) --------------------------------------------------------- */
+.toast {
+    position: fixed; right: var(--space-4); bottom: var(--space-4);
+    background: var(--gray-950); color: #fff;
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    box-shadow: var(--shadow-3);
+    font-size: var(--text-small);
+    display: flex; gap: var(--space-2); align-items: center;
+}
+
+/* --- Baner kampanii (SPEC 4.13; kanon makiety „Teams-Panel”) -------------------- */
+.campaign {
+    background: var(--brand-700);
+    color: #fff;
+    border-radius: var(--radius-md);
+    padding: var(--space-5) var(--space-6);
+    display: flex; flex-wrap: wrap; gap: var(--space-4);
+    align-items: center; justify-content: space-between;
+}
+.campaign .overline { color: var(--brand-200, #F0CBDD); letter-spacing: .14em; }
+.campaign h2 { font-size: var(--text-h2); font-weight: 600; color: #fff; margin-top: .2rem; }
+.campaign .deadline { font-size: var(--text-small); color: var(--brand-100); margin-top: .25rem; }
+.campaign .btn-campaign {
+    display: inline-flex; align-items: center; gap: .45rem;
+    background: #fff; color: var(--brand-800);
+    border-radius: var(--radius-pill);
+    min-height: var(--control-height);
+    padding: 0 var(--space-5);
+    font-weight: 600; font-size: var(--text-body);
+    text-decoration: none; white-space: nowrap;
+}
+
+/* --- Skeleton (SPEC 4.5 L) ------------------------------------------------------ */
+.skeleton { height: var(--text-body); border-radius: var(--radius-sm); background: var(--gray-100); }
+@keyframes pulse { 0%,100% { opacity: .55; } 50% { opacity: .85; } }
+.skeleton.pulse { animation: pulse 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .skeleton.pulse { animation: none; opacity: .7; } }
+
+/* --- Stepper wizarda kandydata (IA 3.2) ----------------------------------------- */
+.stepper { display: flex; align-items: center; gap: var(--space-1); }
+.stepper .step { display: flex; align-items: center; gap: .4rem; font-size: var(--text-micro); font-weight: 550; color: var(--color-text-muted); }
+.stepper .step .n {
+    width: 1.375rem; height: 1.375rem; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 2px solid var(--gray-300); color: var(--gray-500); background: var(--color-surface);
+}
+.stepper .step[data-state="done"] .n { border-color: var(--success-strong); background: var(--success-tint); color: var(--success-strong); }
+.stepper .step[data-state="current"] { color: var(--color-text); }
+.stepper .step[data-state="current"] .n { border-color: var(--color-primary); background: var(--color-primary); color: #fff; }
+.stepper .bar { flex: 1; height: 2px; background: var(--gray-200); }
+
+/* --- Ramka telefonu dla ekranów mobile -------------------------------------------- */
+.device {
+    width: 390px; max-width: 100%;
+    background: var(--color-background);
+    border: 10px solid #17161A; border-radius: 2.6rem;
+    overflow: hidden;
+    box-shadow: var(--shadow-3);
+}
+.device .device-screen { max-height: 76vh; overflow-y: auto; padding: var(--space-4); }
+.device-caption { margin-top: var(--space-2); font-size: var(--text-small); color: var(--color-text-muted); text-align: center; }
+
+/* --- Layouty pomocnicze -------------------------------------------------------- */
+.page { max-width: 88rem; margin: 0 auto; padding: var(--space-8); display: flex; flex-direction: column; gap: var(--space-6); }
+.page-header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-4); }
+.page-header .sub { color: var(--color-text-muted); max-width: 48rem; }
+.grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-6); align-items: start; }
+.col { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
+.desc { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap: var(--space-3) var(--space-6); }
+.desc dt { font-size: var(--text-micro); font-weight: 500; color: var(--color-text-muted); }
+.desc dd { font-weight: 500; overflow-wrap: anywhere; }
+.stack { display: flex; flex-direction: column; gap: var(--space-2); }
+.row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.spread { display: flex; justify-content: space-between; gap: var(--space-3); align-items: center; }
+
+/* metka prototypu */
+.proto-note {
+    position: fixed; left: var(--space-4); bottom: var(--space-4);
+    background: var(--gray-950); color: #fff; opacity: .85;
+    padding: .35rem .7rem; border-radius: var(--radius-pill);
+    font-size: var(--text-micro);
+}
+@media (max-width: 900px) {
+    .page { padding: var(--space-5) var(--space-4) var(--space-8); gap: var(--space-5); }
+    .grid-2 { grid-template-columns: 1fr; }
+    .card { padding: var(--space-4); }
+}

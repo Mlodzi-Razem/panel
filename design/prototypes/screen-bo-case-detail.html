@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Panel MR — prototyp 2: Rekrutacja · szczegół sprawy S-000128</title>
+    <link rel="stylesheet" href="tokens.css">
+</head>
+<body>
+<main class="page">
+    <p class="small muted">Prototyp statyczny · ekran 2/6 · back-office ZO/ZK (desktop) · dane fikcyjne (persony testowe)</p>
+
+    <nav aria-label="Breadcrumb">
+        <p class="small"><a class="muted" href="screen-bo-cases.html">‹ Rekrutacja</a> / <strong class="mono">S-000128</strong></p>
+    </nav>
+
+    <header class="page-header">
+        <div>
+            <h1 style="font-size:var(--text-h1); font-weight:650;">Magdalena Probacyjna</h1>
+            <div class="row" style="margin-top:.3rem;">
+                <span class="badge" data-group="probation"><span class="dot"></span>Okres przedłużony</span>
+                <span class="clock" data-state="over" title="Najpilniejszy zegar: okno oceny ZO — po terminie od 20.11.2026 (nieblokujący). Druga ocena: najpóźniej 17.12.2026.">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/></svg>
+                    Po terminie od 20.11 (nieblokujący)
+                </span>
+                <span class="small muted">Okręg Mazowiecki · utworzona 11.08.2026</span>
+            </div>
+        </div>
+        <div class="row">
+            <span class="badge" data-group="neutral"><span class="dot"></span>RECRUITMENT_MANAGE</span>
+            <button class="btn btn-outline" type="button">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden><path d="M4 8h8M8 4v8"/></svg>
+                Wyślij przypomnienie
+            </button>
+            <button class="btn btn-primary" type="button">Zmień status</button>
+        </div>
+    </header>
+
+    <div class="grid-2">
+        <!-- Lewa kolumna: operacyjna -->
+        <div class="col">
+            <section class="card" aria-labelledby="t-dane">
+                <div class="card-header">
+                    <h2 id="t-dane">Dane kandydata</h2>
+                    <span class="small muted">widoczne: RECRUITMENT_READ</span>
+                </div>
+                <dl class="desc">
+                    <div><dt>Imię i nazwisko</dt><dd>Magdalena Probacyjna</dd></div>
+                    <div><dt>Adres e-mail</dt><dd>magdalena.probacyjna@example.com</dd></div>
+                    <div><dt>Telefon</dt><dd>+48 600 100 200</dd></div>
+                    <div><dt>Data urodzenia</dt><dd>04.07.2003 (23 lata)</dd></div>
+                    <div><dt>PESEL</dt><dd><span class="mono">••••••123</span> <button class="btn btn-ghost" type="button" style="min-height:0; padding:.1rem .5rem; font-size:var(--text-small);">Odsłoń</button></dd></div>
+                    <div><dt>Profil społecznościowy</dt><dd><a href="#">social.example/mprobacyjna</a></dd></div>
+                    <div><dt>Źródło</dt><dd>strona</dd></div>
+                    <div><dt>Ścieżka oceny</dt><dd>Standardowa</dd></div>
+                </dl>
+            </section>
+
+            <section class="card" aria-labelledby="t-deklaracja">
+                <h2 id="t-deklaracja">Deklaracja</h2>
+                <dl class="desc">
+                    <div><dt>Forma</dt><dd>elektroniczna</dd></div>
+                    <div><dt>Data otrzymania</dt><dd>05.09.2026</dd></div>
+                    <div><dt>Referencja artefaktu</dt><dd class="mono">EDECL-2026-09-0128</dd></div>
+                </dl>
+                <div class="row">
+                    <a class="btn btn-outline" href="#">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden><path d="M4 4h8v9H4zM7 5h2M7 7.5h4M7 10h4"/></svg>
+                        Pobierz deklarację (PDF)
+                    </a>
+                    <span class="small muted">Wersja szablonu: 2024-09</span>
+                </div>
+            </section>
+
+            <section class="card" aria-labelledby="t-zegary">
+                <h2 id="t-zegary">Zegary statutowe</h2>
+                <div class="stack">
+                    <div class="spread">
+                        <div>
+                            <p class="small" style="font-weight:600;">Okno oceny ZO <span class="muted">(Z-1)</span></p>
+                            <p class="small muted">06.11.2026 – 20.11.2026 · okres wstępny 62–76 dni od deklaracji</p>
+                        </div>
+                        <span class="clock" data-state="over">Po terminie od 20.11</span>
+                    </div>
+                    <div class="spread">
+                        <div>
+                            <p class="small" style="font-weight:600;">Druga ocena po przedłużeniu <span class="muted">(Z-2)</span></p>
+                            <p class="small muted">najpóźniej 17.12.2026 · decyzja o przedłużeniu: 16.11.2026</p>
+                        </div>
+                        <span class="clock" data-state="ok">Na czas — do 17.12</span>
+                    </div>
+                    <div class="spread">
+                        <div>
+                            <p class="small" style="font-weight:600;">Uchwała o przyjęciu <span class="muted">(Z-3)</span></p>
+                            <p class="small muted">≤7 dni od pozytywnej oceny — zegar ruszy po rekomendacji ZO</p>
+                        </div>
+                        <span class="small muted">uśpiony</span>
+                    </div>
+                </div>
+                <div class="notice" data-tone="info">
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden><path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm-1 4h2v2H9V6zm0 4h2v5H9v-5z"/></svg>
+                    <span>Terminy są <strong>widoczne, ale nieblokujące</strong> (soft): po przekroczeniu możesz nadal rekomendować, przedłużać lub odrzucać.</span>
+                </div>
+            </section>
+
+            <section class="card" aria-labelledby="t-notatki">
+                <div class="card-header">
+                    <h2 id="t-notatki">Notatki i przypomnienia</h2>
+                    <span class="small muted">ostatnie przypomnienie: 28.08.2026</span>
+                </div>
+                <ul class="stack" style="list-style:none;">
+                    <li class="card" style="padding:var(--space-3) var(--space-4); box-shadow:none;">
+                        <p class="small">Kandydatka poprosiła o kontakt telefoniczny po 17:00.</p>
+                        <p class="small muted">Edmund Testowy · dziś, 09:14</p>
+                    </li>
+                </ul>
+                <div class="field">
+                    <label for="note">Nowa notatka</label>
+                    <textarea id="note" placeholder="Co ustaliłaś/eś w kontakcie z kandydatem/kandydatką?"></textarea>
+                    <p class="helper">Notatka trafi do historii sprawy — widzą ją osoby z uprawnieniem RECRUITMENT_READ w tym okręgu.</p>
+                </div>
+                <div class="row">
+                    <button class="btn btn-outline" type="button">Dodaj notatkę</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- Prawa kolumna: kolegialność + historia -->
+        <div class="col">
+            <section class="card" aria-labelledby="t-decyzje">
+                <h2 id="t-decyzje">Decyzje kolegialne</h2>
+                <div class="tablewrap" style="border:none;">
+                    <table class="ui">
+                        <caption class="sr-only">Zapisane decyzje kolegialne sprawy S-000128</caption>
+                        <thead><tr><th scope="col">Decyzja</th><th scope="col">Sygnatura / data</th></tr></thead>
+                        <tbody>
+                            <tr>
+                                <td>Przedłużenie okresu wstępnego<br><span class="small muted">nota: „druga ocena do 17.12.2026”</span></td>
+                                <td><span class="mono">ZO/MZ/21/2026</span><br><span class="small muted">16.11.2026</span></td>
+                            </tr>
+                            <tr>
+                                <td>Ocena ZO — pozytywna<br><span class="small muted">oczekujemy po drugiej ocenie</span></td>
+                                <td class="small muted">—</td>
+                            </tr>
+                            <tr>
+                                <td>Opinia ZK</td>
+                                <td class="small muted">—</td>
+                            </tr>
+                            <tr>
+                                <td>Uchwała ZO o przyjęciu</td>
+                                <td class="small muted">—</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="small muted">Do przyjęcia (status Przyjęta) wymagane są: pozytywna ocena ZO, opinia ZK i uchwała ZO — sprawdzi to system.</p>
+            </section>
+
+            <section class="card" aria-labelledby="t-historia">
+                <div class="card-header">
+                    <h2 id="t-historia">Historia zdarzeń</h2>
+                    <span class="small muted">co było</span>
+                </div>
+                <ol class="timeline" style="margin:0;">
+                    <li>
+                        <span class="tl-icon" aria-hidden>
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12v9H2zM2 4l6 5 6-5"/></svg>
+                        </span>
+                        <div class="tl-body">
+                            <b>Notatka dodana</b>
+                            <div class="meta">Edmund Testowy · dziś, 09:14</div>
+                            <div class="content">Kandydatka poprosiła o kontakt telefoniczny po 17:00.</div>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="tl-icon" aria-hidden>
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h9l3 3v7H2zM11 3v3h3"/></svg>
+                        </span>
+                        <div class="tl-body">
+                            <b>Zapisano decyzję: Przedłużenie okresu wstępnego</b>
+                            <div class="meta">Adam Testowy · 16.11.2026</div>
+                            <div class="content">Sygnatura <span class="mono">ZO/MZ/21/2026</span> · druga ocena najpóźniej 17.12.2026</div>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="tl-icon" aria-hidden>
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h7l3 3v9H3zM10 2v3h3M6 8h4M5.5 8v3M10.5 8v3"/></svg>
+                        </span>
+                        <div class="tl-body">
+                            <b>Zmiana statusu: Okres wstępny → Okres przedłużony</b>
+                            <div class="meta">Adam Testowy · 16.11.2026</div>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="tl-icon" aria-hidden>
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c2 2 2 10 0 12"/></svg>
+                        </span>
+                        <div class="tl-body">
+                            <b>ZK powiadomione o początku okresu wstępnego</b>
+                            <div class="meta">07.09.2026</div>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="tl-icon" aria-hidden>
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h9l3 3v6H2zM13 4v3h2"/></svg>
+                        </span>
+                        <div class="tl-body">
+                            <b>Okno oceny: 06.11 – 20.11.2026</b>
+                            <div class="meta">06.11.2026</div>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="tl-icon done" aria-hidden>
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4.5h10v7H3zM3 6l5 3.5L13 6"/></svg>
+                        </span>
+                        <div class="tl-body">
+                            <b>Deklaracja zapisana (elektroniczna)</b>
+                            <div class="meta">05.09.2026</div>
+                            <div class="content">Zaczyna okres wstępny — zegary ruszyły.</div>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="tl-icon" aria-hidden>
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h9m-3-3 3 3-3 3"/></svg>
+                        </span>
+                        <div class="tl-body">
+                            <b>Zmiana statusu: Oczekuje na deklarację → Deklaracja odebrana</b>
+                            <div class="meta">05.09.2026</div>
+                        </div>
+                    </li>
+                </ol>
+                <button class="btn btn-ghost" type="button">Wczytaj starszą historię</button>
+            </section>
+        </div>
+    </div>
+</main>
+
+<!-- Dialog przejścia (STATES 4.3) — renderowany w stanie otwartym -->
+<div class="overlay" role="presentation">
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-title" aria-describedby="dlg-desc">
+        <h2 id="dlg-title">Odrzuć sprawę</h2>
+        <div class="notice" data-tone="info" id="dlg-desc">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden><path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm-1 4h2v2H9V6zm0 4h2v5H9v-5z"/></svg>
+            <span>Sprawa <strong class="mono">S-000128</strong> (Magdalena Probacyjna) przejdzie ze statusu <strong>Okres przedłużony</strong> do statusu <strong>Odrzucona</strong>. Tej czynności nie można cofnąć — zmiana zapisze się w historii sprawy.</span>
+        </div>
+        <div class="field">
+            <label for="d-target">Nowy status</label>
+            <select id="d-target">
+                <option>Rekomendacja ZO</option>
+                <option selected>Odrzucona</option>
+            </select>
+        </div>
+        <div class="field" data-invalid="true">
+            <label for="d-reason">Powód odrzucenia <span class="req" aria-hidden>*</span><span class="sr-only">(pole wymagane)</span></label>
+            <select id="d-reason" aria-required="true" aria-invalid="true" aria-describedby="d-reason-err">
+                <option selected>Nie spełnia wymagań (ocena)</option>
+                <option>Zakaz przyjęcia (art. 9 ust. 5)</option>
+            </select>
+            <p class="error" id="d-reason-err">
+                <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden><path d="M8 2 1 14h14L8 2zm-.9 5h1.8v4H7.1V7zm0 5h1.8v1.8H7.1V12z"/></svg>
+                Wybierz powód odrzucenia.
+            </p>
+        </div>
+        <div class="field">
+            <label for="d-note">Notatka (opcjonalna)</label>
+            <textarea id="d-note"></textarea>
+            <p class="helper">Notatka trafi do historii sprawy — widoczna dla uprawnionych w okręgu.</p>
+        </div>
+        <div class="row" style="justify-content:flex-end;">
+            <button class="btn btn-outline" type="button">Anuluj</button>
+            <button class="btn btn-danger" type="button">Odrzuć sprawę</button>
+        </div>
+    </section>
+</div>
+
+<div class="proto-note">Prototyp · Panel MR · ekran 2 · dialog w stanie otwartym</div>
+</body>
+</html>

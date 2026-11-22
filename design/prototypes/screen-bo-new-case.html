@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Panel MR — prototyp 3: Rekrutacja · nowa sprawa</title>
+    <link rel="stylesheet" href="tokens.css">
+</head>
+<body>
+<main class="page" style="max-width:56rem;">
+    <p class="small muted">Prototyp statyczny · ekran 3/6 · back-office ZO (desktop) · walidacja: stany błędów</p>
+
+    <nav aria-label="Breadcrumb">
+        <p class="small"><a class="muted" href="screen-bo-cases.html">‹ Rekrutacja</a> / <strong>Nowa sprawa</strong></p>
+    </nav>
+
+    <header class="page-header">
+        <div>
+            <h1 style="font-size:var(--text-h1); font-weight:650;">Nowa sprawa</h1>
+            <p class="sub">Osobie kandydującej w Twoim okręgu. Po utworzeniu sprawa dostaje status <strong>Nowa</strong>.</p>
+        </div>
+        <span class="badge" data-group="neutral"><span class="dot"></span>RECRUITMENT_MANAGE · Okręg Mazowiecki</span>
+    </header>
+
+    <div class="notice" data-tone="danger" role="alert" aria-labelledby="err-sum">
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden><path d="M10 2 1 18h18L10 2zm-.9 6h1.8v4H9.1V8zm0 5h1.8v1.9H9.1V13z"/></svg>
+        <span id="err-sum"><strong>Formularz zawiera 2 błędy.</strong> Popraw pola oznaczone na czerwono: e-mail i nazwisko.</span>
+    </div>
+
+    <form class="card" novalidate>
+        <p class="small muted">Pola oznaczone <span class="req" aria-hidden>*</span> są wymagane.</p>
+
+        <div class="field">
+            <label for="n-district">Okręg</label>
+            <select id="n-district" aria-describedby="n-district-h" readonly>
+                <option selected>Okręg Mazowiecki</option>
+            </select>
+            <p class="helper" id="n-district-h">🔒 Twój okręg — zarząd okręgu zakłada sprawy tylko w swoim zakresie.</p>
+        </div>
+
+        <div class="field">
+            <label for="n-source">Źródło zgłoszenia <span class="req" aria-hidden>*</span><span class="sr-only">(pole wymagane)</span></label>
+            <select id="n-source" aria-required="true">
+                <option>Formularz Google</option>
+                <option>Strona internetowa</option>
+                <option selected>Zgłoszenie ręczne (ZO)</option>
+            </select>
+        </div>
+
+        <div class="row" style="align-items:flex-start;">
+            <div class="field" style="flex:1 1 14rem;">
+                <label for="n-first">Imię <span class="req" aria-hidden>*</span><span class="sr-only">(pole wymagane)</span></label>
+                <input id="n-first" type="text" autocomplete="off" value="Szymon">
+            </div>
+            <div class="field" style="flex:1 1 14rem;" data-invalid="true">
+                <label for="n-last">Nazwisko <span class="req" aria-hidden>*</span><span class="sr-only">(pole wymagane)</span></label>
+                <input id="n-last" type="text" autocomplete="off" aria-required="true" aria-invalid="true" aria-describedby="n-last-err" value="">
+                <p class="error" id="n-last-err">
+                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden><path d="M8 2 1 14h14L8 2zm-.9 5h1.8v4H7.1V7zm0 5h1.8v1.9H7.1v12z"/></svg>
+                    Podaj nazwisko kandydata/kandydatki.
+                </p>
+            </div>
+        </div>
+
+        <div class="field" data-invalid="true">
+            <label for="n-email">Adres e-mail <span class="req" aria-hidden>*</span><span class="sr-only">(pole wymagane)</span></label>
+            <input id="n-email" type="email" autocomplete="off" aria-required="true" aria-invalid="true" aria-describedby="n-email-err n-email-h" value="szymon.kandydacki@@example">
+            <p class="error" id="n-email-err">
+                <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden><path d="M8 2 1 14h14L8 2zm-.9 5h1.8v4H7.1V7zm0 5h1.8v1.9H7.1v12z"/></svg>
+                Podaj adres e-mail w formacie nazwa@domena.pl.
+            </p>
+            <p class="helper" id="n-email-h">Na ten adres wyślemy link do e-deklaracji.</p>
+        </div>
+
+        <div class="field">
+            <label for="n-phone">Telefon</label>
+            <input id="n-phone" type="tel" autocomplete="off" value="+48 601 200 300">
+        </div>
+
+        <div class="field">
+            <label for="n-url">Profil w mediach społecznościowych</label>
+            <input id="n-url" type="url" autocomplete="off" placeholder="https://…">
+        </div>
+
+        <div class="row" style="align-items:flex-start;">
+            <div class="field" style="flex:1 1 14rem;">
+                <label for="n-birth">Data urodzenia</label>
+                <input id="n-birth" type="date" value="2003-07-04">
+                <p class="helper">Członkostwo zwyczajne: 16–26 lat.</p>
+            </div>
+            <div class="field" style="flex:1 1 14rem;">
+                <label for="n-track">Ścieżka oceny</label>
+                <select id="n-track" aria-describedby="n-track-h">
+                    <option selected>Standardowa</option>
+                    <option>Afiliowana</option>
+                    <option>Zaangażowana</option>
+                </select>
+                <p class="helper" id="n-track-h">Najwcześniejsza ocena po 62 / 14 / 31 dniach od deklaracji.</p>
+            </div>
+        </div>
+
+        <div class="field">
+            <label for="n-note">Notatka początkowa</label>
+            <textarea id="n-note" placeholder="Kontekst zgłoszenia — zapisze się jako pierwsza notatka w historii sprawy."></textarea>
+        </div>
+
+        <hr style="border:none; border-top:1px solid var(--color-border);">
+        <div class="row" style="justify-content:flex-end;">
+            <a class="btn btn-outline" href="screen-bo-cases.html">Anuluj</a>
+            <button class="btn btn-primary" type="submit" aria-describedby="submit-h">Utwórz sprawę</button>
+        </div>
+        <p class="small muted" id="submit-h">Po utworzeniu: status Nowa · toast „Sprawę utworzono” · przejście do szczegółów sprawy.</p>
+    </form>
+
+    <!-- Stan referencyjny: sukces (SPEC 4.11) -->
+    <aside class="toast" role="status">
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden width="16" height="16"><path d="M10 1a9 9 0 1 0 0 18A9 9 0 0 0 10 1zm4.5 6.5-5.4 6.3a1 1 0 0 1-1.5.05L4 10.2l1.4-1.4 2.4 2.4 4.8-5.6 1.9 1z" transform="translate(0.05 0.06) scale(0.95)"/></svg>
+        <span>Sprawę utworzono.</span>
+    </aside>
+</main>
+<div class="proto-note">Prototyp · Panel MR · ekran 3 · stan: błędy walidacji + toast referencyjny</div>
+</body>
+</html>
