@@ -33,7 +33,7 @@ panel:
         data:
           storageLimitGigabytes: 10
           cnpgPvcTemplate:
-            volumeName: mrpanel-postgres-pv
+            volumeName: null
             # MicroK8s hostpath storage (domyślna klasa na tym klastrze);
             # prod używała "manual" (ręczne PV).
             storageClassName: microk8s-hostpath
@@ -51,7 +51,7 @@ panel:
     # Wdrażane z GHCR przez ci/deploy-helm-on-vps.sh (--set panel.api.image).
     image: ghcr.io/Mlodzi-Razem/panel-api:stage
     #dockerconfigjson z sekretem GHCR tworzy właściciel (RUNBOOK §11.4).
-    imagePullSecret: ghcr-pull
+    imagePullSecret: ""
     replicaResources:
       # Stage na 8 vCPU: minimum z chart-schema (api: 1 CPU, web: 0.5 CPU).
       maximumMemoryMb: 1024
@@ -65,7 +65,7 @@ panel:
   web:
     url: https://dev.panel.mlodzirazem.org
     image: ghcr.io/Mlodzi-Razem/panel-web:stage
-    imagePullSecret: ghcr-pull
+    imagePullSecret: ""
     hpa:
       enabled: false
     # panel.web.replicas jest wymagane, gdy hpa.enabled=false (szablon
@@ -92,4 +92,4 @@ panel:
       issuer: letsencrypt
       # Publiczny e-mail ACME (nie sekret) — właściciel uzupełnia w kopii
       # tego pliku na VPS (albo przełącza na origin-ca i czyści pole).
-      acmeEmail: it@mlodzirazem.org
+      acmeEmail: bartosz.baginski@proton.me

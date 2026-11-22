@@ -81,8 +81,8 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates curl jq && \
     rm -rf /var/lib/apt/lists/* && \
-    groupadd --system mrpanel && \
-    useradd --system --gid mrpanel --no-create-home \
+    groupadd --system --gid 10001 mrpanel && \
+    useradd --system --uid 10001 --gid mrpanel --no-create-home \
         --shell /usr/sbin/nologin mrpanel
 
 WORKDIR /application
@@ -96,7 +96,7 @@ COPY --from=builder --chown=mrpanel:mrpanel /mrpanel-out/extracted/application .
 # Entrypoint and healthcheck reused from the repo's own scripts
 # (services/panel-api/docker/). They are invoked through `sh`, so the source
 # files do not need the executable bit in the layer.
-USER mrpanel
+USER 10001:10001
 COPY --chown=mrpanel:mrpanel services/panel-api/docker/launch.sh ./
 COPY --chown=mrpanel:mrpanel services/panel-api/docker/healthcheck.sh ./
 

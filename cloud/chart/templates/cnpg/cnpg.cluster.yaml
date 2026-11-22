@@ -6,6 +6,15 @@
   (kindIs "string" .Values.panel.postgres.cnpg.volumes.data.cnpgPvcTemplate)
 ) -}}
 
+{{- /* Database created at bootstrap: the same value the api datasource
+       uses. panel.secrets.postgres.database is owner-supplied via the
+       secrets values file; the chart default is a tpl fail-guard (see
+       values.yaml), so evaluate it with tpl like the api config secret
+       does. "mrpanel" matches the managed role in .Values.panel.postgres.cnpg
+       and keeps `helm template` working with the example secrets file. */ -}}
+{{- $pgDatabase := (tpl (toString (dig "postgres" "database" "" .Values.panel.secrets)) .) | default "mrpanel" -}}
+{{- $pgInitSql := .Values.panel.postgres.cnpg.postInitApplicationSQL -}}
+
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -22,9 +31,12 @@ spec:
     name: cnpg-admin-secret
   bootstrap:
     initdb:
+      database: {{ $pgDatabase | quote }}
       encoding: UTF8
       dataChecksums: true
       locale: en_US.UTF-8
+      postInitApplicationSQL:
+        - CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
   managed:
     roles:
       - name: mrpanel

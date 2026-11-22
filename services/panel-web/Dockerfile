@@ -55,8 +55,8 @@ LABEL org.mlodzirazem.panel.service="panel-web"
 LABEL org.mlodzirazem.panel.stage.release="${GIT_TAG}"
 
 RUN apk add --no-cache libc6-compat && \
-    addgroup -S mrpanel && \
-    adduser -S -G mrpanel -D -H mrpanel
+    addgroup -S -g 10001 mrpanel && \
+    adduser -S -u 10001 -G mrpanel -D -H mrpanel
 
 WORKDIR /application
 
@@ -68,7 +68,7 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
     NEXT_TELEMETRY_DISABLED=1
 
-USER mrpanel
+USER 10001:10001
 
 EXPOSE 3000
 

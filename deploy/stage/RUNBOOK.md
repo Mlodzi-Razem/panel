@@ -563,35 +563,67 @@ nano /opt/panel-stage/microk8s/values.stage-secrets.yaml   # podstaw sekrety jak
 
 ### 11.3. Ekspozycja publiczna 80/443 (JEDYNA rzecz do skonfigurowania w infra)
 
-Gateway istio słucha na LoadBalancerze 10.64.100.1 (MetalLB, sieć wewnętrzna).
-Rekomendacja (raport „Ekspozycja publiczna"): **DNAT na hoście 80→32011,
-443→30308** (NodePorty już przydzielone gatewayowi). Wariant minimalny —
-systemd-unit (odwracalny: `systemctl disable --now ...`):
+Pilotaż zweryfikował architekturę ekspozycji (kluczowe!): istio tworzy
+**osobny, dedykowany dataplane** dla Gatewaya z chartu — serwis
+`panel-gateway-istio` w ns `stage` na LoadBalancerze MetalLB
+**10.64.100.2** (NodePorty przydzielane automatycznie). Stary
+`istio-ingressgateway` (10.64.100.1, NodePorty 32011/30308) **nie obsługuje**
+Gatewaya z chartu — nie wystawiaj przez niego.
+
+**Rekomendacja (sprawdzona w pilotażu): socat na hoście → VIP 10.64.100.2.**
+DNAT/iptables odrzucony celowo: kube-proxy na tym klastrze pracuje w trybie
+`iptables-legacy`, a ufw w nft — reguły REDIRECT na 80/443 bywają przy tym
+podziale zawodne. socat to userspace'owy proxy TCP, zero interakcji z
+łańcuchami iptables/ufw; dwie unity (odwracalne: `systemctl disable --now`):
 
 ```bash
-sudo tee /etc/systemd/system/panel-stage-expose.service >/dev/null <<UNIT
+sudo apt-get install -y socat
+# adres VIP sprawdź: microk8s kubectl -n stage get gateway panel-gateway \
+#   -o jsonpath='{.status.addresses[0].value}'
+sudo tee /etc/systemd/system/panel-stage-expose-http.service >/dev/null <<UNIT
 [Unit]
-Description=Expose microk8s istio-ingressgateway (80/443 -> NodePort 32011/30308)
+Description=panel stage: expose :80 -> istio Gateway VIP 10.64.100.2 (socat)
 After=network-online.target
 Wants=network-online.target
 [Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/sbin/iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-ports 32011
-ExecStart=/sbin/iptables -t nat -A PREROUTING -p tcp --dport 443 -j REDIRECT --to-ports 30308
-ExecStop=/sbin/iptables -t nat -D PREROUTING -p tcp --dport 80 -j REDIRECT --to-ports 32011
-ExecStop=/sbin/iptables -t nat -D PREROUTING -p tcp --dport 443 -j REDIRECT --to-ports 30308
+ExecStart=/usr/bin/socat TCP-LISTEN:80,fork,reuseaddr TCP4:10.64.100.2:80
+Restart=always
+[Install]
+WantedBy=multi-user.target
+UNIT
+sudo tee /etc/systemd/system/panel-stage-expose-https.service >/dev/null <<UNIT
+[Unit]
+Description=panel stage: expose :443 -> istio Gateway VIP 10.64.100.2 (socat)
+After=network-online.target
+Wants=network-online.target
+[Service]
+ExecStart=/usr/bin/socat TCP-LISTEN:443,fork,reuseaddr TCP4:10.64.100.2:443
+Restart=always
 [Install]
 WantedBy=multi-user.target
 UNIT
 sudo systemctl daemon-reload
-sudo systemctl enable --now panel-stage-expose
-sudo iptables -t nat -L PREROUTING -n | grep -E "32011|30308"
+sudo systemctl enable --now panel-stage-expose-http panel-stage-expose-https
+sudo ss -tlnp | grep -E ':(80|443) '        # dowód: socat słucha
 ```
 
-Jeśli włączysz ufw (§1.2) — reguły zostają; 80/443 i tak są dozwolone.
-Warianty alternatywne (MetalLB z pulą publiczną, rozszerzony node-port-range,
-hostPort) — w raporcie, sekcja „Ekspozycja publiczna"; wybierz świadomie.
+Do tego pasy ufw (pilotaż używa dokładnie tych):
+
+```bash
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+# cofnięcie: sudo ufw delete allow 80/tcp && sudo ufw delete allow 443/tcp
+```
+
+Test ekspozycji publicznej (z pilotażu): `curl -sI http://dev.panel.mlodzirazem.org/`
+musi zwrócić 404 z nagłówkiem `server: istio-envoy` — to dowód, że łańcuch
+internet → socat → VIP → Gateway działa; cokolwiek innego (timeout, refused)
+oznacza przerwę w łańcuchu, nie brak strony.
+
+Warianty alternatywne (MetalLB z pulą publiczną, rozszerzony
+node-port-range, hostPort) — w raporcie, sekcja „Ekspozycja publiczna”;
+wybierz świadomie, gdyby socat przestał wystarczać (np. ruch rząd tysięcy
+rps — wtedy pula publiczna MetalLB dla VIP jest naturalnym następcą).
 
 Sprawdzenie DNS przed TLS (wariant letsencrypt wymaga rekordu BEZ proxowania
 Cloudflare — tzw. szary obłok):
@@ -612,19 +644,53 @@ microk8s kubectl -n stage create secret docker-registry ghcr-pull \
     --docker-password=<PAT-READ:PACKAGES>
 ```
 
-Overlay ma ustawione `panel.{api,web}.imagePullSecret: ghcr-pull`.
+Overlay ma DOMYŚLNIE puste `panel.{api,web}.imagePullSecret` (neutralne dla
+pilotażu offline, gdzie obrazy trafiają do containerd przez `ctr images
+import`). Secret jest warstwą per-transport: dla toru GHCR (workflow GHA)
+ustaw `ghcr-pull` oboma serwisami — najprościej w kopii overlay na VPS
+(`imagePullSecret: ghcr-pull` w sekcjach `api:` i `web:`), ewentualnie
+dopisując do wywołania z §11.6:
+
+```text
+--set panel.api.imagePullSecret=ghcr-pull --set panel.web.imagePullSecret=ghcr-pull
+```
 
 ### 11.5. TLS — dwa warianty (rekomendacja: letsencrypt na start)
 
 - **(a) letsencrypt HTTP-01 (rekomendacja stage)**: overlay ma
-  `panel.gateway.tls.issuer: letsencrypt` + `acmeEmail`. Chart dokłada
-  listener HTTP:80 na gatewayu (dla wyzwań ACME) i `ClusterIssuer`
-  `panel-le-issuer`. Wymaga: rekordu DNS bez proxy CF (§11.3) i cert-manager
-  ≥ 1.16 z obsługą Gateway API — zweryfikuj wersję:
+  `panel.gateway.tls.issuer: letsencrypt` + `acmeEmail`
+  (`bartosz.baginski@proton.me`). Chart dokłada listener HTTP:80 na gatewayu
+  (dla wyzwań ACME) i `ClusterIssuer` `panel-le-issuer` z solverem
+  `gatewayHTTPRoute` (cert-manager tworzy własny HTTPRoute podpinany do
+  sekcji `panel-acme` — poprawka z pilotażu; pole `gatewayHTTP01` ze starszych
+  wersji nie istnieje w CRD ≥1.18). Wymagania:
+  1. rekord DNS bez proxy CF (§11.3),
+  2. **cert-manager ≥ 1.18** (schema solvera) i
+  3. **flaga controllera `--enable-gateway-api=true`** — UWAGA (zweryfikowane
+     bojowo na v1.19.1): to NIE jest feature-gate; `--feature-gates=GatewayAPI=true`
+     **nie istnieje** w v1.19.1 i wywala controller w CrashLoop
+     (`unrecognized feature gate: GatewayAPI`). Historycznie był gate
+     `ExperimentalGatewayAPISupport`, dziś jest zwykła flaga. Bez flagi
+     `certificate` utyka w `Ready=False`, a `kubectl describe challenge`
+     pokazuje `couldn't Present challenge: gateway api is not enabled`.
+
+Zweryfikuj wersję i args, a jeśli brak flagi — dołóż ją (to krok
+OWNERA; platforma AD-9, asystent nie modyfikuje ns cert-manager). Wzór
+z pilotażu: JSON patch `op=replace` całej tablicy args (przeszedł na
+v1.19.1; deterministyczny i idempotentny):
 
 ```bash
 microk8s kubectl -n cert-manager get deploy cert-manager \
     -o jsonpath='{.spec.template.spec.containers[0].image}'; echo
+microk8s kubectl -n cert-manager get deploy cert-manager \
+    -o jsonpath='{.spec.template.spec.containers[0].args}'; echo
+# gdy brak "--enable-gateway-api=true" — podmień args na (istniejące + flaga):
+microk8s kubectl -n cert-manager patch deployment cert-manager --type='json' \
+  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/args","value":["--v=2","--cluster-resource-namespace=$(POD_NAMESPACE)","--leader-election-namespace=kube-system","--acme-http01-solver-image=quay.io/jetstack/cert-manager-acmesolver:v1.19.1","--max-concurrent-challenges=60","--enable-gateway-api=true"]}]'
+microk8s kubectl -n cert-manager rollout status deploy/cert-manager
+# dowód działania: w logach kontrolera "enabling the sig-network Gateway API
+# certificate-shim and HTTP-01 solver", po kilku minutach
+# `kubectl -n stage get certificate panel-ssl-cert` → READY=True
 ```
 
 - **(b) origin-ca (jak prod)**: w overlay zmień `issuer: origin-ca` i podstaw
@@ -691,3 +757,42 @@ deploy starych obrazów.
   `panel.api.config` (map w pliku sekretów) — szczegóły w raporcie;
 - backup/healthcheck: ta sama logika; driver `kubectl exec` zamiast
   `docker compose exec` (§11.8).
+
+### 11.11. Pułapki operacyjne (z pilotażu — czytaj ZANIM zdiagnozujesz „helma wiesza")
+
+1. **Helm ubity w trakcie `--wait` zostawia lock release'a.** Objaw:
+   kolejne upgrade kończą się `another operation (install/upgrade/rollback)
+   is in progress`, a `helm list --all` pokazuje `pending-install` /
+   `pending-upgrade`. Helm najpierw APLIKUJE zasoby i dopiero potem czeka
+   (`--wait --timeout 10m`) — przerwany proces czekania zostawia zasoby w
+   klastrze + lock w sekretach release'a. Odzyskanie: dobij zombie procesy
+   helma (`pgrep -fa "[h]elm"` → `kill -9 <pid>` — trik z nawiasem niżej),
+   potem `microk8s helm uninstall panel-stage -n stage` i **świeży
+   `upgrade --install`**. Ubity-process ≠ deinstalacja: zasoby zostają,
+   dopóki ich nie usuniesz.
+2. **`pkill -f` przez ssh zabija własną sesję.** Zdalny shell (`zsh -c`)
+   ma Twój wzorzec w cmdline — `pkill -f "helm.*panel"` matchuje sam siebie.
+   Trik: zapisz wzorzec z nawiasem klasy znaków (`"[p]anel"`) — regex
+   dopasuje `panel` w cudzych cmdline, ale nie literal `[p]anel` w Twoim.
+3. **`microk8s ctr` ma wbudowany namespace k8s.io** — NIE podawaj
+   `-n k8s.io` (błąd „namespace already exists"/duplikat), NIE gzipuj:
+   `docker save OBRAZ | microk8s ctr images import -`. Po imporcie
+   z tym SAMYM tagiem kubelet z `imagePullPolicy: IfNotPresent` trzyma
+   stary image ID: przy podmianie obrazu pod tym samym tagiem
+   **usuń pody** (`kubectl -n stage delete pods -l …`), kubelet dociągnie
+   nowy content.
+4. **`helm --wait` vs `% Waiting`:** log skryptu deploy pokazuje
+   `installing…`/`pending-install` DOPIERO podczas fazy czekania — zasoby
+   istnieją już od pierwszych sekund. Nie myl „nic się nie dzieje"
+   na żywym release: diagnoza przez `kubectl get pods/events` w ns `stage`,
+   nie przez restart helma.
+5. **`runAsNonRoot` + nienumeryczny USER w obrazie** → pody w
+   `CreateContainerConfigError` (`image has non-numeric user (mrpanel)`).
+   Dockerfile'e w repo mają już poprawkę (`USER 10001:10001`); objaw pojawia
+   się, gdy ktoś cofnie USER na literal albo zbuduje obraz ze starego źródła.
+6. **PVC pre-binding vs dynamiczna klasa:** `cnpgPvcTemplate.volumeName`
+   (default chartu: `mrpanel-postgres-pv`) przypina PVC do PV o tej nazwie;
+   jeśli PV nie istnieje, PVC wisi `Pending` na zawsze MIMO poprawnego
+   `storageClassName` (dynamiczny provisioning nie rusza dla
+   volumeName-prebound). Overlay stage ma `volumeName: null` — klucz znika
+   z renderu; nie przywracaj go na klastrach z dynamiczną klasą.

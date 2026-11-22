@@ -40,12 +40,15 @@ spec:
       name: panel-le-acme-account-key
     solvers:
       - http01:
-          gatewayHTTP01:
-            gatewayRef:
-              name: panel-gateway
-              namespace: {{ .Release.Namespace }}
-            # cert-manager matches the protocol listener on the named Gateway;
-            # panel.gateway.yaml attaches an HTTP:80 listener when tls.issuer
-            # is letsencrypt.
-            port: 80
+          # cert-manager >= 1.18 Gateway API solver (experimental): cert-manager
+          # creates its own HTTPRoute attached to the parent Gateway below. The
+          # sectionName targets the HTTP:80 listener that panel.gateway.yaml
+          # attaches when tls.issuer is letsencrypt.
+          gatewayHTTPRoute:
+            parentRefs:
+              - group: gateway.networking.k8s.io
+                kind: Gateway
+                name: panel-gateway
+                namespace: {{ .Release.Namespace }}
+                sectionName: panel-acme
 {{- end -}}
