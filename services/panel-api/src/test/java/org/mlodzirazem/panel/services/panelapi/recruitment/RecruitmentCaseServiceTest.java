@@ -19,6 +19,8 @@ package org.mlodzirazem.panel.services.panelapi.recruitment;
 
 import org.junit.jupiter.api.Test;
 import org.mlodzirazem.panel.services.panelapi.core.error.ConflictException;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.DeclarationForm;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentAssessmentTrack;
 import org.mlodzirazem.panel.services.panelapi.core.error.NotFoundException;
 import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentCaseEventType;
@@ -28,6 +30,8 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.Re
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TRecruitmentCase;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TRecruitmentCaseEvent;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TRecruitmentCaseRepository;
+import org.mlodzirazem.panel.services.panelapi.recruitment.workflow.RecruitmentWorkflowService;
 import org.mlodzirazem.panel.services.panelapi.test.DomainTestSupport;
 import org.mlodzirazem.panel.services.panelapi.test.db.PostgresTest;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +50,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class RecruitmentCaseServiceTest extends DomainTestSupport {
     @Autowired
     RecruitmentCaseService recruitmentCases;
+
+    @Autowired
+    RecruitmentWorkflowService workflow;
+
+    @Autowired
+    TRecruitmentCaseRepository caseRepository;
 
     private TMember member() {
         return newMember("Halina", "Kordynatorka", "mazowieckie");
@@ -298,7 +308,7 @@ class RecruitmentCaseServiceTest extends DomainTestSupport {
 
         TRecruitmentCaseEvent note = recruitmentCases.addNote(candidateCase.getId(), "Dzwonić w czwartek", operator.getId());
         assertThat(note.getEventType()).isEqualTo(RecruitmentCaseEventType.NOTE_ADDED);
-        assertThat(note.getPayload()).contains("\"Dzwonić w czwartek\"");
+        assertThat(note.getPayload()).contains("note").doesNotContain("Dzwonić");
         assertThat(jdbc.queryForObject("SELECT created_by_user_id FROM recruitment_case_events WHERE id = ?",
             Long.class, note.getId())).isEqualTo(operator.getId());
 
@@ -316,6 +326,106 @@ class RecruitmentCaseServiceTest extends DomainTestSupport {
         assertThat(timeline).extracting(TRecruitmentCaseEvent::getEventType)
             .containsExactly(RecruitmentCaseEventType.CASE_CREATED, RecruitmentCaseEventType.NOTE_ADDED,
                 RecruitmentCaseEventType.REMINDER_SENT);
+    }
+
+    @Test
+    void availableTransitionsReportTheIntakeClusterAndItsBoundary() {
+        TMember operator = member();
+        TRecruitmentCase candidateCase = recruitmentCases.create(candidate("opcje-s@example.org", null), operator.getId());
+
+        List<RecruitmentCaseTransitionOption> fromNew = recruitmentCases.availableTransitions(candidateCase.getId());
+        assertThat(fromNew).extracting(RecruitmentCaseTransitionOption::target)
+            .containsExactly(RecruitmentCaseStatus.IN_PROGRESS, RecruitmentCaseStatus.NO_CONTACT,
+                RecruitmentCaseStatus.REJECTED);
+        fromNew.forEach(option -> {
+            assertThat(option.allowed()).as("target %s", option.target()).isTrue();
+            assertThat(option.blockedReason()).as("target %s", option.target()).isNull();
+            if (option.target() == RecruitmentCaseStatus.REJECTED) {
+                assertThat(option.rejectionReasons())
+                    .containsExactly(RecruitmentRejectionReason.FALSE_ENTRY);
+            } else {
+                assertThat(option.rejectionReasons()).isNull();
+            }
+        });
+
+        recruitmentCases.transition(candidateCase.getId(), RecruitmentCaseStatus.IN_PROGRESS,
+            null, operator.getId());
+        recruitmentCases.transition(candidateCase.getId(), RecruitmentCaseStatus.AWAITING_DECLARATION,
+            null, operator.getId());
+
+        RecruitmentCaseTransitionOption m3Boundary = recruitmentCases.availableTransitions(candidateCase.getId())
+            .stream()
+            .filter(option -> option.target() == RecruitmentCaseStatus.DECLARATION_RECEIVED)
+            .findFirst()
+            .orElseThrow();
+        assertThat(m3Boundary.allowed()).isFalse();
+        assertThat(m3Boundary.blockedReason()).isEqualTo("DECLARATION_ARTIFACT_REQUIRED");
+
+        recruitmentCases.transition(candidateCase.getId(), RecruitmentCaseStatus.REJECTED,
+            RecruitmentRejectionReason.NO_DECLARATION, operator.getId());
+
+        assertThat(recruitmentCases.availableTransitions(candidateCase.getId())).isEmpty();
+        assertThatThrownBy(() -> recruitmentCases.availableTransitions(candidateCase.getId() + 999))
+            .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void availableTransitionsExposeTheFullPostDeclarationClusterAndItsReservations() {
+        long actor = districtActor();
+        TRecruitmentCase opened = recruitmentCases.create(candidate("mapa-dekl@example.org", null), actor);
+        opened.setStatus(RecruitmentCaseStatus.AWAITING_DECLARATION);
+        caseRepository.saveAndFlush(opened);
+
+        // AWAITING_DECLARATION: the declaration arrival stays artifact-gated (M4a).
+        RecruitmentCaseTransitionOption artifactGate = recruitmentCases.availableTransitions(opened.getId())
+            .stream()
+            .filter(option -> option.target() == RecruitmentCaseStatus.DECLARATION_RECEIVED)
+            .findFirst()
+            .orElseThrow();
+        assertThat(artifactGate.allowed()).isFalse();
+        assertThat(artifactGate.blockedReason()).isEqualTo("DECLARATION_ARTIFACT_REQUIRED");
+
+        TRecruitmentCase declared = workflow.recordDeclaration(opened.getId(), actor, DeclarationForm.SCAN,
+            RecruitmentAssessmentTrack.STANDARD, LocalDate.now().minusDays(80));
+        assertThat(recruitmentCases.availableTransitions(declared.getId()))
+            .extracting(RecruitmentCaseTransitionOption::target)
+            .containsExactly(RecruitmentCaseStatus.PROBATION);
+
+        TRecruitmentCase probation = workflow.startProbation(declared.getId(), actor);
+        List<RecruitmentCaseTransitionOption> fromProbation = recruitmentCases.availableTransitions(probation.getId());
+        assertThat(fromProbation).extracting(RecruitmentCaseTransitionOption::target)
+            .containsExactly(RecruitmentCaseStatus.PROBATION_EXTENDED, RecruitmentCaseStatus.ZO_RECOMMENDED,
+                RecruitmentCaseStatus.REJECTED);
+        RecruitmentCaseTransitionOption probationRejection = fromProbation.stream()
+            .filter(option -> option.target() == RecruitmentCaseStatus.REJECTED)
+            .findFirst()
+            .orElseThrow();
+        assertThat(probationRejection.rejectionReasons())
+            .containsExactly(RecruitmentRejectionReason.NOT_FIT, RecruitmentRejectionReason.ZK_BAN);
+
+        TRecruitmentCase recommended = workflow.recordZoRecommendation(probation.getId(), actor,
+            board("mazowieckie").getId(), probation.getAssessmentNotBeforeOn().plusDays(3),
+            "ZO/MZ/44/2026", null);
+        assertThat(recruitmentCases.availableTransitions(recommended.getId()))
+            .extracting(RecruitmentCaseTransitionOption::target)
+            .containsExactly(RecruitmentCaseStatus.ZK_VOTING);
+
+        TRecruitmentCase voting = workflow.startZkVoting(recommended.getId(), actor);
+        List<RecruitmentCaseTransitionOption> fromVoting = recruitmentCases.availableTransitions(voting.getId());
+        assertThat(fromVoting).extracting(RecruitmentCaseTransitionOption::target)
+            .containsExactly(RecruitmentCaseStatus.ACCEPTED, RecruitmentCaseStatus.REJECTED);
+        assertThat(fromVoting.getFirst().allowed()).isFalse();
+        assertThat(fromVoting.getFirst().blockedReason()).isEqualTo("MEMBER_ALLOCATION_PENDING");
+        assertThat(fromVoting.getFirst().rejectionReasons()).isNull();
+        assertThat(fromVoting.get(1).allowed()).isTrue();
+        assertThat(fromVoting.get(1).rejectionReasons())
+            .containsExactly(RecruitmentRejectionReason.VOTE_FAILED, RecruitmentRejectionReason.ZK_BAN);
+    }
+
+    private long districtActor() {
+        TMember actor = newMember("Aniela", "Okręgowa", "mazowieckie");
+        grant(actor, board("mazowieckie"), "COORDINATOR");
+        return actor.getId();
     }
 
     private NewRecruitmentCase candidate(String email, LocalDate birthDate) {

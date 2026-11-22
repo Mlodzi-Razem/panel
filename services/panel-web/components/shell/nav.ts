@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-export type NavIcon = 'dashboard' | 'profile' | 'members' | 'requests' | 'ending' | 'bodies' | 'fees';
+export type NavIcon = 'dashboard' | 'profile' | 'members' | 'requests' | 'ending' | 'bodies' | 'fees' | 'recruitment';
 
 export type NavItem = {
     href: string;

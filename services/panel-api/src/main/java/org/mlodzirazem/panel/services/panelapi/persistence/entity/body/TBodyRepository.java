@@ -32,6 +32,14 @@ public interface TBodyRepository extends JpaRepository<TBody, Long> {
     @Query("select b from TBody b join fetch b.bodyTemplate t where t.kind = :kind order by b.name")
     List<TBody> findAllByKind(@Param("kind") BodyKind kind);
 
+    /**
+     * The body of the given kind installed under the parent body, e.g. the Zarząd Okręgu of a
+     * district. Districts seed exactly one board each; first match is enough for the caller.
+     */
+    @Query("select b from TBody b where b.parentBody.id = :parentId and b.bodyTemplate.kind = :kind"
+        + " order by b.id")
+    List<TBody> findAllByParentBodyIdAndKind(@Param("parentId") long parentId, @Param("kind") BodyKind kind);
+
     @Query("select b from TBody b left join fetch b.bodyTemplate order by b.name")
     List<TBody> findAllWithTemplate();
 }

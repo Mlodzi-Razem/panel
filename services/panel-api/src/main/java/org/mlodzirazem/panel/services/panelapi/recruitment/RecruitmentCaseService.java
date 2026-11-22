@@ -83,4 +83,16 @@ public interface RecruitmentCaseService {
      * The case timeline, oldest first: create, status changes, notes, reminders.
      */
     List<TRecruitmentCaseEvent> timeline(long caseId);
+
+    /**
+     * The statutory targets of the current status, each with the verdict the transition endpoint
+     * would give right now: allowed through the whole state machine, blocked with the matching
+     * error code for closed cases and the two flows owned by other milestones — the declaration
+     * arrival (artifact-gated, M4a) and the ACCEPTED flip (member-number allocation, M6). The
+     * single source is {@link RecruitmentRules}, so the front end never keeps a local copy of the
+     * state map.
+     *
+     * @throws org.mlodzirazem.panel.services.panelapi.core.error.NotFoundException if there is no such case
+     */
+    List<RecruitmentCaseTransitionOption> availableTransitions(long caseId);
 }

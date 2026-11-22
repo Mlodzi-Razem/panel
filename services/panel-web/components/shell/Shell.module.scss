@@ -21,6 +21,7 @@ $mobile: 960px;
     display: grid;
     grid-template-columns: var(--size-sidebar-width) minmax(0, 1fr);
     min-height: 100dvh;
+    position: relative;
 
     @media (max-width: $mobile) {
         grid-template-columns: minmax(0, 1fr);
@@ -275,4 +276,26 @@ $mobile: 960px;
     width: 3.75rem;
     height: auto;
     filter: brightness(0) invert(1);
+}
+
+/* C9: skupowalny skip-link — ukryty do momentu fokusu klawiatury, potem pełny kontrast. */
+.skipLink {
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+    z-index: 30;
+    padding: 0.5rem 0.75rem;
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 2px solid var(--color-focus);
+    border-radius: 0 var(--radius-sm) 0 0;
+    font-weight: 600;
+    text-decoration: none;
+    transform: translateY(-200%);
+
+    &:focus-visible {
+        transform: none;
+        outline: 3px solid var(--color-focus);
+        outline-offset: 2px;
+    }
 }

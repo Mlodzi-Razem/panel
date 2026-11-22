@@ -87,3 +87,15 @@ export function entraConfig(): EntraConfig | undefined {
     return {tenantId, clientId, clientSecret: optional('PANEL_ENTRA_CLIENT_SECRET')};
 }
 
+const RECRUITMENT_DECLARATION_MOCK_ENV_VAR = 'PANEL_RECRUITMENT_DECLARATION_MOCK';
+
+/**
+ * When "1", the anonymous candidate declaration form at /rekrutacja/deklaracja/[token]
+ * answers from the in-panel mock adapter (panel-api/recruitment/mockDeclarationFormApi)
+ * instead of the real backend. Development and demo switch only; production leaves it unset
+ * and routes the contract calls to PANEL_API_URL. See the README next to the page.
+ */
+export function recruitmentDeclarationMockEnabled(): boolean {
+    return process.env[RECRUITMENT_DECLARATION_MOCK_ENV_VAR]?.trim() === '1';
+}
+

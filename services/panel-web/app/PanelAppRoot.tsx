@@ -16,6 +16,7 @@
  */
 
 import React, { Suspense } from "react";
+import { getTranslations } from "next-intl/server";
 import SuspenseFallback from "@/app/SuspenseFallback";
 import Sidebar, { SidebarUser } from "@/components/shell/Sidebar";
 import { NavGroup } from "@/components/shell/nav";
@@ -23,10 +24,17 @@ import styles from "@/components/shell/Shell.module.scss";
 
 export type PanelAppRootProps = React.PropsWithChildren<{ user: SidebarUser; groups: NavGroup[] }>;
 
-export default function PanelAppRoot({user, groups, children}: PanelAppRootProps) {
+/**
+ * The application shell. The skip link is the first focusable element of the page (C9):
+ * keyboard users jump straight over the navigation to the main content region.
+ */
+export default async function PanelAppRoot({user, groups, children}: PanelAppRootProps) {
+    const t = await getTranslations("menu");
+
     return <div className={styles.shell}>
+        <a className={styles.skipLink} href="#main-content">{t("skipToContent")}</a>
         <Sidebar user={user} groups={groups}/>
-        <div className={styles.main}>
+        <div className={styles.main} id="main-content">
             <Suspense fallback={<SuspenseFallback/>}>
                 {children}
             </Suspense>

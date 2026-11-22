@@ -20,8 +20,11 @@ package org.mlodzirazem.panel.services.panelapi.api.v1.recruitment;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import org.jspecify.annotations.Nullable;
 import org.mlodzirazem.panel.services.panelapi.api.v1.common.PersonRef;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.DeclarationForm;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentAssessmentTrack;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentCaseEventType;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentCaseStatus;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentDecisionKind;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentRejectionReason;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentSource;
 import tools.jackson.databind.JsonNode;
@@ -70,7 +73,34 @@ public final class RecruitmentResponses {
         @Nullable LocalDate closedAt,
         ZonedDateTime createdAt,
         @Nullable ZonedDateTime updatedAt,
+        @Nullable DeclarationForm declarationForm,
+        @Nullable String declarationReference,
+        @Nullable LocalDate declarationReceivedOn,
+        @Nullable RecruitmentAssessmentTrack assessmentTrack,
+        @Nullable LocalDate assessmentNotBeforeOn,
+        @Nullable LocalDate assessmentNotLaterOn,
+        int extensionCount,
+        @Nullable LocalDate extensionDecidedOn,
+        @Nullable LocalDate secondAssessmentNotLaterOn,
+        @Nullable LocalDate zoRecommendedOn,
+        @Nullable LocalDate admissionResolutionNotLaterOn,
+        List<CaseDecisionResponse> decisions,
         List<CaseEventResponse> events
+    ) {
+    }
+
+    /**
+     * One collegial resolution recorded on the case (M3 engine). The collegial note stays in the
+     * module's audit trail and is not served over HTTP; the deciding body identifies who decided.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record CaseDecisionResponse(
+        long id,
+        RecruitmentDecisionKind kind,
+        LocalDate decidedOn,
+        String decisionSignature,
+        long decidingBodyId,
+        String decidingBodyName
     ) {
     }
 
@@ -82,5 +112,23 @@ public final class RecruitmentResponses {
         ZonedDateTime createdAt,
         @Nullable PersonRef actor
     ) {
+    }
+
+    /**
+     * One candidate move of the transitions endpoint: the same verdict the transition POST would
+     * give from the current status — the front end renders the buttons from this and never keeps a
+     * local copy of the state map.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record CaseTransitionResponse(
+        RecruitmentCaseStatus target,
+        RecruitmentCaseEventType type,
+        boolean allowed,
+        @Nullable List<RecruitmentRejectionReason> rejectionReasons,
+        @Nullable String blockedReason
+    ) {
+    }
+
+    public record CaseTransitionsResponse(List<CaseTransitionResponse> transitions) {
     }
 }

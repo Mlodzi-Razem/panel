@@ -222,6 +222,63 @@
             <groupId>tools.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-csv</artifactId>
         </dependency>
+        <!-- Electronic declaration (M4a): server-side PDF rendering (LGPL/MPL, iText 4 lineage) -->
+        <dependency>
+            <groupId>com.github.librepdf</groupId>
+            <artifactId>openpdf</artifactId>
+            <version>3.0.6</version>
+        </dependency>
+        <!-- EU DSS (European Commission Digital Signature Service, LGPL-2.1-class licensing as
+             published by the EC's esig/dss project): PAdES validation and signing, PDFBox backend -->
+        <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>dss-pades</artifactId>
+            <version>6.5.1</version>
+        </dependency>
+        <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>dss-pades-pdfbox</artifactId>
+            <version>6.5.1</version>
+        </dependency>
+        <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>dss-validation</artifactId>
+            <version>6.5.1</version>
+        </dependency>
+        <!-- the IUtils implementation DSS discovers at runtime (the validation jar leaves it open) -->
+        <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>dss-utils-apache-commons</artifactId>
+            <version>6.5.1</version>
+        </dependency>
+        <!-- the CMS generator implementation PAdES validation and test signing discover at runtime -->
+        <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>dss-cms-object</artifactId>
+            <version>6.5.1</version>
+        </dependency>
+        <!-- the default ETSI validation policy loader (ValidationPolicyFactory, discovered at runtime) -->
+        <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>dss-policy-jaxb</artifactId>
+            <version>6.5.1</version>
+        </dependency>
+        <!-- test only: P12 token for PAdES fixture signing against the validator (self-signed certs) -->
+        <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>dss-token</artifactId>
+            <version>6.5.1</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- BouncyCastle PKIX/CMS: org.bouncycastle.cms.* is on the RUNTIME path of the offline
+             PAdES validation (dss-cms-object); DSS leaves the BC artifacts optional, so the panel
+             ships them itself (bcprov/bcutil 1.81.1 ride along transitively — the same line the
+             packaged jar already carried). Test fixtures reuse the same artifacts. -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>1.81.1</version>
+        </dependency>
     </dependencies>
 
     <build>

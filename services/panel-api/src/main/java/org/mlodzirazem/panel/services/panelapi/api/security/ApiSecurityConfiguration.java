@@ -74,6 +74,7 @@ class ApiSecurityConfiguration {
             )
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(EndpointRequest.to("health", "info", "prometheus")).permitAll()
+                .requestMatchers("/public/declaration-form/**").permitAll()
                 .requestMatchers(EndpointRequest.toAnyEndpoint()).denyAll()
                 .anyRequest().authenticated()
             )

@@ -82,6 +82,35 @@ public class TRecruitmentCase extends TBaseEntity {
     @Column(name = "candidate_birth_date")
     private @Nullable LocalDate candidateBirthDate;
 
+    /** Official name ("w dowodzie", paper form A.1/A.2) — carries over into members at PRZYJĘTA. */
+    @Column(name = "candidate_formal_first_name")
+    private @Nullable String candidateFormalFirstName;
+
+    @Column(name = "candidate_formal_last_name")
+    private @Nullable String candidateFormalLastName;
+
+    /** Preferred name (paper form A.3/A.4), optional. */
+    @Column(name = "candidate_preferred_first_name")
+    private @Nullable String candidatePreferredFirstName;
+
+    @Column(name = "candidate_preferred_last_name")
+    private @Nullable String candidatePreferredLastName;
+
+    /** Pronouns used by the candidate (paper form A.6), optional. */
+    @Column(name = "candidate_pronouns")
+    private @Nullable String candidatePronouns;
+
+    /** Candidate PESEL (paper form A.5), same idiom as members.formal_identifier; GDPR Art. 9. */
+    @Column(name = "candidate_formal_identifier")
+    private @Nullable String candidateFormalIdentifier;
+
+    /**
+     * Provisional trial-account number (97xxxx-99xxxx, dev/README §7.3), UPN/employeeId marker only;
+     * provisioning, PRZYJĘTA rename and REJECTED cleanup belong to M6. NULL until DEKLARACJA DOSZŁA.
+     */
+    @Column(name = "trial_account_number")
+    private @Nullable Long trialAccountNumber;
+
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "source", nullable = false, columnDefinition = "recruitment_source")

@@ -20,12 +20,22 @@ package org.mlodzirazem.panel.services.panelapi.api.v1;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.DeclarationForm;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentAssessmentTrack;
+import org.mlodzirazem.panel.services.panelapi.recruitment.workflow.RecruitmentWorkflowService;
+import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RecruitmentApiTest extends ApiTestSupport {
+    @Autowired
+    RecruitmentWorkflowService workflow;
+
     TMember zoA;
     TMember zoB;
     TMember zk;
@@ -204,8 +214,8 @@ class RecruitmentApiTest extends ApiTestSupport {
 
         Res m3Boundary = post(zoA, "/recruitment-cases/" + caseId + "/transitions",
             Map.of("target", "DECLARATION_RECEIVED"));
-        assertThat(m3Boundary.status()).isEqualTo(422);
-        assertThat(m3Boundary.code()).isEqualTo("TRANSITION_NOT_ALLOWED");
+        assertThat(m3Boundary.status()).isEqualTo(409);
+        assertThat(m3Boundary.code()).isEqualTo("DECLARATION_ARTIFACT_REQUIRED");
 
         Res noReason = post(zoA, "/recruitment-cases/" + caseId + "/transitions", Map.of("target", "REJECTED"));
         assertThat(noReason.status()).isEqualTo(422);
@@ -278,5 +288,276 @@ class RecruitmentApiTest extends ApiTestSupport {
 
         Res secondPage = get(zoA, "/recruitment-cases?page=1&size=2");
         assertThat(secondPage.body().path("items")).hasSize(1);
+    }
+
+    private List<String> kinds(Res response) {
+        List<String> kinds = new ArrayList<>();
+        response.body().path("decisions").forEach(d -> kinds.add(d.path("kind").asText()));
+        return kinds;
+    }
+
+    private List<String> fieldValues(Res response, String field) {
+        List<String> values = new ArrayList<>();
+        response.body().path("transitions").forEach(node -> values.add(node.path(field).asText()));
+        return values;
+    }
+
+    @Test
+    void transitionsEndpointMirrorsTheRulesFromANewCase() {
+        long caseId = post(zoA, "/recruitment-cases", caseBody(mazowieckie(),
+            candidate("Ola", "Opcjowa", "opcje@example.org"))).body().path("id").asLong();
+
+        Res options = get(zoA, "/recruitment-cases/" + caseId + "/transitions");
+        assertThat(options.status()).isEqualTo(200);
+        assertThat(fieldValues(options, "target")).containsExactly("IN_PROGRESS", "NO_CONTACT", "REJECTED");
+        options.body().path("transitions").forEach(node -> {
+            assertThat(node.path("type").asText()).isEqualTo("STATUS_CHANGED");
+            assertThat(node.path("allowed").asBoolean()).isTrue();
+            assertThat(node.has("blockedReason")).isFalse();
+        });
+        List<String> reasons = new ArrayList<>();
+        options.body().path("transitions").get(2).path("rejectionReasons")
+            .forEach(node -> reasons.add(node.asText()));
+        assertThat(reasons).containsExactly("FALSE_ENTRY");
+
+        assertThat(get(treasurerA, "/recruitment-cases/" + caseId + "/transitions").status()).isEqualTo(200);
+        assertThat(get(zoB, "/recruitment-cases/" + caseId + "/transitions").status()).isEqualTo(403);
+        assertThat(get(plain, "/recruitment-cases/" + caseId + "/transitions").status()).isEqualTo(403);
+        assertThat(get(zoA, "/recruitment-cases/999999/transitions").status()).isEqualTo(404);
+    }
+
+    @Test
+    void transitionsEndpointRefusesTheM3BoundaryAndClosedCases() {
+        long caseId = post(zoA, "/recruitment-cases", caseBody(mazowieckie(),
+            candidate("Ona", "NaGranicz", "m3granica@example.org"))).body().path("id").asLong();
+
+        post(zoA, "/recruitment-cases/" + caseId + "/transitions", Map.of("target", "IN_PROGRESS"));
+        post(zoA, "/recruitment-cases/" + caseId + "/transitions", Map.of("target", "AWAITING_DECLARATION"));
+
+        Res atDeclaration = get(zoA, "/recruitment-cases/" + caseId + "/transitions");
+        assertThat(fieldValues(atDeclaration, "target")).containsExactly("DECLARATION_RECEIVED", "REJECTED");
+        assertThat(atDeclaration.body().path("transitions").get(0).path("allowed").asBoolean()).isFalse();
+        assertThat(atDeclaration.body().path("transitions").get(0).path("blockedReason").asText())
+            .isEqualTo("DECLARATION_ARTIFACT_REQUIRED");
+        assertThat(post(zoA, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "DECLARATION_RECEIVED")).status()).isEqualTo(409);
+        assertThat(atDeclaration.body().path("transitions").get(1).path("allowed").asBoolean()).isTrue();
+        List<String> reasons = new ArrayList<>();
+        atDeclaration.body().path("transitions").get(1).path("rejectionReasons")
+            .forEach(node -> reasons.add(node.asText()));
+        assertThat(reasons).containsExactly("NO_DECLARATION");
+
+        post(zoA, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "REJECTED", "rejectionReason", "NO_DECLARATION"));
+
+        Res closed = get(zoA, "/recruitment-cases/" + caseId + "/transitions");
+        assertThat(closed.status()).isEqualTo(200);
+        assertThat(fieldValues(closed, "target")).isEmpty();
+        assertThat(post(zoA, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "IN_PROGRESS")).code()).isEqualTo("CASE_NOT_OPEN");
+    }
+
+    /** Drives a fresh HTTP case to PROBATION with the M3 engine as a fixture (the M4a flow serves the declaration). */
+    private long probationCase(String email) {
+        long caseId = post(zoA, "/recruitment-cases", caseBody(mazowieckie(),
+            candidate("Persefona", "Procesowa", email))).body().path("id").asLong();
+        post(zoA, "/recruitment-cases/" + caseId + "/transitions", Map.of("target", "IN_PROGRESS"));
+        post(zoA, "/recruitment-cases/" + caseId + "/transitions", Map.of("target", "AWAITING_DECLARATION"));
+        workflow.recordDeclaration(caseId, zoA.getId(), DeclarationForm.SCAN,
+            RecruitmentAssessmentTrack.STANDARD, LocalDate.now().minusDays(80));
+        workflow.startProbation(caseId, zoA.getId());
+        return caseId;
+    }
+
+    private long votingCase(String email) {
+        long caseId = probationCase(email);
+        post(zoA, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "ZO_RECOMMENDED",
+                "decidingBodyId", board("mazowieckie").getId(),
+                "decidedOn", LocalDate.now().toString(),
+                "signature", "ZO/MZ/44/2026"));
+        post(zoA, "/recruitment-cases/" + caseId + "/transitions", Map.of("target", "ZK_VOTING"));
+        return caseId;
+    }
+
+    @Test
+    void postDeclarationTransitionsRunOverHttpWithTheEngineRules() {
+        long caseId = probationCase("postdekl@example.org");
+
+        Res options = get(zoA, "/recruitment-cases/" + caseId + "/transitions");
+        assertThat(fieldValues(options, "target"))
+            .containsExactly("PROBATION_EXTENDED", "ZO_RECOMMENDED", "REJECTED");
+
+        assertThat(post(treasurerA, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "ZK_VOTING")).status()).isEqualTo(403);
+        assertThat(post(zoB, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "ZK_VOTING")).status()).isEqualTo(403);
+
+        Res recommended = post(zoA, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "ZO_RECOMMENDED",
+                "decidingBodyId", board("mazowieckie").getId(),
+                "decidedOn", LocalDate.now().toString(),
+                "signature", "ZO/MZ/45/2026",
+                "note", "aktywna w projekcie"));
+        assertThat(recommended.status()).isEqualTo(200);
+        assertThat(recommended.body().path("status").asString()).isEqualTo("ZO_RECOMMENDED");
+        assertThat(recommended.body().path("zoRecommendedOn").asString()).isEqualTo(LocalDate.now().toString());
+        assertThat(recommended.body().path("admissionResolutionNotLaterOn").asString())
+            .isEqualTo(LocalDate.now().plusDays(7).toString());
+        assertThat(recommended.body().path("decisions").get(0).path("kind").asString())
+            .isEqualTo("ZO_ASSESSMENT_POSITIVE");
+        assertThat(recommended.body().path("decisions").get(0).path("decisionSignature").asString())
+            .isEqualTo("ZO/MZ/45/2026");
+
+        Res voting = post(zoA, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "ZK_VOTING"));
+        assertThat(voting.status()).isEqualTo(200);
+        assertThat(voting.body().path("status").asString()).isEqualTo("ZK_VOTING");
+
+        Res asZkToo = post(zk, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "REJECTED",
+                "rejectionReason", "VOTE_FAILED",
+                "decidingBodyId", board("mazowieckie").getId(),
+                "decidedOn", LocalDate.now().toString(),
+                "signature", "ZO/MZ/46/2026"));
+        assertThat(asZkToo.status()).isEqualTo(200);
+        assertThat(asZkToo.body().path("status").asString()).isEqualTo("REJECTED");
+        assertThat(asZkToo.body().path("rejectionReason").asString()).isEqualTo("VOTE_FAILED");
+        assertThat(asZkToo.body().path("closedAt").asString()).isEqualTo(LocalDate.now().toString());
+    }
+
+    @Test
+    void assessmentWindowIsEnforcedAndTheExtensionIsOnce() {
+        long caseId = probationCase("wczesna@example.org");
+
+        Res tooEarly = post(zoA, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "ZO_RECOMMENDED",
+                "decidingBodyId", board("mazowieckie").getId(),
+                "decidedOn", LocalDate.now().minusDays(120).toString(),
+                "signature", "ZO/MZ/47/2026"));
+        assertThat(tooEarly.status()).isEqualTo(422);
+        assertThat(tooEarly.code()).isEqualTo("ASSESSMENT_TOO_EARLY");
+
+        Res extended = post(zoA, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "PROBATION_EXTENDED",
+                "decidingBodyId", board("mazowieckie").getId(),
+                "decidedOn", LocalDate.now().toString(),
+                "signature", "ZO/MZ/48/2026"));
+        assertThat(extended.status()).isEqualTo(200);
+        assertThat(extended.body().path("status").asString()).isEqualTo("PROBATION_EXTENDED");
+        assertThat(extended.body().path("extensionCount").asInt()).isEqualTo(1);
+        assertThat(extended.body().path("secondAssessmentNotLaterOn").asString())
+            .isEqualTo(LocalDate.now().plusDays(31).toString());
+
+        // The once-only rule holds over REST through the map: PROBATION_EXTENDED has no self-edge,
+        // so a second extension cannot even be requested (EXTENSION_ALREADY_USED stays an engine backstop).
+        Res again = post(zoA, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "PROBATION_EXTENDED",
+                "decidingBodyId", board("mazowieckie").getId(),
+                "decidedOn", LocalDate.now().toString(),
+                "signature", "ZO/MZ/49/2026"));
+        assertThat(again.status()).isEqualTo(422);
+        assertThat(again.code()).isEqualTo("TRANSITION_NOT_ALLOWED");
+
+        assertThat(post(zoA, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "ZO_RECOMMENDED")).status()).isEqualTo(400);
+        assertThat(post(zoA, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "ZO_RECOMMENDED",
+                "decidingBodyId", board("mazowieckie").getId(),
+                "decidedOn", LocalDate.now().toString(),
+                "signature", "   ")).status()).isEqualTo(400);
+
+        Res foreignBoard = post(zoA, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "ZO_RECOMMENDED",
+                "decidingBodyId", board("slaskie").getId(),
+                "decidedOn", LocalDate.now().toString(),
+                "signature", "ZO/MZ/50/2026"));
+        assertThat(foreignBoard.status()).isEqualTo(422);
+        assertThat(foreignBoard.code()).isEqualTo("DECIDING_BODY_NOT_ZO");
+
+        Res secondAssessment = post(zoA, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "ZO_RECOMMENDED",
+                "decidingBodyId", board("mazowieckie").getId(),
+                "decidedOn", LocalDate.now().toString(),
+                "signature", "ZO/MZ/51/2026"));
+        assertThat(secondAssessment.status()).isEqualTo(200);
+        assertThat(secondAssessment.body().path("status").asString()).isEqualTo("ZO_RECOMMENDED");
+    }
+
+    @Test
+    void decisionsOverHttpAreRoleGatedAndUniqueAndDoNotFlipTheStatus() {
+        long caseId = votingCase("decyzyjna@example.org");
+
+        assertThat(post(zoA, "/recruitment-cases/" + caseId + "/decisions",
+            Map.of("kind", "PERIOD_EXTENSION",
+                "decidedOn", LocalDate.now().toString(),
+                "signature", "X")).status()).isEqualTo(400);
+
+        Res zoAsZk = post(zoA, "/recruitment-cases/" + caseId + "/decisions",
+            Map.of("kind", "ZK_APPROVAL",
+                "decidedOn", LocalDate.now().toString(),
+                "signature", "ZK/77/2026"));
+        assertThat(zoAsZk.status()).isEqualTo(403);
+        assertThat(zoAsZk.code()).isEqualTo("RECRUITMENT_APPROVE_REQUIRED");
+
+        Res resolutionTooEarly = post(zoA, "/recruitment-cases/" + caseId + "/decisions",
+            Map.of("kind", "ZO_ADMISSION_RESOLUTION",
+                "decidedOn", LocalDate.now().toString(),
+                "signature", "ZO/MZ/78/2026"));
+        assertThat(resolutionTooEarly.status()).isEqualTo(409);
+        assertThat(resolutionTooEarly.code()).isEqualTo("ZK_APPROVAL_REQUIRED");
+
+        Res zkApproval = post(zk, "/recruitment-cases/" + caseId + "/decisions",
+            Map.of("kind", "ZK_APPROVAL",
+                "decidedOn", LocalDate.now().toString(),
+                "signature", "ZK/77/2026"));
+        assertThat(zkApproval.status()).isEqualTo(200);
+        assertThat(zkApproval.body().path("status").asString()).isEqualTo("ZK_VOTING");
+        List<String> kindsAfterZk = kinds(zkApproval);
+        assertThat(kindsAfterZk).contains("ZK_APPROVAL");
+        assertThat(zkApproval.body().path("decisions").get(kindsAfterZk.size() - 1).path("decidingBodyName").asString())
+            .isEqualTo("Zarząd Krajowy");
+
+        assertThat(post(zk, "/recruitment-cases/" + caseId + "/decisions",
+            Map.of("kind", "ZK_APPROVAL",
+                "decidedOn", LocalDate.now().toString(),
+                "signature", "ZK/77/2026")).code()).isEqualTo("DECISION_ALREADY_RECORDED");
+
+        Res zkResolution = post(zk, "/recruitment-cases/" + caseId + "/decisions",
+            Map.of("kind", "ZO_ADMISSION_RESOLUTION",
+                "decidedOn", LocalDate.now().toString(),
+                "signature", "ZO/MZ/78/2026"));
+        assertThat(zkResolution.status()).isEqualTo(403);
+
+        Res resolution = post(zoA, "/recruitment-cases/" + caseId + "/decisions",
+            Map.of("kind", "ZO_ADMISSION_RESOLUTION",
+                "decidedOn", LocalDate.now().toString(),
+                "signature", "ZO/MZ/78/2026"));
+        assertThat(resolution.status()).isEqualTo(200);
+        assertThat(resolution.body().path("status").asString()).isEqualTo("ZK_VOTING");
+
+        assertThat(kinds(resolution))
+            .contains("ZO_ASSESSMENT_POSITIVE", "ZK_APPROVAL", "ZO_ADMISSION_RESOLUTION");
+
+        Res accepted = post(zk, "/recruitment-cases/" + caseId + "/transitions",
+            Map.of("target", "ACCEPTED"));
+        assertThat(accepted.status()).isEqualTo(409);
+        assertThat(accepted.code()).isEqualTo("MEMBER_ALLOCATION_PENDING");
+    }
+
+    @Test
+    void acceptedFlipIsExplicitlyBlockedInTheHelperToo() {
+        long caseId = votingCase("rezerva@example.org");
+
+        Res options = get(zk, "/recruitment-cases/" + caseId + "/transitions");
+        assertThat(fieldValues(options, "target")).containsExactly("ACCEPTED", "REJECTED");
+        assertThat(options.body().path("transitions").get(0).path("allowed").asBoolean()).isFalse();
+        assertThat(options.body().path("transitions").get(0).path("blockedReason").asText())
+            .isEqualTo("MEMBER_ALLOCATION_PENDING");
+
+        List<String> reasons = new ArrayList<>();
+        options.body().path("transitions").get(1).path("rejectionReasons")
+            .forEach(node -> reasons.add(node.asText()));
+        assertThat(reasons).containsExactly("VOTE_FAILED", "ZK_BAN");
     }
 }

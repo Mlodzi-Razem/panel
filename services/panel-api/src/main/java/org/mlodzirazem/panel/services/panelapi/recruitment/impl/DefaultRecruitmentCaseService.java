@@ -40,6 +40,7 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TR
 import org.mlodzirazem.panel.services.panelapi.recruitment.NewRecruitmentCase;
 import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentCandidateField;
 import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentCaseService;
+import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentCaseTransitionOption;
 import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentCaseUpdate;
 import org.mlodzirazem.panel.services.panelapi.recruitment.workflow.RecruitmentRules;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -49,6 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -211,8 +213,7 @@ class DefaultRecruitmentCaseService implements RecruitmentCaseService {
         }
 
         TRecruitmentCaseEvent eventCase = events.saveAndFlush(withActor(newEvent(candidateCase,
-            RecruitmentCaseEventType.NOTE_ADDED,
-            "{\"fields\": [\"note\"], \"note\": " + jsonEscape(trimmed) + "}"), actorMemberId));
+            RecruitmentCaseEventType.NOTE_ADDED, "{\"fields\": [\"note\"]}"), actorMemberId));
 
         auditLog.record("recruitment :: case-note",
             AuditPayload.of("caseId", caseId).withFields(List.of("note")));
@@ -245,6 +246,44 @@ class DefaultRecruitmentCaseService implements RecruitmentCaseService {
     public List<TRecruitmentCaseEvent> timeline(long caseId) {
         get(caseId);
         return events.findAllByRecruitmentCaseIdOrderByCreatedAtAscIdAsc(caseId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RecruitmentCaseTransitionOption> availableTransitions(long caseId) {
+        TRecruitmentCase candidateCase = get(caseId);
+        RecruitmentCaseStatus from = candidateCase.getStatus();
+        boolean closed = candidateCase.getClosedAt() != null;
+
+        return RecruitmentRules.allowedTargets(from).stream()
+            .sorted(Comparator.comparingInt(Enum::ordinal))
+            .map(target -> {
+                if (closed) {
+                    return new RecruitmentCaseTransitionOption(target, false, null, "CASE_NOT_OPEN");
+                }
+
+                // The two flows owned by other milestones stay visible but explicitly blocked:
+                // the declaration arrival is artifact-gated (M4a), ACCEPTED allocates the member
+                // number and the members row in one transaction (M6).
+                if (from == RecruitmentCaseStatus.AWAITING_DECLARATION
+                    && target == RecruitmentCaseStatus.DECLARATION_RECEIVED) {
+                    return new RecruitmentCaseTransitionOption(target, false, null, "DECLARATION_ARTIFACT_REQUIRED");
+                }
+                if (target == RecruitmentCaseStatus.ACCEPTED) {
+                    return new RecruitmentCaseTransitionOption(target, false, null, "MEMBER_ALLOCATION_PENDING");
+                }
+
+                if (target == RecruitmentCaseStatus.REJECTED) {
+                    List<RecruitmentRejectionReason> reasons
+                        = RecruitmentRules.allowedRejectionReasons(from).stream()
+                            .sorted(Comparator.comparingInt(Enum::ordinal))
+                            .toList();
+                    return new RecruitmentCaseTransitionOption(target, true, reasons, null);
+                }
+
+                return new RecruitmentCaseTransitionOption(target, true, null, null);
+            })
+            .toList();
     }
 
     /**

@@ -23,6 +23,7 @@ import { Provider } from "next-auth/providers/index";
 import env, { entraConfig } from "@/config/env";
 import { verifyTeamsSsoToken } from "@/auth/teamsSso";
 import { ENTRA_PROVIDER, GOOGLE_PROVIDER, TEAMS_SSO_PROVIDER } from "@/auth/providers";
+import { DEV_LOGIN_PROVIDER, devLoginProvider } from "@/auth/devLogin";
 
 const googleClientId = env.PANEL_GOOGLE_CLIENT_ID;
 const googleClientSecret = env.PANEL_GOOGLE_CLIENT_SECRET;
@@ -83,6 +84,11 @@ function providers(): Provider[] {
         }));
     }
 
+    const devLogin = devLoginProvider();
+    if (devLogin) {
+        list.push(devLogin);
+    }
+
     return list;
 }
 
@@ -120,6 +126,11 @@ const authOptions = {
                     return !!entra && (profile as { tid?: string } | undefined)?.tid === entra.tenantId;
                 case TEAMS_SSO_PROVIDER:
                     return !!entra;
+                case DEV_LOGIN_PROVIDER:
+                    // double gate: even if the provider somehow registers in a production image,
+                    // a sign-in is refused unless the dev gate is open right now
+                    return process.env.NODE_ENV !== 'production'
+                        && process.env.PANEL_DEV_LOGIN === 'true';
                 default:
                     return false;
             }

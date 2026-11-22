@@ -48,6 +48,7 @@ export default async function AuthorizedLayout({children}: React.PropsWithChildr
     if (me.kind === 'linked') {
         const canDecide = hasPermission(me.me, PERMISSIONS.formalManage);
         const canReadFormal = hasPermission(me.me, PERMISSIONS.formalRead);
+        const canReadRecruitment = hasPermission(me.me, PERMISSIONS.recruitmentRead);
         const pending = canDecide ? await listPendingChangeRequests() : null;
 
         const groups: NavGroup[] = [
@@ -70,6 +71,9 @@ export default async function AuthorizedLayout({children}: React.PropsWithChildr
                     }] : []),
                     ...(canReadFormal ? [{href: '/members/ending', labelKey: 'ending', icon: 'ending' as const}] : []),
                     {href: '/bodies', labelKey: 'bodies', icon: 'bodies'},
+                    ...(canReadRecruitment ? [{
+                        href: '/rekrutacja', labelKey: 'recruitment', icon: 'recruitment' as const,
+                    }] : []),
                 ],
             },
             {

@@ -20,6 +20,11 @@ package org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
+import java.util.List;
+
 @Repository
 public interface TAdmissionBanRepository extends JpaRepository<TAdmissionBan, Long> {
+    /** Bans anchored to a formal identifier; activity range is filtered by the caller (art. 9 ust. 5). */
+    List<TAdmissionBan> findAllByFormalIdentifier(String formalIdentifier);
 }

@@ -31,4 +31,16 @@ public interface TRecruitmentCaseRepository extends JpaRepository<TRecruitmentCa
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from TRecruitmentCase c where c.id = :id")
     Optional<TRecruitmentCase> findByIdForUpdate(@Param("id") Long id);
+
+    /**
+     * Open-case duplicate of a candidate identifier (e-declaration block, art. 9 ust. 5 hygiene);
+     * the partial unique index of the schema stays the race-safe backstop.
+     */
+    @Query("select count(c) > 0 from TRecruitmentCase c"
+        + " where c.candidateFormalIdentifier = :formalIdentifier and c.closedAt is null"
+        + " and c.id <> :caseId")
+    boolean existsAnotherOpenCaseByFormalIdentifier(
+        @Param("formalIdentifier") String formalIdentifier,
+        @Param("caseId") Long caseId
+    );
 }

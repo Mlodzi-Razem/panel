@@ -32,6 +32,7 @@ import {
     SignOutIcon,
     SquaresFourIcon,
     TrayIcon,
+    UserPlusIcon,
     UsersThreeIcon,
     XIcon,
 } from "@phosphor-icons/react/ssr";
@@ -48,6 +49,7 @@ const ICONS: Record<NavIcon, React.ReactNode> = {
     ending: <HourglassMediumIcon aria-hidden/>,
     bodies: <BuildingsIcon aria-hidden/>,
     fees: <MoneyIcon aria-hidden/>,
+    recruitment: <UserPlusIcon aria-hidden/>,
 };
 
 export type SidebarUser = { name: string; email?: string | null; image?: string | null };

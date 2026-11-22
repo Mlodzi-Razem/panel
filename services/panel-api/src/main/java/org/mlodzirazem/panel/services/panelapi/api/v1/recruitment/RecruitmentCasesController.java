@@ -26,20 +26,32 @@ import org.mlodzirazem.panel.services.panelapi.api.v1.common.Names;
 import org.mlodzirazem.panel.services.panelapi.api.v1.common.PageResponse;
 import org.mlodzirazem.panel.services.panelapi.api.v1.common.PersonRef;
 import org.mlodzirazem.panel.services.panelapi.api.v1.recruitment.RecruitmentResponses.CaseDetailResponse;
+import org.mlodzirazem.panel.services.panelapi.api.v1.recruitment.RecruitmentResponses.CaseDecisionResponse;
 import org.mlodzirazem.panel.services.panelapi.api.v1.recruitment.RecruitmentResponses.CaseEventResponse;
 import org.mlodzirazem.panel.services.panelapi.api.v1.recruitment.RecruitmentResponses.CaseSummaryResponse;
 import org.mlodzirazem.panel.services.panelapi.api.v1.recruitment.RecruitmentResponses.DistrictRef;
+import org.mlodzirazem.panel.services.panelapi.core.error.ConflictException;
 import org.mlodzirazem.panel.services.panelapi.core.error.ForbiddenException;
+import org.mlodzirazem.panel.services.panelapi.core.error.NotFoundException;
+import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.BodyKind;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBody;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBodyRepository;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentCaseEventType;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentCaseStatus;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentDecisionKind;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentRejectionReason;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentSource;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TRecruitmentCase;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TRecruitmentCaseEvent;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TRecruitmentCaseRepository;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TRecruitmentDecision;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TRecruitmentDecisionRepository;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType;
 import org.mlodzirazem.panel.services.panelapi.recruitment.NewRecruitmentCase;
 import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentCaseService;
+import org.mlodzirazem.panel.services.panelapi.recruitment.workflow.RecruitmentRules;
+import org.mlodzirazem.panel.services.panelapi.recruitment.workflow.RecruitmentWorkflowService;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -54,6 +66,8 @@ import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,9 +87,12 @@ public class RecruitmentCasesController {
 
     private final CallerResolver callers;
     private final RecruitmentCaseService recruitment;
+    private final RecruitmentWorkflowService workflow;
     private final RecruitmentCaseSearch search;
     private final RecruitmentCandidateParser parser;
     private final TRecruitmentCaseRepository cases;
+    private final TRecruitmentDecisionRepository decisions;
+    private final TBodyRepository bodies;
     private final JsonMapper json;
 
     public record CreateCaseRequest(
@@ -90,7 +107,20 @@ public class RecruitmentCasesController {
 
     public record TransitionRequest(
         @Nullable RecruitmentCaseStatus target,
-        @Nullable RecruitmentRejectionReason rejectionReason
+        @Nullable RecruitmentRejectionReason rejectionReason,
+        @Nullable Long decidingBodyId,
+        @Nullable LocalDate decidedOn,
+        @Nullable String signature,
+        @Nullable String note
+    ) {
+    }
+
+    /** The two collegial resolutions the M3b back office records over HTTP. */
+    public record DecisionRequest(
+        @Nullable RecruitmentDecisionKind kind,
+        @Nullable LocalDate decidedOn,
+        @Nullable String signature,
+        @Nullable String note
     ) {
     }
 
@@ -131,6 +161,21 @@ public class RecruitmentCasesController {
         requireRead(caller, candidateCase);
 
         return detail(candidateCase, recruitment.timeline(id));
+    }
+
+    @GetMapping("/{id}/transitions")
+    public RecruitmentResponses.CaseTransitionsResponse transitions(@PathVariable("id") long id) {
+        Caller caller = callers.require();
+        TRecruitmentCase candidateCase = recruitment.get(id);
+
+        requireRead(caller, candidateCase);
+
+        return new RecruitmentResponses.CaseTransitionsResponse(
+            recruitment.availableTransitions(id).stream()
+                .map(option -> new RecruitmentResponses.CaseTransitionResponse(
+                    option.target(), RecruitmentCaseEventType.STATUS_CHANGED, option.allowed(),
+                    option.rejectionReasons(), option.blockedReason()))
+                .toList());
     }
 
     @PostMapping
@@ -176,11 +221,171 @@ public class RecruitmentCasesController {
 
         TRecruitmentCase candidateCase = recruitment.get(id);
 
-        requireManage(caller, candidateCase);
+        boolean postDeclaration = RecruitmentRules.POST_DECLARATION_STATES.contains(candidateCase.getStatus());
+        if (postDeclaration) {
+            requireManageOrApprove(caller, candidateCase);
+        } else {
+            requireManage(caller, candidateCase);
+        }
+        requireOpen(candidateCase);
+        requireReachable(candidateCase, request.target());
+        requireNotReserved(request.target());
 
-        recruitment.transition(id, request.target(), request.rejectionReason(), caller.id());
+        if (postDeclaration) {
+            transitionPostDeclaration(candidateCase, caller.id(), request);
+        } else {
+            recruitment.transition(id, request.target(), request.rejectionReason(), caller.id());
+        }
 
         return detail(recruitment.get(id), recruitment.timeline(id));
+    }
+
+    /**
+     * Records one of the two collegial resolutions of the admission flow over the M3 engine:
+     * {@code ZK_APPROVAL} (global RECRUITMENT_APPROVE, decided by the Zarząd Krajowy) or
+     * {@code ZO_ADMISSION_RESOLUTION} (RECRUITMENT_MANAGE of the case's district, decided by its
+     * Zarząd Okręgu). The deciding body is resolved server-side; a second decision of the same kind
+     * answers 409 DECISION_ALREADY_RECORDED. The status flip to ACCEPTED stays with M6.
+     */
+    @PostMapping("/{id}/decisions")
+    public CaseDetailResponse recordDecision(@PathVariable("id") long id, @RequestBody DecisionRequest request) {
+        Caller caller = callers.require();
+        TRecruitmentCase candidateCase = recruitment.get(id);
+
+        if (request.kind() != RecruitmentDecisionKind.ZK_APPROVAL
+            && request.kind() != RecruitmentDecisionKind.ZO_ADMISSION_RESOLUTION) {
+            throw ApiException.badRequest("INVALID_VALUE",
+                "kind must be ZK_APPROVAL or ZO_ADMISSION_RESOLUTION", List.of("kind"));
+        }
+
+        if (request.kind() == RecruitmentDecisionKind.ZK_APPROVAL) {
+            if (!caller.permissions().canGlobally(PermissionType.RECRUITMENT_APPROVE)) {
+                throw new ForbiddenException("RECRUITMENT_APPROVE_REQUIRED",
+                    "Recording a ZK opinion requires the global RECRUITMENT_APPROVE permission");
+            }
+            workflow.recordZkApproval(id, caller.id(), nationalBoard().getId(), request.decidedOn(),
+                requireDecisionInput(request.signature(), request.decidedOn()), request.note());
+        } else {
+            requireManage(caller, candidateCase);
+            workflow.recordAdmissionResolution(id, caller.id(), districtBoardOf(candidateCase).getId(),
+                request.decidedOn(), requireDecisionInput(request.signature(), request.decidedOn()), request.note());
+        }
+
+        return detail(recruitment.get(id), recruitment.timeline(id));
+    }
+
+    /**
+     * The two flows owned by other milestones refuse with the exact code the transitions helper
+     * shows, whatever the caller's permissions are: the declaration arrival (M4a, artifact-gated
+     * e-declaration) and the ACCEPTED flip (M6, member-number allocation in one transaction).
+     */
+    private static void requireNotReserved(RecruitmentCaseStatus target) {
+        if (target == RecruitmentCaseStatus.DECLARATION_RECEIVED) {
+            throw new ConflictException("DECLARATION_ARTIFACT_REQUIRED",
+                "The declaration arrives with its artifact in the M4a e-declaration flow");
+        }
+
+        if (target == RecruitmentCaseStatus.ACCEPTED) {
+            throw new ConflictException("MEMBER_ALLOCATION_PENDING",
+                "ACCEPTED is reserved for the M6 admission flow (member number + members row)");
+        }
+    }
+
+    /**
+     * The post-declaration edges the M3b back office drives over the M3 engine. The reserved flows
+     * never reach this method ({@link #requireNotReserved} answers first).
+     */
+    private void transitionPostDeclaration(TRecruitmentCase candidateCase, long actorId,
+                                          TransitionRequest request) {
+        long id = candidateCase.getId();
+        RecruitmentCaseStatus target = request.target();
+
+        switch (target) {
+            case PROBATION -> workflow.startProbation(id, actorId);
+            case PROBATION_EXTENDED, ZO_RECOMMENDED -> {
+                requireDecisionInput(request.signature(), request.decidedOn());
+                requireBodyId(request.decidingBodyId());
+                if (target == RecruitmentCaseStatus.PROBATION_EXTENDED) {
+                    workflow.extendAssessment(id, actorId, request.decidingBodyId(), request.decidedOn(),
+                        request.signature(), request.note());
+                } else {
+                    workflow.recordZoRecommendation(id, actorId, request.decidingBodyId(), request.decidedOn(),
+                        request.signature(), request.note());
+                }
+            }
+            case ZK_VOTING -> workflow.startZkVoting(id, actorId);
+            case REJECTED -> {
+                if (request.rejectionReason() == null) {
+                    throw new RuleViolationException("REJECTION_REASON_REQUIRED",
+                        "Closing a post-declaration case as REJECTED requires a rejection reason");
+                }
+                requireDecisionInput(request.signature(), request.decidedOn());
+                requireBodyId(request.decidingBodyId());
+                workflow.reject(id, actorId, request.decidingBodyId(), request.decidedOn(),
+                    request.rejectionReason(), request.signature(), request.note());
+            }
+            default -> throw new RuleViolationException("TRANSITION_NOT_ALLOWED",
+                "The transition " + candidateCase.getStatus().name() + " -> " + target.name()
+                    + " is not served by the back office");
+        }
+    }
+
+    /** Closed cases answer 409 before anything else, exactly like the M2 intake does. */
+    private static void requireOpen(TRecruitmentCase candidateCase) {
+        if (candidateCase.getClosedAt() != null) {
+            throw new ConflictException("CASE_NOT_OPEN", "The case is closed; closed cases are read-only");
+        }
+    }
+
+    /** Only the edges of {@link RecruitmentRules} are reachable; everything else answers 422. */
+    private static void requireReachable(TRecruitmentCase candidateCase, RecruitmentCaseStatus target) {
+        if (!RecruitmentRules.canTransition(candidateCase.getStatus(), target)) {
+            throw new RuleViolationException("TRANSITION_NOT_ALLOWED",
+                "The transition " + candidateCase.getStatus().name() + " -> " + target.name()
+                    + " is not part of the state machine");
+        }
+    }
+
+    private static String requireDecisionInput(@Nullable String signature, @Nullable LocalDate decidedOn) {
+        if (decidedOn == null) {
+            throw ApiException.badRequest("FIELD_REQUIRED", "decidedOn is required", List.of("decidedOn"));
+        }
+        if (signature == null || signature.isBlank()) {
+            throw ApiException.badRequest("FIELD_REQUIRED", "signature is required", List.of("signature"));
+        }
+        return signature.strip();
+    }
+
+    private static void requireBodyId(@Nullable Long decidingBodyId) {
+        if (decidingBodyId == null) {
+            throw ApiException.badRequest("FIELD_REQUIRED", "decidingBodyId is required", List.of("decidingBodyId"));
+        }
+    }
+
+    private static void requireManageOrApprove(Caller caller, TRecruitmentCase candidateCase) {
+        boolean allowed = caller.permissions().canInDistrict(PermissionType.RECRUITMENT_MANAGE,
+                candidateCase.getDistrict().getId())
+            || caller.permissions().canGlobally(PermissionType.RECRUITMENT_APPROVE);
+
+        if (!allowed) {
+            throw new ForbiddenException("RECRUITMENT_MANAGE_REQUIRED",
+                "Post-declaration transitions require RECRUITMENT_MANAGE of the case's district"
+                    + " or the global RECRUITMENT_APPROVE");
+        }
+    }
+
+    private TBody nationalBoard() {
+        return bodies.findAllByKind(BodyKind.NATIONAL_BOARD).stream()
+            .findFirst()
+            .orElseThrow(() -> new NotFoundException("Body kind NATIONAL_BOARD", 0));
+    }
+
+    private TBody districtBoardOf(TRecruitmentCase candidateCase) {
+        return bodies.findAllByParentBodyIdAndKind(candidateCase.getDistrict().getId(), BodyKind.DISTRICT_BOARD)
+            .stream()
+            .findFirst()
+            .orElseThrow(() -> new NotFoundException("District board of " + candidateCase.getDistrict().getName(),
+                candidateCase.getDistrict().getId()));
     }
 
     @PostMapping("/{id}/notes")
@@ -252,7 +457,34 @@ public class RecruitmentCasesController {
             candidateCase.getClosedAt(),
             candidateCase.getCreatedAt(),
             candidateCase.getUpdatedAt(),
+            candidateCase.getDeclarationForm(),
+            candidateCase.getDeclarationReference(),
+            candidateCase.getDeclarationReceivedOn(),
+            candidateCase.getAssessmentTrack(),
+            candidateCase.getAssessmentNotBeforeOn(),
+            candidateCase.getAssessmentNotLaterOn(),
+            candidateCase.getExtensionCount(),
+            candidateCase.getExtensionDecidedOn(),
+            candidateCase.getSecondAssessmentNotLaterOn(),
+            candidateCase.getZoRecommendedOn(),
+            candidateCase.getAdmissionResolutionNotLaterOn(),
+            decisions.findAllByRecruitmentCaseId(candidateCase.getId()).stream()
+                .sorted(Comparator.comparing(TRecruitmentDecision::getDecidedOn)
+                    .thenComparing(TRecruitmentDecision::getId))
+                .map(this::decision)
+                .toList(),
             timeline.stream().map(this::event).toList()
+        );
+    }
+
+    private CaseDecisionResponse decision(TRecruitmentDecision decision) {
+        return new CaseDecisionResponse(
+            decision.getId(),
+            decision.getDecisionKind(),
+            decision.getDecidedOn(),
+            decision.getDecisionSignature(),
+            decision.getDecidingBody().getId(),
+            decision.getDecidingBody().getName()
         );
     }
 

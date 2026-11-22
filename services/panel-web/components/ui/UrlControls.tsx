@@ -90,11 +90,13 @@ export type UrlFilterSelectProps = {
     allLabel?: string;
     icon?: React.ReactNode;
     options: { value: string; label: string }[];
+    /** Optional phase groups (E3): rendered as <optgroup>s before the flat options. */
+    groups?: { label: string; options: { value: string; label: string }[] }[];
     defaultValue?: string;
     resetParams?: readonly string[];
 };
 
-export function UrlFilterSelect({param, label, allLabel, icon, options, defaultValue = '', resetParams = ['page']}: UrlFilterSelectProps) {
+export function UrlFilterSelect({param, label, allLabel, icon, options, groups, defaultValue = '', resetParams = ['page']}: UrlFilterSelectProps) {
     const {searchParams, set} = useUrlParams(resetParams);
     const value = searchParams.get(param) ?? defaultValue;
     const id = useId();
@@ -106,6 +108,9 @@ export function UrlFilterSelect({param, label, allLabel, icon, options, defaultV
         </label>
         <select id={id} value={value} onChange={event => set(param, event.target.value === defaultValue ? '' : event.target.value)}>
             {allLabel !== undefined && <option value="">{allLabel}</option>}
+            {groups?.map(group => <optgroup key={group.label} label={group.label}>
+                {group.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </optgroup>)}
             {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
         <CaretDownIcon aria-hidden className={styles.chevron}/>

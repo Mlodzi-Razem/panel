@@ -1,0 +1,130 @@
+/*!
+ * Copyright (C) 2026 Stowarzyszenie Młodzi Razem
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+.reason {
+    margin: var(--space-1) 0 0;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+}
+
+.timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.timelineItem {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding-left: var(--space-4);
+    border-left: 2px solid var(--gray-200);
+}
+
+.timelineHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.timelinePayload {
+    margin: 0;
+    color: var(--gray-700);
+    overflow-wrap: anywhere;
+}
+
+.transitions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.transitionOption {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    align-items: flex-start;
+}
+
+.blockedReason {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+}
+
+/* STATES 4.3: the irreversible-step warning shown inside the REJECTED (and any terminal) form. */
+.terminalWarning {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--color-warning);
+}
+
+.mutedText {
+    color: var(--color-text-muted);
+}
+
+.inlineForm {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    max-width: 28rem;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+}
+
+/* M3b: the collegial decisions block and the declaration-link dialog. */
+.decisions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.decisions dl {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin: 0;
+}
+
+.declarationLink {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.formUrl {
+    font-family: var(--font-mono, monospace);
+    word-break: break-all;
+    margin: 0;
+    padding: var(--space-2);
+    background: var(--color-surface-muted);
+    border-radius: var(--radius-1, 4px);
+}
+
+.dialogActions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}

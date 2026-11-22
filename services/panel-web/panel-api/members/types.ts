@@ -269,4 +269,7 @@ export const PERMISSIONS = {
     formalRead: 'FORMAL_PERSONAL_DATA_READ',
     formalManage: 'FORMAL_PERSONAL_DATA_MANAGE',
     bodiesManage: 'BODIES_MANAGE',
+    recruitmentRead: 'RECRUITMENT_READ',
+    recruitmentManage: 'RECRUITMENT_MANAGE',
+    recruitmentApprove: 'RECRUITMENT_APPROVE',
 } as const;

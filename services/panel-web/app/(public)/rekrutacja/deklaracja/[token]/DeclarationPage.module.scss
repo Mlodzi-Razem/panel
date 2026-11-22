@@ -1,0 +1,438 @@
+/*
+ * Copyright (C) 2026 Stowarzyszenie Młodzi Razem
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/* Anonymous candidate declaration form — the same brand as the login page (plum gradient band,
+   white logo), mobile-first: a single column of cards. Uses the shared design tokens. */
+
+.shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    background: var(--color-background-deep);
+}
+
+.band {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-6) var(--space-5) calc(var(--space-6) - var(--space-2));
+    color: #ffffff;
+    background:
+        radial-gradient(circle at 20% 15%, var(--plum-500) 0%, transparent 55%),
+        linear-gradient(145deg, var(--plum-700) 0%, var(--plum-900) 70%, var(--plum-950) 100%);
+}
+
+.bandLogo {
+    width: 7.5rem;
+    height: auto;
+    filter: brightness(0) invert(1);
+
+    @media (min-width: 900px) {
+        width: 9rem;
+    }
+}
+
+.column {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+    width: 100%;
+    max-width: 43rem;
+    margin-inline: auto;
+    padding: var(--space-6) var(--space-4) var(--space-8);
+    flex: 1;
+
+    @media (min-width: 900px) {
+        padding-inline: var(--space-6);
+    }
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding: var(--space-5);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--size-border-radius);
+    box-shadow: var(--shadow-1, 0 var(--space-1) calc(var(--space-2) * 3) var(--color-shadow));
+}
+
+.cardTitle {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 650;
+    color: var(--color-text);
+}
+
+.cardHint {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--color-text-muted);
+}
+
+.greeting {
+    margin: 0;
+    font-size: clamp(1.5rem, 4vw, 1.9rem);
+    font-weight: 650;
+    line-height: 1.2;
+    text-wrap: balance;
+}
+
+.lead {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--color-text);
+}
+
+.stepper {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 550;
+    color: var(--color-text-muted);
+}
+
+.stepNumber {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-border-strong);
+    font-size: 0.75rem;
+}
+
+.stepDone > .stepNumber {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.stepCurrent {
+    color: var(--color-primary);
+
+    > .stepNumber {
+        background: var(--color-primary);
+        border-color: var(--color-primary);
+        color: var(--color-on-text);
+    }
+}
+
+.sectionTitle {
+    margin: 0 0 calc(var(--space-1) * -1);
+    font-size: 0.9rem;
+    font-weight: 650;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.formGrid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-4) var(--space-5);
+
+    @media (min-width: 900px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.fieldError {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--color-danger);
+}
+
+.checkboxRow {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: start;
+    padding: 0;
+    border: none;
+}
+
+.checkbox {
+    width: 1.3rem;
+    height: 1.3rem;
+    margin: 0.15rem 0 0;
+    accent-color: var(--color-primary);
+}
+
+.checkboxLabel {
+    font-size: 0.92rem;
+    line-height: 1.5;
+    color: var(--color-text);
+}
+
+.checkboxError {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding-left: calc(1.3rem + 0.75rem);
+    font-size: 0.8rem;
+    color: var(--color-danger);
+}
+
+.checkboxHint {
+    margin: 0.25rem 0 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--color-text-muted);
+}
+
+.oath {
+    margin: 0;
+    padding: var(--space-4);
+    background: var(--color-primary-soft);
+    border: 1px solid var(--plum-200);
+    border-radius: var(--size-border-radius);
+}
+
+.oathList {
+    margin: var(--space-3) 0 0;
+    padding-left: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+
+.infoDuty {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.55;
+}
+
+.infoDutyList {
+    margin: var(--space-2) 0;
+    padding-left: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+}
+
+.pdfFrame {
+    width: 100%;
+    min-height: 26rem;
+    height: min(70dvh, 38rem);
+    border: 1px solid var(--color-border);
+    border-radius: calc(var(--size-border-radius) / 2);
+    background: var(--color-surface);
+}
+
+.linkButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 1.1rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 999px;
+    font-size: 0.88rem;
+    font-weight: 550;
+    text-decoration: none;
+    color: var(--color-primary);
+    background: var(--color-surface);
+
+    &:hover {
+        background: var(--color-background-shallow);
+    }
+
+    &:focus-visible {
+        outline: 0.1875rem solid var(--color-focus-strong, #93275D);
+        outline-offset: 0.125rem;
+    }
+}
+
+.dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-6) var(--space-4);
+    text-align: center;
+    border: 2px dashed var(--color-border-strong);
+    border-radius: var(--size-border-radius);
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+
+    &.dropzoneActive {
+        border-color: var(--color-primary);
+        background: var(--color-primary-soft);
+    }
+}
+
+.dropzoneButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 1.05rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 999px;
+    font-size: 0.88rem;
+    font-weight: 550;
+    color: var(--color-primary);
+    background: var(--color-surface);
+    cursor: pointer;
+
+    &:hover {
+        background: var(--color-background-shallow);
+    }
+
+    &:focus-within {
+        outline: 0.1875rem solid var(--color-focus-strong, #93275D);
+        outline-offset: 0.125rem;
+    }
+}
+
+.fileChip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    max-width: 100%;
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-background-shallow);
+    border-radius: 0.5rem;
+    font-size: 0.85rem;
+    text-align: left;
+
+    > span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+.statusBlock {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    align-items: flex-start;
+}
+
+.statusIcon {
+    font-size: 2rem;
+}
+
+.statusTitle {
+    margin: 0;
+    font-size: clamp(1.4rem, 4vw, 1.75rem);
+    font-weight: 650;
+    line-height: 1.2;
+    text-wrap: balance;
+}
+
+.statusBody {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--color-text);
+}
+
+.statusIconDanger {
+    color: var(--danger-strong, #b32433);
+}
+
+.statusIconSuccess {
+    color: var(--color-success);
+}
+
+.progressStatus {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dropzone,
+    .dropzoneActive {
+        transition: none;
+    }
+}
+
+.visuallyHidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* REVIEW A4/C1 (BLOCKER #4): tekst sukcesu w success-strong — wzorzec var(--token, fallback):
+ * token wyląduje w theme przy merge gałęzi designu; fallback trzyma kontrast samodzielnie
+ * (#14663A na tincie #E7F6ED = 6,29:1). Selectora nie kładziemy na .notice w Page.module.scss
+ * (plik wspólny — patch J6). */
+.successText {
+    color: var(--success-strong, #14663A);
+}
+
+/* NICE #14 (SPEC §2.5): identyfikatory w fontzie mono. */
+.monoInput {
+    font-family: var(--font-mono, monospace);
+}
+
+/* C4/SHOULD #9: na ekranach dotykowych inputy ≥16px (anty-auto-zoom iOS).
+ * Form.module.scss jest wspólny (nie ruszamy) — nadklasa w moim module, który jest
+ * dodanym className na <form> tego widoku. */
+.formCard {
+    align-self: stretch;
+}
+
+@media (max-width: 900px) {
+    .formCard input,
+    .formCard select,
+    .formCard textarea {
+        font-size: 1rem;
+    }
+}
+
+/* NICE #16: chip pliku — rozmiar + przycisk ghost „Usuń” (prototyp 4b). */
+.fileChipMeta {
+    flex: none;
+    color: var(--color-text-muted);
+}
+
+.fileChipRemove {
+    min-height: 2.75rem;
+    padding-inline: 0.6rem;
+    font-size: 0.875rem;
+}
