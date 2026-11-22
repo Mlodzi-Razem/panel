@@ -76,7 +76,7 @@ class GraphEntraUserLookupTest {
     private final MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
 
     private GraphEntraUserLookup lookup(EntraProperties properties) {
-        return new GraphEntraUserLookup(properties, builder.build(), clock);
+        return new GraphEntraUserLookup(new EntraGraphAppToken(properties, builder.build(), clock), builder.build());
     }
 
     private static EntraProperties secretConfigured() {

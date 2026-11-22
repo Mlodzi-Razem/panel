@@ -17,3 +17,7 @@ panel:
   entra:
     client-certificate: ${PANEL_ENTRA_CLIENT_CERTIFICATE:}
     client-certificate-key: ${PANEL_ENTRA_CLIENT_CERTIFICATE_KEY:}
+  mail:
+    enabled: ${PANEL_MAIL_ENABLED:false}
+    sender: ${PANEL_MAIL_SENDER:}
+    daily-external-limit: ${PANEL_MAIL_DAILY_EXTERNAL_LIMIT:}
