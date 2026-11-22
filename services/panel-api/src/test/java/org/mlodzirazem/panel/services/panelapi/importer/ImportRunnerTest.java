@@ -53,7 +53,11 @@ class ImportRunnerTest extends DomainTestSupport {
         String output = captured.toString(StandardCharsets.UTF_8);
 
         assertThat(output).contains("Mode: dry run", "Rows: 2", "Created: 2", "Errors: 0");
-        assertThat(output).doesNotContain("Testa", "Probna", "example.org");
+        // Surnames + the e-mail token of the fixture rows: unique strings that framework or
+        // parallel-test noise cannot print. ("Testa" alone is not usable as a marker — the
+        // substring hides inside junit's "interceptTestableMethod" in stack traces that can bleed
+        // into this global stdout capture while async listeners from earlier tests are logging.)
+        assertThat(output).doesNotContain("Probna", "Testowski", "testa.probna@example.org");
         assertThat(runner.getExitCode()).isZero();
         assertThat(memberRepository.findByMemberId("7001")).isEmpty();
     }

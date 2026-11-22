@@ -19,6 +19,7 @@ package org.mlodzirazem.panel.services.panelapi.bodies;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.BodyKind;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBody;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBodyMembership;
@@ -59,60 +60,58 @@ class BodyMembershipServiceTest extends DomainTestSupport {
     }
 
     @Test
-    void zkMemberWithKskFunctionConflictsAndConfirmationEndsTheEarlierMandate() {
+    void zkMemberWithKskFunctionIsBlockedAsIncompatibleMembership() {
         TMember member = newMember("Zed", "Konflikt", "mazowieckie");
         TBodyMembership ksk = grant(member, body("peer-court"), "MEMBER", today.minusMonths(6), null);
         AssignMembership request = assign(member, body("national-board"), "SECRETARY", today, null);
 
         AssignmentCheck check = service.check(request);
 
-        assertThat(check.conflicts()).singleElement().satisfies(conflict -> {
-            assertThat(conflict.membershipId()).isEqualTo(ksk.getId());
-            assertThat(conflict.bodyKind()).isEqualTo(BodyKind.PEER_COURT);
-            assertThat(conflict.endsOn()).isEqualTo(today);
+        assertThat(check.violations()).singleElement().satisfies(v -> {
+            assertThat(v.code()).isEqualTo(FunctionViolation.Code.INCOMPATIBLE_MEMBERSHIP);
+            assertThat(v.conflictingMembershipId()).isEqualTo(ksk.getId());
+            assertThat(v.conflictingBodyName()).isEqualTo(body("peer-court").getName());
         });
-        assertThat(check.violations()).isEmpty();
+        assertThat(check.conflicts()).isEmpty();
 
-        assertThatThrownBy(() -> service.assign(request, false)).isInstanceOf(ConfirmationRequiredException.class);
+        assertThatThrownBy(() -> service.assign(request, false)).isInstanceOf(AssignmentBlockedException.class);
+        assertThatThrownBy(() -> service.assign(request, true)).isInstanceOf(AssignmentBlockedException.class);
         assertThat(membershipCount(member)).isEqualTo(1);
-
-        AssignmentResult result = service.assign(request, true);
-
-        assertThat(result.endedMemberships()).extracting(TBodyMembership::getId).containsExactly(ksk.getId());
-        assertThat(jdbc.queryForObject("SELECT valid_to FROM body_memberships WHERE id = ?", LocalDate.class,
-            ksk.getId())).isEqualTo(today);
-        assertThat(membershipCount(member)).isEqualTo(2);
-        assertThat(events.events).extracting(BodyMembershipChanged::change)
-                                 .containsExactly(BodyMembershipChanged.Change.ENDED, BodyMembershipChanged.Change.CREATED);
-        assertThat(auditCount("bodies :: membership-assign")).isEqualTo(1);
-        assertThat(auditCount("bodies :: membership-end")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM body_memberships WHERE valid_to IS NOT NULL",
+            Integer.class)).isZero();
+        assertThat(auditCount("bodies :: membership-assign")).isZero();
+        assertThat(auditCount("bodies :: membership-end")).isZero();
     }
 
     @Test
-    void zkConflictsWithAnyBoardEvenWhenSinglePerson() {
+    void zkIsIncompatibleWithAnyDistrictBoardEvenWhenSinglePerson() {
         TMember member = newMember("Zora", "Board", "mazowieckie");
         grant(member, board("mazowieckie"), "COORDINATOR", today.minusMonths(3), null);
 
         AssignmentCheck check = service.check(assign(member, body("national-board"), "CO_CHAIR", today, null));
 
-        assertThat(check.conflicts()).singleElement().satisfies(c -> assertThat(c.bodyKind()).isEqualTo(BodyKind.DISTRICT_BOARD));
+        assertThat(check.violations()).singleElement().satisfies(v -> {
+            assertThat(v.code()).isEqualTo(FunctionViolation.Code.INCOMPATIBLE_MEMBERSHIP);
+            assertThat(v.conflictingBodyName()).isEqualTo(board("mazowieckie").getName());
+        });
     }
 
     @Test
-    void kkwWithSinglePersonDistrictBoardIsNotAConflict() {
+    void kkwWithSinglePersonDistrictBoardIsAllowedByTheSinglePersonExemption() {
         TMember member = newMember("Kira", "Solo", "mazowieckie");
         grant(member, body("electoral-commission"), "MEMBER", today.minusMonths(3), null);
 
         AssignmentCheck check = service.check(assign(member, board("mazowieckie"), "COORDINATOR", today, null));
 
         assertThat(check.conflicts()).isEmpty();
+        assertThat(check.violations()).isEmpty();
         assertThat(check.needsConfirmation()).isFalse();
         assertThat(service.assign(assign(member, board("mazowieckie"), "COORDINATOR", today, null), false)
                           .endedMemberships()).isEmpty();
     }
 
     @Test
-    void kkwWithMultiPersonDistrictBoardConflicts() {
+    void kkwWithMultiPersonDistrictBoardIsIncompatible() {
         TMember other = newMember("Olga", "Other", "mazowieckie");
         TMember member = newMember("Kira", "Multi", "mazowieckie");
         grant(other, board("mazowieckie"), "COORDINATOR", today.minusMonths(3), null);
@@ -120,7 +119,10 @@ class BodyMembershipServiceTest extends DomainTestSupport {
 
         AssignmentCheck check = service.check(assign(member, board("mazowieckie"), "VICE_COORDINATOR", today, null));
 
-        assertThat(check.conflicts()).singleElement().satisfies(c -> assertThat(c.bodyKind()).isEqualTo(BodyKind.ELECTORAL_COMMISSION));
+        assertThat(check.violations()).singleElement().satisfies(v -> {
+            assertThat(v.code()).isEqualTo(FunctionViolation.Code.INCOMPATIBLE_MEMBERSHIP);
+            assertThat(v.conflictingBodyName()).isEqualTo(body("electoral-commission").getName());
+        });
     }
 
     @Test
@@ -128,13 +130,14 @@ class BodyMembershipServiceTest extends DomainTestSupport {
         TMember solo = newMember("Sol", "Solo", "slaskie");
         grant(solo, board("slaskie"), "COORDINATOR", today.minusMonths(3), null);
 
-        assertThat(service.check(assign(solo, body("peer-court"), "MEMBER", today, null)).conflicts()).isEmpty();
+        assertThat(service.check(assign(solo, body("peer-court"), "MEMBER", today, null)).violations()).isEmpty();
 
         TMember second = newMember("Sec", "Ond", "slaskie");
         grant(second, board("slaskie"), "VICE_COORDINATOR", today.minusMonths(1), null);
 
-        assertThat(service.check(assign(solo, body("audit-commission"), "MEMBER", today, null)).conflicts())
-            .singleElement().satisfies(c -> assertThat(c.bodyKind()).isEqualTo(BodyKind.DISTRICT_BOARD));
+        assertThat(service.check(assign(solo, body("audit-commission"), "MEMBER", today, null)).violations())
+            .singleElement().satisfies(v -> assertThat(v.conflictingBodyName())
+                .isEqualTo(board("slaskie").getName()));
     }
 
     @Test
@@ -154,16 +157,25 @@ class BodyMembershipServiceTest extends DomainTestSupport {
         TMember member = newMember("Nora", "National", "mazowieckie");
         grant(member, body("peer-court"), "MEMBER", today.minusMonths(6), null);
 
-        assertThat(service.check(assign(member, body("audit-commission"), "MEMBER", today, null)).conflicts())
-            .singleElement().satisfies(c -> assertThat(c.bodyKind()).isEqualTo(BodyKind.PEER_COURT));
-        assertThat(service.check(assign(member, body("electoral-commission"), "MEMBER", today, null)).conflicts())
-            .singleElement().satisfies(c -> assertThat(c.bodyKind()).isEqualTo(BodyKind.PEER_COURT));
+        assertThat(service.check(assign(member, body("audit-commission"), "MEMBER", today, null)).violations())
+            .singleElement().satisfies(v -> {
+                assertThat(v.code()).isEqualTo(FunctionViolation.Code.INCOMPATIBLE_MEMBERSHIP);
+                assertThat(v.conflictingBodyName()).isEqualTo(body("peer-court").getName());
+            });
+        assertThat(service.check(assign(member, body("electoral-commission"), "MEMBER", today, null)).violations())
+            .singleElement().satisfies(v -> {
+                assertThat(v.code()).isEqualTo(FunctionViolation.Code.INCOMPATIBLE_MEMBERSHIP);
+                assertThat(v.conflictingBodyName()).isEqualTo(body("peer-court").getName());
+            });
 
         TMember auditor = newMember("Ada", "Audit", "mazowieckie");
         grant(auditor, body("audit-commission"), "MEMBER", today.minusMonths(6), null);
 
-        assertThat(service.check(assign(auditor, body("electoral-commission"), "MEMBER", today, null)).conflicts())
-            .singleElement().satisfies(c -> assertThat(c.bodyKind()).isEqualTo(BodyKind.AUDIT_COMMISSION));
+        assertThat(service.check(assign(auditor, body("electoral-commission"), "MEMBER", today, null)).violations())
+            .singleElement().satisfies(v -> {
+                assertThat(v.code()).isEqualTo(FunctionViolation.Code.INCOMPATIBLE_MEMBERSHIP);
+                assertThat(v.conflictingBodyName()).isEqualTo(body("audit-commission").getName());
+            });
     }
 
     @Test
@@ -195,14 +207,16 @@ class BodyMembershipServiceTest extends DomainTestSupport {
     }
 
     @Test
-    void incompatibleLaterMandateIsABlockingViolation() {
+    void anIncompatibleMandateStartingLaterIsAlsoBlocked() {
         TMember member = newMember("Lara", "Later", "mazowieckie");
         grant(member, body("peer-court"), "MEMBER", today.plusMonths(2), null);
 
         AssignmentCheck check = service.check(assign(member, body("national-board"), "SECRETARY", today, null));
 
-        assertThat(check.violations()).extracting(FunctionViolation::code)
-                                      .contains(FunctionViolation.Code.INCOMPATIBLE_LATER_MANDATE);
+        assertThat(check.violations()).singleElement().satisfies(v -> {
+            assertThat(v.code()).isEqualTo(FunctionViolation.Code.INCOMPATIBLE_MEMBERSHIP);
+            assertThat(v.conflictingBodyName()).isEqualTo(body("peer-court").getName());
+        });
         assertThatThrownBy(() -> service.assign(assign(member, body("national-board"), "SECRETARY", today, null), true))
             .isInstanceOf(AssignmentBlockedException.class);
     }
@@ -288,7 +302,7 @@ class BodyMembershipServiceTest extends DomainTestSupport {
         TMember member = newMember("Eda", "Ender", "mazowieckie");
         TBodyMembership membership = grant(member, body("peer-court"), "MEMBER", today.minusMonths(1), null);
 
-        TBodyMembership ended = service.end(membership.getId(), null);
+        TBodyMembership ended = service.end(membership.getId(), null, null);
 
         assertThat(ended.getValidTo()).isEqualTo(today);
         assertThat(events.events).singleElement().satisfies(e -> {
@@ -297,7 +311,7 @@ class BodyMembershipServiceTest extends DomainTestSupport {
         });
         assertThat(service.activeOf(member.getId())).isEmpty();
         assertThat(service.historyOf(member.getId())).hasSize(1);
-        assertThatThrownBy(() -> service.end(membership.getId(), null)).hasMessageContaining("already ended");
+        assertThatThrownBy(() -> service.end(membership.getId(), null, null)).hasMessageContaining("already closed");
     }
 
     @Test
@@ -314,6 +328,71 @@ class BodyMembershipServiceTest extends DomainTestSupport {
             null, null))).hasMessageContaining("needs a parent");
         assertThatThrownBy(() -> bodyService.create(new NewBody(template(BodyKind.TEAM).getId(), "x", null,
             district("slaskie").getId(), null))).hasMessageContaining("cannot have a parent");
+    }
+
+    @Test
+    void incompatibilityIsJudgedOnDateRangesNotOnlyOpenMandates() {
+        TMember overlapping = newMember("Ola", "Overlap", "mazowieckie");
+        grant(overlapping, body("national-board"), "SECRETARY", today.minusYears(2), today.plusMonths(6));
+
+        assertThat(service.check(assign(overlapping, board("mazowieckie"), "COORDINATOR", today, today.plusYears(1)))
+                       .violations())
+            .singleElement().satisfies(v -> assertThat(v.code())
+                .isEqualTo(FunctionViolation.Code.INCOMPATIBLE_MEMBERSHIP));
+
+        TMember boundary = newMember("Ada", "Boundary", "mazowieckie");
+        grant(boundary, body("national-board"), "SECRETARY", today.minusYears(2), today);
+
+        assertThat(service.check(assign(boundary, board("mazowieckie"), "COORDINATOR", today, null)).violations())
+            .isEmpty();
+
+        TMember disjoint = newMember("Iwa", "Disjoint", "mazowieckie");
+        grant(disjoint, body("national-board"), "SECRETARY", today.minusYears(4), today.minusYears(3));
+
+        assertThat(service.check(assign(disjoint, board("mazowieckie"), "COORDINATOR", today.minusYears(2), null))
+                       .violations()).isEmpty();
+    }
+
+    @Test
+    void closingAMembershipRetroactivelyRequiresADecisionReference() {
+        TMember member = newMember("Rita", "Retro", "mazowieckie");
+        TBodyMembership membership = grant(member, body("peer-court"), "MEMBER", today.minusMonths(6), null);
+
+        assertThatThrownBy(() -> service.end(membership.getId(), today.minusDays(10), null))
+            .isInstanceOf(RuleViolationException.class)
+            .hasMessageContaining("decision reference");
+
+        assertThat(jdbc.queryForObject("SELECT valid_to FROM body_memberships WHERE id = ?", LocalDate.class,
+            membership.getId())).isNull();
+
+        TBodyMembership ended = service.end(membership.getId(), today.minusDays(10), "ZO/MZ/01/2026");
+
+        assertThat(ended.getValidTo()).isEqualTo(today.minusDays(10));
+        assertThat(jdbc.queryForObject("SELECT decision_reference FROM body_memberships WHERE id = ?", String.class,
+            membership.getId())).isEqualTo("ZO/MZ/01/2026");
+        assertThat(auditPayloads("bodies :: membership-end")).contains("decisionReference");
+
+        assertThatThrownBy(() -> service.end(membership.getId(), null, null))
+            .hasMessageContaining("already closed");
+    }
+
+    @Test
+    void endingTodayOrLaterNeedsNoReasonButAClosedMandateCannotBeExtended() {
+        TMember member = newMember("Fran", "Future", "mazowieckie");
+        TBodyMembership membership = grant(member, body("peer-court"), "MEMBER", today.minusMonths(1), null);
+
+        TBodyMembership planned = service.end(membership.getId(), today.plusDays(5), null);
+
+        assertThat(planned.getValidTo()).isEqualTo(today.plusDays(5));
+        assertThat(jdbc.queryForObject("SELECT decision_reference FROM body_memberships WHERE id = ?", String.class,
+            membership.getId())).isNull();
+
+        assertThatThrownBy(() -> service.end(membership.getId(), today.plusDays(30), null))
+            .hasMessageContaining("already closed");
+
+        TBodyMembership shortened = service.end(membership.getId(), today, "KKR/02/2026");
+
+        assertThat(shortened.getValidTo()).isEqualTo(today);
     }
 
     private TBody commissionerBody(String districtSlug) {

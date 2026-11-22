@@ -18,6 +18,7 @@
 package org.mlodzirazem.panel.services.panelapi.members;
 
 import org.junit.jupiter.api.Test;
+import org.mlodzirazem.panel.services.panelapi.core.error.ConflictException;
 import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.MemberStatus;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.MembershipType;
@@ -145,6 +146,59 @@ class MemberServiceTest extends DomainTestSupport {
             .extracting("code").isEqualTo("MEMBER_ID_RESERVED");
 
         assertThat(memberRepository.findById(member.getId()).orElseThrow().getMemberId()).isNull();
+    }
+
+    @Test
+    void duplicateUniqueKeysSurfaceAsFriendlyConflictsInsteadOfRawErrors() {
+        Map<MemberField, Object> base = new EnumMap<>(MemberField.class);
+        base.put(MemberField.PREFERRED_NAME_FIRST, "Dana");
+        base.put(MemberField.PREFERRED_NAME_LAST, "Duplikat");
+        base.put(MemberField.FORMAL_NAME_FIRST, "Dana");
+        base.put(MemberField.FORMAL_NAME_LAST, "Duplikat");
+        base.put(MemberField.BIRTH_DATE, LocalDate.of(2003, 3, 3));
+        base.put(MemberField.DOMAIN_EMAIL, "dana@example.org");
+        base.put(MemberField.MEMBER_ID, "111222");
+        base.put(MemberField.FORMAL_IDENTIFIER, "83020312345");
+
+        memberService.create(new NewMember(base, district("mazowieckie").getId()));
+
+        Map<MemberField, Object> sameNumber = new EnumMap<>(base);
+        sameNumber.put(MemberField.PREFERRED_NAME_FIRST, "Ewa");
+        sameNumber.put(MemberField.FORMAL_NAME_FIRST, "Ewa");
+        sameNumber.put(MemberField.PREFERRED_NAME_LAST, "Numerowa");
+        sameNumber.put(MemberField.FORMAL_NAME_LAST, "Numerowa");
+        sameNumber.put(MemberField.DOMAIN_EMAIL, "ewa@example.org");
+        sameNumber.put(MemberField.FORMAL_IDENTIFIER, null);
+
+        assertThatThrownBy(() -> memberService.create(new NewMember(sameNumber, district("mazowieckie").getId())))
+            .isInstanceOf(ConflictException.class)
+            .extracting("code").isEqualTo("MEMBER_ID_EXISTS");
+
+        Map<MemberField, Object> sameEmail = new EnumMap<>(sameNumber);
+        sameEmail.put(MemberField.MEMBER_ID, "111333");
+        sameEmail.put(MemberField.DOMAIN_EMAIL, "dana@example.org");
+
+        assertThatThrownBy(() -> memberService.create(new NewMember(sameEmail, district("mazowieckie").getId())))
+            .isInstanceOf(ConflictException.class)
+            .extracting("code").isEqualTo("DOMAIN_EMAIL_EXISTS");
+
+        Map<MemberField, Object> sameFormalIdentifier = new EnumMap<>(sameNumber);
+        sameFormalIdentifier.put(MemberField.MEMBER_ID, "111444");
+        sameFormalIdentifier.put(MemberField.FORMAL_IDENTIFIER, "83020312345");
+
+        assertThatThrownBy(() -> memberService.create(
+            new NewMember(sameFormalIdentifier, district("mazowieckie").getId())))
+            .isInstanceOf(ConflictException.class)
+            .extracting("code").isEqualTo("FORMAL_IDENTIFIER_EXISTS");
+
+        Map<MemberField, Object> samePrivateEmail = new EnumMap<>(sameNumber);
+        samePrivateEmail.put(MemberField.MEMBER_ID, "111555");
+        samePrivateEmail.put(MemberField.PRIVATE_EMAILS, List.of("dana@example.org"));
+
+        assertThatThrownBy(() -> memberService.create(
+            new NewMember(samePrivateEmail, district("mazowieckie").getId())))
+            .isInstanceOf(ConflictException.class)
+            .extracting("code").isEqualTo("EMAIL_ALREADY_USED");
     }
 
     @Test

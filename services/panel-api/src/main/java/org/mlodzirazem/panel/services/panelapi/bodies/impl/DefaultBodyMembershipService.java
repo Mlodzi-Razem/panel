@@ -28,10 +28,10 @@ import org.mlodzirazem.panel.services.panelapi.bodies.AssignmentResult;
 import org.mlodzirazem.panel.services.panelapi.bodies.BodyMembershipChanged;
 import org.mlodzirazem.panel.services.panelapi.bodies.BodyMembershipService;
 import org.mlodzirazem.panel.services.panelapi.bodies.ConfirmationRequiredException;
-import org.mlodzirazem.panel.services.panelapi.bodies.FunctionConflict;
 import org.mlodzirazem.panel.services.panelapi.bodies.FunctionViolation;
 import org.mlodzirazem.panel.services.panelapi.bodies.FunctionWarning;
 import org.mlodzirazem.panel.services.panelapi.core.error.ConflictException;
+import org.mlodzirazem.panel.services.panelapi.core.error.ConstraintConflicts;
 import org.mlodzirazem.panel.services.panelapi.core.error.NotFoundException;
 import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
 import org.mlodzirazem.panel.services.panelapi.members.BodiesManagerGuard;
@@ -49,6 +49,7 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.MemberS
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMemberRepository;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,6 +57,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -63,6 +65,18 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 class DefaultBodyMembershipService implements BodyMembershipService {
+    /**
+     * The partial unique index on open mandates (body_memberships_open_unique_idx) is the database's
+     * last line of defence for one-open-mandate-per-(member, body, memberType); races surface here
+     * as 23505 and are translated into a friendly 409 instead of a generic conflict.
+     */
+    private static final Map<String, RuntimeException> OPEN_DUPLICATE_INDEXES = Map.of(
+        "body_memberships_open_unique_idx",
+        new ConflictException("OPEN_MEMBERSHIP_EXISTS",
+            "The member already holds an open mandate for this function in the body",
+            List.of("memberId", "memberTypeId"))
+    );
+
     private final TBodyMembershipRepository memberships;
     private final TBodyRepository bodies;
     private final TBodyTemplateMemberTypeRepository memberTypes;
@@ -85,6 +99,14 @@ class DefaultBodyMembershipService implements BodyMembershipService {
     public AssignmentResult assign(AssignMembership request, boolean confirmed) {
         bodiesManagerGuard.lock();
 
+        TMember actor = currentMemberResolver.current().orElse(null);
+
+        if (actor != null && actor.getId().equals(request.memberId())) {
+            throw new RuleViolationException(
+                "SELF_ASSIGNMENT_NOT_ALLOWED",
+                "A function cannot be assigned to oneself; another member with BODIES_MANAGE has to record the decision");
+        }
+
         Evaluation evaluation = evaluate(request);
         AssignmentCheck check = evaluation.check();
 
@@ -96,24 +118,6 @@ class DefaultBodyMembershipService implements BodyMembershipService {
             throw new ConfirmationRequiredException(check);
         }
 
-        TMember actor = currentMemberResolver.current().orElse(null);
-        List<TBodyMembership> ended = new ArrayList<>();
-
-        for (FunctionConflict conflict : check.conflicts()) {
-            TBodyMembership earlier = evaluation.existing()
-                                                .stream()
-                                                .filter(m -> m.getId().equals(conflict.membershipId()))
-                                                .findFirst()
-                                                .orElseThrow();
-
-            earlier.setValidTo(conflict.endsOn());
-            earlier.setUpdatedBy(actor);
-            memberships.saveAndFlush(earlier);
-            ended.add(earlier);
-
-            publishAndAudit(BodyMembershipChanged.Change.ENDED, earlier, "bodies :: membership-end", List.of("validTo"));
-        }
-
         TBodyMembership membership = new TBodyMembership();
         membership.setMember(evaluation.member());
         membership.setBody(evaluation.body());
@@ -121,31 +125,47 @@ class DefaultBodyMembershipService implements BodyMembershipService {
         membership.setValidFrom(request.validFrom());
         membership.setValidTo(request.validTo());
         membership.setCreatedBy(actor);
-        memberships.saveAndFlush(membership);
+
+        try {
+            memberships.saveAndFlush(membership);
+        } catch (DataIntegrityViolationException conflict) {
+            throw ConstraintConflicts.translate(conflict, OPEN_DUPLICATE_INDEXES);
+        }
 
         publishAndAudit(BodyMembershipChanged.Change.CREATED, membership, "bodies :: membership-assign",
             request.validTo() == null ? List.of("validFrom") : List.of("validFrom", "validTo"));
 
-        return new AssignmentResult(membership, ended, check);
+        return new AssignmentResult(membership, List.of(), check);
     }
 
     @Override
     @Transactional
-    public TBodyMembership end(long membershipId, @Nullable LocalDate endDate) {
+    public TBodyMembership end(long membershipId, @Nullable LocalDate endDate, @Nullable String decisionReference) {
         bodiesManagerGuard.lock();
 
         TBodyMembership membership = memberships.findById(membershipId)
                                                 .orElseThrow(() -> new NotFoundException("Body membership",
                                                     membershipId));
 
-        LocalDate date = endDate != null ? endDate : LocalDate.now(clock);
+        LocalDate today = LocalDate.now(clock);
+        LocalDate date = endDate != null ? endDate : today;
 
         if (!date.isAfter(membership.getValidFrom())) {
             throw new RuleViolationException("INVALID_PERIOD", "The end date must be after the start date");
         }
 
         if (membership.getValidTo() != null && !membership.getValidTo().isAfter(date)) {
-            throw new ConflictException("ALREADY_ENDED", "The membership already ended");
+            throw new RuleViolationException("MEMBERSHIP_ALREADY_CLOSED",
+                "The membership is already closed on " + membership.getValidTo()
+                    + "; a closed mandate can only be shortened, never extended or reopened");
+        }
+
+        boolean retroactive = date.isBefore(today);
+        String reference = decisionReference == null ? null : decisionReference.trim();
+
+        if (retroactive && (reference == null || reference.isBlank())) {
+            throw new RuleViolationException("RETROACTIVE_CORRECTION_REQUIRES_REASON",
+                "Changing a membership's history requires a decision reference (e.g. the resolution signature)");
         }
 
         if (membership.getValidTo() == null && bodiesManagerGuard.wouldLeaveNone(List.of(membership.getId()), null, 0)) {
@@ -154,10 +174,16 @@ class DefaultBodyMembershipService implements BodyMembershipService {
         }
 
         membership.setValidTo(date);
+        membership.setDecisionReference(reference != null && reference.isBlank() ? null : reference);
         membership.setUpdatedBy(currentMemberResolver.current().orElse(null));
         memberships.saveAndFlush(membership);
 
-        publishAndAudit(BodyMembershipChanged.Change.ENDED, membership, "bodies :: membership-end", List.of("validTo"));
+        publishAndAudit(
+            BodyMembershipChanged.Change.ENDED,
+            membership,
+            "bodies :: membership-end",
+            membership.getDecisionReference() == null ? List.of("validTo") : List.of("validTo", "decisionReference")
+        );
 
         return membership;
     }
@@ -212,7 +238,6 @@ class DefaultBodyMembershipService implements BodyMembershipService {
                                                             request.memberTypeId()));
 
         List<FunctionViolation> violations = new ArrayList<>();
-        List<FunctionConflict> conflicts = new ArrayList<>();
         List<FunctionWarning> warnings = new ArrayList<>();
 
         List<TBodyMembership> existing = memberships.findAllByMemberId(member.getId());
@@ -237,38 +262,14 @@ class DefaultBodyMembershipService implements BodyMembershipService {
 
         if (template != null && validPeriod) {
             checkDuplicates(request, existing, span, violations);
-            checkIncompatibilities(request, body, template, existing, span, conflicts, violations);
+            checkIncompatibilities(request, body, template, existing, span, violations);
             checkTermLimit(body, template, existing, span, warnings);
             checkSinglePersonExemptionLoss(request, body, template, span, warnings);
             checkCommissionerTerm(body, template, existing, span, violations);
         }
 
-        if (violations.isEmpty()) {
-            checkLastBodiesManager(request, memberType, conflicts, violations);
-        }
-
-        return new Evaluation(member, body, memberType, existing, new AssignmentCheck(conflicts, warnings, violations));
-    }
-
-    private void checkLastBodiesManager(
-        AssignMembership request,
-        TBodyTemplateMemberType memberType,
-        List<FunctionConflict> conflicts,
-        List<FunctionViolation> violations
-    ) {
-        if (conflicts.isEmpty()) {
-            return;
-        }
-
-        List<Long> endedIds = conflicts.stream().map(FunctionConflict::membershipId).toList();
-        int successors = bodiesManagerGuard.grantsGlobalManagement(memberType, request.validFrom(), request.validTo())
-            ? 1
-            : 0;
-
-        if (bodiesManagerGuard.wouldLeaveNone(endedIds, null, successors)) {
-            violations.add(violation(FunctionViolation.Code.LAST_BODIES_MANAGER,
-                "Ending the conflicting mandate would leave nobody able to manage bodies"));
-        }
+        return new Evaluation(member, body, memberType, existing,
+            new AssignmentCheck(List.of(), warnings, violations));
     }
 
     private void checkDuplicates(
@@ -294,7 +295,6 @@ class DefaultBodyMembershipService implements BodyMembershipService {
         TBodyTemplate template,
         List<TBodyMembership> existing,
         FunctionRules.Span span,
-        List<FunctionConflict> conflicts,
         List<FunctionViolation> violations
     ) {
         List<TBodyTemplateIncompatibility> rules = incompatibilities.findAll();
@@ -330,22 +330,15 @@ class DefaultBodyMembershipService implements BodyMembershipService {
                 }
             }
 
-            if (earlier.getValidFrom().isBefore(request.validFrom())) {
-                conflicts.add(new FunctionConflict(
-                    earlier.getId(),
-                    earlier.getBody().getId(),
-                    earlier.getBody().getName(),
-                    earlierTemplate.getKind(),
-                    earlier.getMemberType().getId(),
-                    earlier.getMemberType().getName(),
-                    earlier.getValidFrom(),
-                    earlier.getValidTo(),
-                    request.validFrom()
-                ));
-            } else {
-                violations.add(violation(FunctionViolation.Code.INCOMPATIBLE_LATER_MANDATE,
-                    "An incompatible function in " + earlier.getBody().getName() + " starts no earlier"));
-            }
+            violations.add(FunctionViolation.incompatible(
+                "The function in %s is incompatible with %s over the requested period (statutory group"
+                    .formatted(earlier.getBody().getName(), body.getName())
+                    + " of art. 18 ust. 1 pkt 6; incompatible mandates are never auto-closed —"
+                    + " end the earlier membership explicitly first)",
+                earlier.getId(),
+                earlier.getBody().getId(),
+                earlier.getBody().getName()
+            ));
         }
     }
 

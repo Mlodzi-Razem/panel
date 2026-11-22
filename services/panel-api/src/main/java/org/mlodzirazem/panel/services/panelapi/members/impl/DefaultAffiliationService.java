@@ -21,6 +21,8 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.mlodzirazem.panel.services.panelapi.audit.AuditLog;
 import org.mlodzirazem.panel.services.panelapi.audit.AuditPayload;
+import org.mlodzirazem.panel.services.panelapi.core.error.ConflictException;
+import org.mlodzirazem.panel.services.panelapi.core.error.ConstraintConflicts;
 import org.mlodzirazem.panel.services.panelapi.core.error.NotFoundException;
 import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
 import org.mlodzirazem.panel.services.panelapi.members.AffiliationService;
@@ -33,6 +35,7 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMemberDistrictAffiliation;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMemberDistrictAffiliationRepository;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMemberRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +43,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -50,6 +54,22 @@ class DefaultAffiliationService implements AffiliationService {
     private static final String OPERATION_SUPPORTING = "members :: affiliation-supporting";
     private static final String OPERATION_VOTING = "members :: affiliation-voting";
     private static final List<String> FIELDS = List.of("districtAffiliations");
+
+    /**
+     * Friendly translations for SQL 23505 on the partial unique indexes guarding open affiliations,
+     * looked up by index name.
+     */
+    private static final Map<String, RuntimeException> OPEN_AFFILIATION_INDEXES = Map.of(
+        "member_district_affiliations_open_primary_idx",
+        new ConflictException("OPEN_PRIMARY_EXISTS", "The member already has an open primary district affiliation",
+            List.of("districtAffiliations")),
+        "member_district_affiliations_open_votes_idx",
+        new ConflictException("OPEN_VOTES_EXISTS", "The member already votes in another open district affiliation",
+            List.of("districtAffiliations")),
+        "member_district_affiliations_open_district_idx",
+        new ConflictException("OPEN_DISTRICT_EXISTS", "The member already has an open affiliation with this district",
+            List.of("districtAffiliations"))
+    );
 
     private final TMemberDistrictAffiliationRepository affiliations;
     private final TMemberRepository members;
@@ -197,7 +217,7 @@ class DefaultAffiliationService implements AffiliationService {
                 .findFirst()
                 .ifPresent(primary -> {
                     primary.setVotesHere(true);
-                    affiliations.saveAndFlush(primary);
+                    write(primary);
                 });
         }
 
@@ -221,7 +241,7 @@ class DefaultAffiliationService implements AffiliationService {
 
         clearVotes(open);
         target.setVotesHere(true);
-        affiliations.saveAndFlush(target);
+        write(target);
 
         auditLog.record(OPERATION_VOTING, payload(memberId, districtId));
     }
@@ -238,7 +258,7 @@ class DefaultAffiliationService implements AffiliationService {
         }
 
         if (changed) {
-            affiliations.flush();
+            flushWrites();
         }
     }
 
@@ -248,10 +268,10 @@ class DefaultAffiliationService implements AffiliationService {
         if (affiliation.getValidFrom().isBefore(today)) {
             affiliation.setValidTo(today);
             affiliation.setUpdatedBy(actor());
-            affiliations.saveAndFlush(affiliation);
+            write(affiliation);
         } else {
             affiliations.delete(affiliation);
-            affiliations.flush();
+            flushWrites();
         }
     }
 
@@ -269,7 +289,23 @@ class DefaultAffiliationService implements AffiliationService {
         affiliation.setValidFrom(today());
         affiliation.setCreatedBy(actor());
 
-        return affiliations.saveAndFlush(affiliation);
+        return write(affiliation);
+    }
+
+    private TMemberDistrictAffiliation write(TMemberDistrictAffiliation affiliation) {
+        try {
+            return affiliations.saveAndFlush(affiliation);
+        } catch (DataIntegrityViolationException conflict) {
+            throw ConstraintConflicts.translate(conflict, OPEN_AFFILIATION_INDEXES);
+        }
+    }
+
+    private void flushWrites() {
+        try {
+            affiliations.flush();
+        } catch (DataIntegrityViolationException conflict) {
+            throw ConstraintConflicts.translate(conflict, OPEN_AFFILIATION_INDEXES);
+        }
     }
 
     private TMember member(long memberId) {

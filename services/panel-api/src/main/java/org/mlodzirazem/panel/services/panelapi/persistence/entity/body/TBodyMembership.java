@@ -63,6 +63,13 @@ public class TBodyMembership extends TBaseEntity {
     @Column(name = "valid_to")
     private @Nullable LocalDate validTo;
 
+    /**
+     * Reference of the resolution that justifies a correction of this membership's history
+     * (required whenever valid_to is moved to a past date). Name only — never its contents.
+     */
+    @Column(name = "decision_reference")
+    private @Nullable String decisionReference;
+
     public boolean isActiveOn(LocalDate date) {
         return !validFrom.isAfter(date) && (validTo == null || validTo.isAfter(date));
     }

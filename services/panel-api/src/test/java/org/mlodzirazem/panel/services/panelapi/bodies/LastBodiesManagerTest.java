@@ -60,37 +60,38 @@ class LastBodiesManagerTest extends DomainTestSupport {
     }
 
     @Test
-    void confirmingAnArt21ConflictThatEndsTheLastManagerIsBlocked() {
+    void movingTheLastManagerIntoKskIsBlockedAsIncompatibleNotAsLastManager() {
         AssignMembership request = toKsk(last);
 
         AssignmentCheck check = service.check(request);
 
-        assertThat(check.conflicts()).hasSize(1);
-        assertThat(check.blocked()).isTrue();
+        assertThat(check.conflicts()).isEmpty();
         assertThat(check.violations()).extracting(FunctionViolation::code)
-                                      .containsExactly(FunctionViolation.Code.LAST_BODIES_MANAGER);
+                                      .containsExactly(FunctionViolation.Code.INCOMPATIBLE_MEMBERSHIP);
 
         assertThatThrownBy(() -> service.assign(request, true))
             .isInstanceOf(AssignmentBlockedException.class)
             .extracting(e -> ((AssignmentBlockedException) e).getCode())
-            .isEqualTo("LAST_BODIES_MANAGER");
+            .isEqualTo("INCOMPATIBLE_MEMBERSHIP");
         assertThat(validTo(lastSeat)).isNull();
         assertThat(membershipCount(last)).isEqualTo(1);
+        assertThatThrownBy(() -> service.end(lastSeat.getId(), null, null)).isInstanceOf(RuleViolationException.class);
     }
 
     @Test
-    void assigningASuccessorFirstAllowsTheConflictToEndTheMandate() {
+    void aSuccessorAllowsEndingTheLastMandateButNotAnIncompatibleMove() {
         TMember successor = newMember("Sven", "Successor", "slaskie");
 
         service.assign(new AssignMembership(successor.getId(), body("national-board").getId(),
             memberType(BodyKind.NATIONAL_BOARD, "VICE_CHAIR").getId(), today, null), false);
 
-        assertThat(service.check(toKsk(last)).violations()).isEmpty();
+        assertThat(service.check(toKsk(last)).violations())
+            .extracting(FunctionViolation::code)
+            .containsExactly(FunctionViolation.Code.INCOMPATIBLE_MEMBERSHIP);
 
-        AssignmentResult result = service.assign(toKsk(last), true);
-
-        assertThat(result.endedMemberships()).hasSize(1);
+        service.end(lastSeat.getId(), null, null);
         assertThat(validTo(lastSeat)).isEqualTo(today);
+        assertThat(service.check(toKsk(last)).violations()).isEmpty();
     }
 
     @Test
@@ -105,15 +106,21 @@ class LastBodiesManagerTest extends DomainTestSupport {
         TMember future = newMember("Fiona", "Future", "slaskie");
         grant(future, body("national-board"), "TREASURER", today.plusDays(10), null);
 
+        // The move to KSK is blocked by the statute first: an incompatible mandate is never
+        // silently closed anymore, so the check reports INCOMPATIBLE_MEMBERSHIP (not the guard).
         assertThat(service.check(toKsk(last)).violations()).extracting(FunctionViolation::code)
-                                                           .containsExactly(FunctionViolation.Code.LAST_BODIES_MANAGER);
-        assertThatThrownBy(() -> service.end(lastSeat.getId(), null)).isInstanceOf(RuleViolationException.class);
+                                                           .containsExactly(FunctionViolation.Code.INCOMPATIBLE_MEMBERSHIP);
+        // The last-manager guard still ignores successors that are removed, not open-ended or
+        // not yet active — ending the last mandate stays refused and nothing is mutated.
+        assertLastManagerRefusal(() -> service.end(lastSeat.getId(), null, null));
+        assertThat(validTo(lastSeat)).isNull();
+        assertThat(auditCount("bodies :: membership-end")).isZero();
     }
 
     @Test
     void endingTheLastManagerIsRefusedNowAndWithAFutureDate() {
-        assertLastManagerRefusal(() -> service.end(lastSeat.getId(), null));
-        assertLastManagerRefusal(() -> service.end(lastSeat.getId(), today.plusDays(30)));
+        assertLastManagerRefusal(() -> service.end(lastSeat.getId(), null, null));
+        assertLastManagerRefusal(() -> service.end(lastSeat.getId(), today.plusDays(30), null));
         assertThat(validTo(lastSeat)).isNull();
         assertThat(auditCount("bodies :: membership-end")).isZero();
     }
@@ -123,10 +130,10 @@ class LastBodiesManagerTest extends DomainTestSupport {
         TMember other = newMember("Olek", "Other", "slaskie");
         TBodyMembership otherSeat = grant(other, body("national-board"), "CO_CHAIR");
 
-        service.end(lastSeat.getId(), null);
+        service.end(lastSeat.getId(), null, null);
         assertThat(validTo(lastSeat)).isEqualTo(today);
 
-        assertLastManagerRefusal(() -> service.end(otherSeat.getId(), today.plusDays(1)));
+        assertLastManagerRefusal(() -> service.end(otherSeat.getId(), today.plusDays(1), null));
     }
 
     @Test
@@ -165,7 +172,7 @@ class LastBodiesManagerTest extends DomainTestSupport {
         TMember ksk = newMember("Kasia", "Court", "slaskie");
         TBodyMembership seat = grant(ksk, body("peer-court"), "MEMBER");
 
-        service.end(seat.getId(), null);
+        service.end(seat.getId(), null, null);
 
         assertThat(validTo(seat)).isEqualTo(today);
     }
@@ -197,8 +204,19 @@ class LastBodiesManagerTest extends DomainTestSupport {
         grant(ksk, body("peer-court"), "MEMBER", today.minusMonths(6), null);
 
         assertThat(service.check(toKsk(ksk, "CHAIR")).violations()).isEmpty();
+
+        // Nobody holds BODIES_MANAGE, so nothing blocks creating the first manager (bootstrap).
+        TMember bootstrap = newMember("Borys", "Bootstrap", "slaskie");
+        service.assign(new AssignMembership(bootstrap.getId(), body("national-board").getId(),
+            memberType(BodyKind.NATIONAL_BOARD, "SECRETARY").getId(), today, null), false);
+        assertThat(membershipCount(bootstrap)).isEqualTo(1);
+
+        // Kasia holding an open KSK seat makes a cross-body ZK assignment a statutory violation
+        // (never auto-closed anymore) — but the guard itself does not add a LAST_BODIES_MANAGER.
         assertThat(service.check(new AssignMembership(ksk.getId(), body("national-board").getId(),
-            memberType(BodyKind.NATIONAL_BOARD, "SECRETARY").getId(), today, null)).violations()).isEmpty();
+            memberType(BodyKind.NATIONAL_BOARD, "SECRETARY").getId(), today, null)).violations())
+            .extracting(FunctionViolation::code)
+            .containsExactly(FunctionViolation.Code.INCOMPATIBLE_MEMBERSHIP);
     }
 
     private Callable<Boolean> ending(TBodyMembership seat, CountDownLatch start) {
@@ -206,7 +224,7 @@ class LastBodiesManagerTest extends DomainTestSupport {
             start.await();
 
             try {
-                service.end(seat.getId(), null);
+                service.end(seat.getId(), null, null);
                 return true;
             } catch (RuleViolationException e) {
                 if (!"LAST_BODIES_MANAGER".equals(e.getCode())) {

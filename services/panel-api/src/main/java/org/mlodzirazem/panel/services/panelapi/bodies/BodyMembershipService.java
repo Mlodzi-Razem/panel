@@ -25,22 +25,26 @@ import java.util.List;
 
 public interface BodyMembershipService {
     /**
-     * Dry run of the Art. 20, 21 and 52 rules; changes nothing.
+     * Dry run of the assignment rules; changes nothing. Incompatible overlapping mandates
+     * (art. 18 ust. 1 pkt 6) are reported as hard {@code INCOMPATIBLE_MEMBERSHIP} violations.
      */
     AssignmentCheck check(AssignMembership request);
 
     /**
-     * Throws {@link AssignmentBlockedException} on violations and {@link ConfirmationRequiredException} when there
-     * are conflicts or warnings and {@code confirmed} is false. When confirmed, conflicting earlier memberships
-     * are ended ({@code valid_to}) first. Publishes {@link BodyMembershipChanged} for each ended and created
-     * membership and audits both.
+     * Throws {@link AssignmentBlockedException} on violations, {@link ConfirmationRequiredException} when there
+     * are warnings and {@code confirmed} is false, and {@code SELF_ASSIGNMENT_NOT_ALLOWED} when the caller is
+     * the subject of the assignment. Nothing is ever auto-closed: incompatible mandates have to be ended
+     * explicitly via {@link #end(long, LocalDate, String)}. Publishes {@link BodyMembershipChanged}
+     * for the created membership and audits it.
      */
     AssignmentResult assign(AssignMembership request, boolean confirmed);
 
     /**
-     * Ends the membership on the given date (today by default).
+     * Ends (closes) the membership on the given date (today by default). A date in the past —
+     * a retroactive correction of history — requires a decision reference; a closed membership can
+     * only be shortened, never extended or reopened.
      */
-    TBodyMembership end(long membershipId, @Nullable LocalDate endDate);
+    TBodyMembership end(long membershipId, @Nullable LocalDate endDate, @Nullable String decisionReference);
 
     List<TBodyMembership> activeIn(long bodyId);
 

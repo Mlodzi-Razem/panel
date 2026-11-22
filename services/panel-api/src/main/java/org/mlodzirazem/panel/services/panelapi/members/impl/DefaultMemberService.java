@@ -21,6 +21,8 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.mlodzirazem.panel.services.panelapi.audit.AuditLog;
 import org.mlodzirazem.panel.services.panelapi.audit.AuditPayload;
+import org.mlodzirazem.panel.services.panelapi.core.error.ConflictException;
+import org.mlodzirazem.panel.services.panelapi.core.error.ConstraintConflicts;
 import org.mlodzirazem.panel.services.panelapi.core.error.NotFoundException;
 import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
 import org.mlodzirazem.panel.services.panelapi.members.AffiliationService;
@@ -37,6 +39,7 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMemberRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -58,6 +61,28 @@ class DefaultMemberService implements MemberService {
         MemberField.BIRTH_DATE,
         MemberField.STATUS,
         MemberField.MEMBERSHIP_TYPE
+    );
+
+    /**
+     * Friendly translations for SQL 23505 on the member registry's unique keys (and the e-mail
+     * sync trigger's row in member_emails), looked up by constraint name.
+     */
+    private static final Map<String, RuntimeException> UNIQUE_KEY_CONFLICTS = Map.of(
+        "members_member_id_key",
+        new ConflictException("MEMBER_ID_EXISTS", "The member number is already taken",
+            List.of("memberId")),
+        "members_domain_email_key",
+        new ConflictException("DOMAIN_EMAIL_EXISTS", "The domain e-mail is already taken",
+            List.of("domainEmail")),
+        "members_formal_identifier_key",
+        new ConflictException("FORMAL_IDENTIFIER_EXISTS", "The formal identifier is already taken",
+            List.of("formalIdentifier")),
+        "members_private_emails_key",
+        new ConflictException("PRIVATE_EMAILS_EXISTS", "One of the private e-mails is already taken",
+            List.of("privateEmails")),
+        "member_emails_pkey",
+        new ConflictException("EMAIL_ALREADY_USED", "One of these e-mails already belongs to another member",
+            List.of("domainEmail", "privateEmails"))
     );
 
     private final TMemberRepository members;
@@ -101,7 +126,12 @@ class DefaultMemberService implements MemberService {
         }
 
         currentMemberResolver.current().ifPresent(member::setCreatedBy);
-        members.saveAndFlush(member);
+
+        try {
+            members.saveAndFlush(member);
+        } catch (DataIntegrityViolationException conflict) {
+            throw ConstraintConflicts.translate(conflict, UNIQUE_KEY_CONFLICTS);
+        }
 
         affiliations.setPrimaryDistrict(member.getId(), newMember.primaryDistrictId(), false);
 
@@ -132,7 +162,12 @@ class DefaultMemberService implements MemberService {
 
         if (!changed.isEmpty()) {
             currentMemberResolver.current().ifPresent(member::setUpdatedBy);
-            members.saveAndFlush(member);
+
+            try {
+                members.saveAndFlush(member);
+            } catch (DataIntegrityViolationException conflict) {
+                throw ConstraintConflicts.translate(conflict, UNIQUE_KEY_CONFLICTS);
+            }
 
             auditLog.record("members :: update", AuditPayload.of("memberId", memberId).withFields(names(changed)));
         }

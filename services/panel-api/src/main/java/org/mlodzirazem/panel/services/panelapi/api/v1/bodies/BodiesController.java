@@ -176,7 +176,8 @@ public class BodiesController {
     public MembershipResponse end(
         @PathVariable("id") long id,
         @PathVariable("membershipId") long membershipId,
-        @RequestParam(name = "endDate", required = false) @Nullable LocalDate endDate
+        @RequestParam(name = "endDate", required = false) @Nullable LocalDate endDate,
+        @RequestParam(name = "decisionReference", required = false) @Nullable String decisionReference
     ) {
         callers.requireBodiesManager();
 
@@ -185,7 +186,7 @@ public class BodiesController {
                                                        .orElseThrow(() -> new NotFoundException("Membership",
                                                            membershipId));
 
-        return membership(bodyMemberships.end(existing.getId(), endDate));
+        return membership(bodyMemberships.end(existing.getId(), endDate, decisionReference));
     }
 
     private AssignMembership assignment(long bodyId, AssignRequest request) {

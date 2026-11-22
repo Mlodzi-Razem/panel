@@ -64,7 +64,7 @@ class BodiesApiTest extends ApiTestSupport {
     }
 
     @Test
-    void conflictNeedsConfirmationThenEndsTheEarlierMandate() {
+    void zkMemberAssignedToAZoBoardWhileHoldingZkIsRejectedWith422() {
         long boardId = board("mazowieckie").getId();
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("memberId", zkMember.getId());
@@ -73,30 +73,66 @@ class BodiesApiTest extends ApiTestSupport {
 
         Res check = post(secretary, path + "/check", request);
         assertThat(check.status()).isEqualTo(200);
-        assertThat(check.body().path("conflicts")).hasSize(1);
+        assertThat(check.body().path("violations")).hasSize(1);
+        assertThat(check.body().path("violations").get(0).path("code").asText()).isEqualTo("INCOMPATIBLE_MEMBERSHIP");
+        assertThat(check.body().path("violations").get(0).path("conflictingBodyName").asText())
+            .isEqualTo(body("national-board").getName());
+        assertThat(check.body().path("violations").get(0).path("conflictingMembershipId").asLong())
+            .isGreaterThan(0);
 
         Res refused = post(secretary, path, request);
-        assertThat(refused.status()).isEqualTo(409);
-        assertThat(refused.code()).isEqualTo("CONFIRMATION_REQUIRED");
-        assertThat(refused.body().path("check").path("conflicts")).hasSize(1);
+        assertThat(refused.status()).isEqualTo(422);
+        assertThat(refused.code()).isEqualTo("INCOMPATIBLE_MEMBERSHIP");
+        assertThat(refused.body().path("check").path("violations")).hasSize(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM body_memberships WHERE valid_to IS NOT NULL", Integer.class))
             .isZero();
 
         request.put("confirmed", true);
+        assertThat(post(secretary, path, request).status()).isEqualTo(422);
+
+        assertThat(get(secretary, "/bodies/" + boardId + "/memberships").body()).isEmpty();
+    }
+
+    @Test
+    void bodiesManagersCannotAssignFunctionsToThemselves() {
+        long boardId = board("mazowieckie").getId();
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("memberId", zkMember.getId());
+        request.put("memberTypeId", memberType(BodyKind.DISTRICT_BOARD, "COORDINATOR").getId());
+
+        Res res = post(zkMember, "/bodies/" + boardId + "/memberships", request);
+
+        assertThat(res.status()).isEqualTo(422);
+        assertThat(res.code()).isEqualTo("SELF_ASSIGNMENT_NOT_ALLOWED");
+        assertThat(jdbc.queryForObject(
+            "SELECT COUNT(*) FROM body_memberships WHERE member_id = ? AND body_id = ?", Integer.class,
+            zkMember.getId(), boardId)).isZero();
+    }
+
+    @Test
+    void endingAMembershipInPastRequiresTheDecisionReference() {
+        long spokespersonId = body("press-spokesperson").getId();
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("memberId", plain.getId());
+        request.put("memberTypeId", memberType(BodyKind.PRESS_SPOKESPERSON, "SPOKESPERSON").getId());
+        request.put("validFrom", LocalDate.now().minusDays(10).toString());
+        String path = "/bodies/" + spokespersonId + "/memberships";
+
         Res assigned = post(secretary, path, request);
         assertThat(assigned.status()).isEqualTo(201);
-        assertThat(assigned.body().path("endedMemberships")).hasSize(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM body_memberships WHERE valid_to IS NOT NULL", Integer.class))
-            .isEqualTo(1);
-
-        assertThat(get(plain, "/bodies/" + boardId).body().path("composition").toString()).contains("Zbyszek Krajowy");
-        assertThat(get(secretary, path).body()).hasSize(1);
 
         long membershipId = assigned.body().path("membership").path("id").asLong();
-        Res ended = delete(secretary, path + "/" + membershipId + "?endDate=" + LocalDate.now().plusDays(1));
-        assertThat(ended.status()).isEqualTo(200);
-        assertThat(delete(secretary, "/bodies/" + body("national-board").getId() + "/memberships/" + membershipId)
-            .status()).isEqualTo(404);
+
+        Res retro = delete(secretary, path + "/" + membershipId + "?endDate=" + LocalDate.now().minusDays(5));
+        assertThat(retro.status()).isEqualTo(422);
+        assertThat(retro.code()).isEqualTo("RETROACTIVE_CORRECTION_REQUIRES_REASON");
+
+        Res corrected = delete(
+            secretary, path + "/" + membershipId + "?endDate=" + LocalDate.now().minusDays(5)
+                + "&decisionReference=ZK/03/2026");
+        assertThat(corrected.status()).isEqualTo(200);
+        assertThat(jdbc.queryForObject("SELECT decision_reference FROM body_memberships WHERE id = ?", String.class,
+            membershipId)).isEqualTo("ZK/03/2026");
     }
 
     @Test
