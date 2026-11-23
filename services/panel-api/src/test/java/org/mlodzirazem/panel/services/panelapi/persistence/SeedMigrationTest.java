@@ -54,14 +54,14 @@ class SeedMigrationTest extends DomainTestSupport {
         assertThat(jdbc.queryForList("SELECT code FROM bodies WHERE parent_body_id IS NULL AND code NOT LIKE 'district-%'",
             String.class))
             .containsExactlyInAnyOrder("general-assembly", "national-board", "peer-court", "audit-commission",
-                "electoral-commission", "press-spokesperson");
+                "electoral-commission", "press-spokesperson", "national-it-proxy");
     }
 
     @Test
     void seedsBodyTemplatesWithKinds() {
         assertThat(jdbc.queryForList("SELECT kind::text FROM body_templates", String.class))
             .containsExactlyInAnyOrder("GENERAL_ASSEMBLY", "NATIONAL_BOARD", "PEER_COURT", "AUDIT_COMMISSION",
-                "ELECTORAL_COMMISSION", "PRESS_SPOKESPERSON", "TEAM", "DISTRICT", "DISTRICT_ASSEMBLY",
+                "ELECTORAL_COMMISSION", "PRESS_SPOKESPERSON", "NATIONAL_IT_PROXY", "TEAM", "DISTRICT", "DISTRICT_ASSEMBLY",
                 "DISTRICT_BOARD", "DISTRICT_TREASURER", "DISTRICT_COMMISSIONER", "LOCAL_CIRCLE");
         assertThat(jdbc.queryForObject("SELECT max_term_months FROM body_templates WHERE kind = 'DISTRICT_COMMISSIONER'",
             Integer.class)).isEqualTo(3);
@@ -81,6 +81,7 @@ class SeedMigrationTest extends DomainTestSupport {
         assertThat(memberTypes("DISTRICT_COMMISSIONER")).containsExactly("COMMISSIONER");
         assertThat(memberTypes("GENERAL_ASSEMBLY")).containsExactly("DELEGATE");
         assertThat(memberTypes("PRESS_SPOKESPERSON")).containsExactly("SPOKESPERSON");
+        assertThat(memberTypes("NATIONAL_IT_PROXY")).containsExactly("PROXY");
         assertThat(memberTypes("TEAM")).containsExactlyInAnyOrder("LEADER", "MEMBER");
         assertThat(memberTypes("LOCAL_CIRCLE")).containsExactlyInAnyOrder("COORDINATOR", "MEMBER");
         assertThat(memberTypes("DISTRICT")).isEmpty();
@@ -99,6 +100,10 @@ class SeedMigrationTest extends DomainTestSupport {
             "BODIES_MANAGE", "DIRECTORY_GROUPS_MANAGE", "DIRECTORY_USERS_MANAGE",
             "RECRUITMENT_READ", "RECRUITMENT_APPROVE");
         assertThat(permissions("National board treasurer")).hasSize(9).contains("FEES_READ", "FEES_MANAGE");
+        assertThat(permissions("National IT proxy")).containsExactlyInAnyOrder("CONTACT_PERSONAL_DATA_READ",
+            "CONTACT_PERSONAL_DATA_MANAGE", "FORMAL_PERSONAL_DATA_READ", "FORMAL_PERSONAL_DATA_MANAGE",
+            "BODIES_MANAGE", "DIRECTORY_GROUPS_MANAGE", "DIRECTORY_USERS_MANAGE", "FEES_READ", "FEES_MANAGE",
+            "RECRUITMENT_READ");
         assertThat(permissions("No permissions")).isEmpty();
     }
 
@@ -106,6 +111,7 @@ class SeedMigrationTest extends DomainTestSupport {
     void mapsMemberTypesToTheRightGroupScopes() {
         assertThat(groupOf("NATIONAL_BOARD", "SECRETARY")).isEqualTo("GLOBAL/National board");
         assertThat(groupOf("NATIONAL_BOARD", "TREASURER")).isEqualTo("GLOBAL/National board treasurer");
+        assertThat(groupOf("NATIONAL_IT_PROXY", "PROXY")).isEqualTo("GLOBAL/National IT proxy");
         assertThat(groupOf("DISTRICT_BOARD", "COORDINATOR")).isEqualTo("LOCAL/District board");
         assertThat(groupOf("DISTRICT_COMMISSIONER", "COMMISSIONER")).isEqualTo("LOCAL/District board");
         assertThat(groupOf("DISTRICT_TREASURER", "TREASURER")).isEqualTo("LOCAL/District treasurer");

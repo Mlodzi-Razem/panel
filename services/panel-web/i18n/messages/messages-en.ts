@@ -263,6 +263,7 @@ const enMessages = {
             AUDIT_COMMISSION: "National Audit Commission (Krajowa Komisja Rewizyjna)",
             ELECTORAL_COMMISSION: "National Electoral Commission (Krajowa Komisja Wyborcza)",
             PRESS_SPOKESPERSON: "Press Spokesperson",
+            NATIONAL_IT_PROXY: "National Board IT proxy",
             TEAM: "Team or commission",
             DISTRICT: "District (Okręg)",
             DISTRICT_ASSEMBLY: "District Assembly (Walne Zebranie Okręgu)",

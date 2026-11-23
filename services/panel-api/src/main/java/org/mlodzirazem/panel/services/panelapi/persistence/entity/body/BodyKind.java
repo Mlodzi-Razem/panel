@@ -24,6 +24,8 @@ public enum BodyKind {
     AUDIT_COMMISSION,
     ELECTORAL_COMMISSION,
     PRESS_SPOKESPERSON,
+    /** Pełnomocnik ZK ds. IT: a ZK power of attorney (statute 2026, art. 21 ust. 2 pkt 7), not an organ. */
+    NATIONAL_IT_PROXY,
     TEAM,
     DISTRICT,
     DISTRICT_ASSEMBLY,
