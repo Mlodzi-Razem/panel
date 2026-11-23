@@ -41,6 +41,14 @@ Steps in the tenant (owner):
 2. Teams Admin Center → Manage apps → Upload new app: upload `teams/build/panel-mr-dev.panel.mlodzirazem.org.zip`.
 3. Pin the app for pilot users with a pilot app setup policy.
 
+`TEAMS_APP=prod|dev` overrides which catalog entry the package updates. The production entry („Panel MR”, version 1.1.0 for `panel.mlodzirazem.org`) was uploaded first and now points at stage through an update built with:
+
+```bash
+TEAMS_APP=prod HOST=dev.panel.mlodzirazem.org node teams/package.mjs
+```
+
+This writes `teams/build/panel-mr-dev.panel.mlodzirazem.org-prod-app.zip`. Upload it from the app's page in Manage apps (Upload file) as an update. Before production starts, build the default package with a higher `version` and update the same entry again.
+
 ## Entra app registration
 
 - Set `api.requestedAccessTokenVersion` to `2` in the app registration manifest. Panel's Teams SSO check (`auth/teamsSso.ts`) accepts only v2 tokens.

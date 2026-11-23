@@ -20,8 +20,9 @@
 //   node teams/package.mjs                                  # production host
 //   HOST=dev.panel.mlodzirazem.org node teams/package.mjs   # stage, separate dev app
 //   HOST=my-tunnel-3000.euw.devtunnels.ms node teams/package.mjs
+//   TEAMS_APP=prod HOST=dev.panel.mlodzirazem.org node teams/package.mjs  # production entry -> stage
 //
-// Output: teams/build/manifest.json, the two icons and teams/build/panel-mr-<host>.zip
+// Output: teams/build/manifest.json, the two icons and teams/build/panel-mr-<host>[-<app>-app].zip
 
 import {copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {dirname, join, relative} from 'node:path';
@@ -54,9 +55,16 @@ if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(ho
 }
 
 const isProd = host === DEFAULT_HOST;
+// TEAMS_APP=prod|dev picks which catalog entry the package updates; by default it follows HOST.
+// Override it to repoint an already uploaded app at another host, e.g. the production entry at stage.
+const defaultTeamsApp = isProd ? 'prod' : 'dev';
+const teamsApp = (process.env.TEAMS_APP || defaultTeamsApp).trim().toLowerCase();
+if (teamsApp !== 'prod' && teamsApp !== 'dev') {
+    fail(`TEAMS_APP must be "prod" or "dev", got "${process.env.TEAMS_APP}"`);
+}
 const manifestText = readFileSync(join(teamsDir, 'manifest.template.json'), 'utf8')
     .replaceAll('{{HOST}}', host)
-    .replaceAll('{{APP_ID}}', isProd ? PROD_APP_ID : DEV_APP_ID)
+    .replaceAll('{{APP_ID}}', teamsApp === 'prod' ? PROD_APP_ID : DEV_APP_ID)
     .replaceAll('{{NAME_SUFFIX}}', isProd ? '' : ' (dev)');
 if (manifestText.includes('{{')) {
     fail('manifest.template.json has a placeholder other than {{HOST}}, {{APP_ID}} and {{NAME_SUFFIX}}');
@@ -88,7 +96,8 @@ for (const icon of Object.keys(ICONS)) {
 }
 
 // zip updates an existing archive in place, so start from scratch.
-const zipPath = join(buildDir, `panel-mr-${host}.zip`);
+const zipName = teamsApp === defaultTeamsApp ? `panel-mr-${host}.zip` : `panel-mr-${host}-${teamsApp}-app.zip`;
+const zipPath = join(buildDir, zipName);
 rmSync(zipPath, {force: true});
 execFileSync('zip', ['-q', '-X', '-j', zipPath, 'manifest.json', ...Object.keys(ICONS)], {
     cwd: buildDir,
