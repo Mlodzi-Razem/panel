@@ -480,6 +480,30 @@ przycisk zwróci błąd — i tak jest domyślnie na stage.
 - Raporty/analizy wypisujemy wyłącznie **agregaty** (liczby rządów / statusy),
   nigdy wiersze z danymi osób.
 
+### §10.1. Własne konto na stage („Your account is not linked”)
+
+Logowanie Microsoft działa, ale Panel łączy konto Entra z członkiem po
+`employeeId` (Graph), a pusta baza stage nie ma takiego członka. Szablon
+`deploy/stage/sql/stage-member.example.sql` dodaje jednego członka: numer
+prawdziwy (= `employeeId`), reszta może być pseudonimowa; opcjonalnie jeden
+faktycznie pełniony mandat. Warunki po stronie Entra: `User.Read.All`
+(Application) z admin consent, `employeeId` na koncie, certyfikat w bloku
+`panel.secrets.entra` (ten sam komplet obsługuje panel-web i panel-api).
+
+```bash
+microk8s kubectl -n stage get pods -l cnpg.io/cluster=cnpg     # nazwa poda, zwykle cnpg-1
+nano ~/stage-member.sql                                        # wklej szablon, uzupełnij WYPEŁNIJ
+microk8s kubectl -n stage exec -i cnpg-1 -c postgres -- psql -U postgres -d mrpanel < ~/stage-member.sql
+rm ~/stage-member.sql
+```
+
+Potem odśwież `dev.panel` (w razie potrzeby wyloguj i zaloguj). Diagnoza, gdy
+nadal „not linked”:
+`microk8s kubectl -n stage logs deploy/panel-api --since=15m | grep -iE 'entra|graph|unlinked'`
+— `panel.entra is not configured` = brak certyfikatu w panel-api;
+`Graph rejected the user lookup: 403` = brak admin consent `User.Read.All`;
+brak wpisów = `employeeId` różny od numeru albo konto wyłączone.
+
 ---
 
 ## Appendix A: instalacja Docker Engine od zera (inna maszyna niż obecny VPS)
