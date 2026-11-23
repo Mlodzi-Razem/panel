@@ -1,8 +1,8 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.19/MicrosoftTeams.schema.json",
   "manifestVersion": "1.19",
-  "version": "1.0.0",
-  "id": "6a34764f-e007-45ff-a767-943cafa9d6ce",
+  "version": "1.1.0",
+  "id": "{{APP_ID}}",
   "localizationInfo": {
     "defaultLanguageTag": "pl-pl"
   },
@@ -13,8 +13,8 @@
     "termsOfUseUrl": "https://{{HOST}}/teams/about"
   },
   "name": {
-    "short": "Panel MR",
-    "full": "Panel MR – Młodzi Razem"
+    "short": "Panel MR{{NAME_SUFFIX}}",
+    "full": "Panel MR – Młodzi Razem{{NAME_SUFFIX}}"
   },
   "description": {
     "short": "Twoje członkostwo, okręg i głosowania w Młodych Razem.",
@@ -66,7 +66,7 @@
   "validDomains": ["{{HOST}}"],
   "webApplicationInfo": {
     "id": "6b106e9e-8d52-48a3-b09e-52985110f6c6",
-    "resource": "api://panel.mlodzirazem.org/6b106e9e-8d52-48a3-b09e-52985110f6c6"
+    "resource": "api://{{HOST}}/6b106e9e-8d52-48a3-b09e-52985110f6c6"
   },
   "showLoadingIndicator": false
 }

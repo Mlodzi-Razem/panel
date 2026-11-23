@@ -18,6 +18,7 @@
 // Builds the Microsoft Teams app package for MR Panel.
 //
 //   node teams/package.mjs                                  # production host
+//   HOST=dev.panel.mlodzirazem.org node teams/package.mjs   # stage, separate dev app
 //   HOST=my-tunnel-3000.euw.devtunnels.ms node teams/package.mjs
 //
 // Output: teams/build/manifest.json, the two icons and teams/build/panel-mr-<host>.zip
@@ -29,6 +30,11 @@ import {fileURLToPath} from 'node:url';
 import process from 'node:process';
 
 const DEFAULT_HOST = 'panel.mlodzirazem.org';
+// Teams app id of the production app. Every other host is a dev/stage copy that gets its own
+// fixed id, so uploading it never replaces the production app in the org catalog.
+const PROD_APP_ID = '6a34764f-e007-45ff-a767-943cafa9d6ce';
+const DEV_APP_ID = '4f8bec34-7497-4d50-a534-2dbc73e1b447';
+const MAX_SHORT_NAME = 30; // Teams limit for name.short
 const ICONS = {'color.png': 192, 'outline.png': 32};
 
 const teamsDir = dirname(fileURLToPath(import.meta.url));
@@ -47,15 +53,22 @@ if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(ho
     fail(`HOST must be a bare host name such as ${DEFAULT_HOST}, got "${process.env.HOST}"`);
 }
 
+const isProd = host === DEFAULT_HOST;
 const manifestText = readFileSync(join(teamsDir, 'manifest.template.json'), 'utf8')
-    .replaceAll('{{HOST}}', host);
+    .replaceAll('{{HOST}}', host)
+    .replaceAll('{{APP_ID}}', isProd ? PROD_APP_ID : DEV_APP_ID)
+    .replaceAll('{{NAME_SUFFIX}}', isProd ? '' : ' (dev)');
 if (manifestText.includes('{{')) {
-    fail('manifest.template.json has a placeholder other than {{HOST}}');
+    fail('manifest.template.json has a placeholder other than {{HOST}}, {{APP_ID}} and {{NAME_SUFFIX}}');
 }
+let manifest;
 try {
-    JSON.parse(manifestText);
+    manifest = JSON.parse(manifestText);
 } catch (e) {
     fail(`manifest is not valid JSON: ${e.message}`);
+}
+if (manifest.name.short.length > MAX_SHORT_NAME) {
+    fail(`name.short "${manifest.name.short}" is ${manifest.name.short.length} characters, Teams allows ${MAX_SHORT_NAME}`);
 }
 
 // Teams rejects icons of any other size; read width and height from the PNG header.
