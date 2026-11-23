@@ -20,8 +20,9 @@ commit (właściciel, po review; GPG)
    │ push na branch release/stage (albo tag v*)
    ▼
 GitHub Actions (.github/workflows/stage.yml)
-   ├─ panel-api: mvn verify (Testcontainers na runnerze)
-   ├─ build obrazów linux/amd64 → GHCR (tag sha-<hash> + branch + "stage")
+   ├─ panel-api: mvn verify (Testcontainers na runnerze) → artefakt panel-api-jar
+   ├─ build obrazów linux/amd64 → GHCR (tag sha-<hash> + branch + "stage");
+   │    panel-api z tego jara (Dockerfile.prebuilt, bez Mavena; RUNBOOK §6.6)
    └─ ssh na VPS: rsync deploy/stage → ci/deploy-on-vps.sh
         ├─ docker compose pull panel-api, panel-web
         ├─ docker compose up -d --wait
@@ -57,6 +58,9 @@ GitHuba: `ci/post-receive.example` (bare repo na VPS).
 Dockerfilee obrazów: [services/panel-api/Dockerfile](../../services/panel-api/Dockerfile)
 i [services/panel-web/Dockerfile](../../services/panel-web/Dockerfile)
 (multi-stage; maven → JRE 25, node 24 LTS → node:24-alpine standalone).
+CI buduje panel-api z jara po verify:
+[services/panel-api/Dockerfile.prebuilt](../../services/panel-api/Dockerfile.prebuilt)
+(ten sam etap runtime; RUNBOOK §6.6).
 
 ## Architektura / decyzje
 

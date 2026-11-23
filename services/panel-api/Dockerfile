@@ -1,4 +1,9 @@
-# panel-api — image for the STAGE environment (deploy/stage).
+# panel-api — image for the STAGE environment (deploy/stage), built from sources.
+#
+# Local/manual path (deploy/stage Makefile, ci/release-local.sh). CI builds the
+# stage image from the jar that passed `mvn verify` instead:
+# services/panel-api/Dockerfile.prebuilt. Keep stage 2 (runtime) of both files
+# identical; the verify job in .github/workflows/stage.yml diffs them.
 #
 # Build (repo root as context, worktree /Users/nepose/Projects/panel/panel-stage):
 #   docker build -f services/panel-api/Dockerfile \

@@ -1,0 +1,93 @@
+# panel-api — STAGE image from a PREBUILT Spring Boot jar (the CI path).
+#
+# In .github/workflows/stage.yml the jar is the one that `mvn verify` produced
+# in the job "panel-api verify" (artifact `panel-api-jar`). The image therefore
+# carries exactly the tested bytes, and the image build never resolves Maven
+# dependencies (no second round of downloads from Maven Central, no HTTP 429).
+#
+# Build context = services/panel-api (NOT the repo root: the root .dockerignore
+# drops **/target). services/panel-api/.dockerignore narrows that context to
+# target/panel-api-*.jar and the two scripts in docker/.
+#
+# Local build (legacy builder ok: no `--mount`, no heredocs, no `COPY --chmod`):
+#   1. the jar: Docker-Maven recipe from dev/README.md §6 with
+#      `package -DskipTests` instead of `verify`;
+#   2. docker build -f services/panel-api/Dockerfile.prebuilt \
+#                   -t panel-api:$(git rev-parse --short HEAD) \
+#                   --build-arg GIT_TAG=$(git rev-parse --short HEAD) \
+#                   services/panel-api
+#
+# services/panel-api/Dockerfile (full Maven build from sources) stays for
+# local/manual builds. Stage 2 below must stay identical to its stage 2 (only
+# the context-relative paths of the scripts differ); the verify job checks it.
+
+# ---------------------------------------------------------------------------
+# 1. Extract: exactly one prebuilt jar → Spring Boot layers.
+# ---------------------------------------------------------------------------
+FROM eclipse-temurin:25-jre-jammy AS builder
+
+COPY target/panel-api-*.jar /mrpanel-in/
+
+RUN set -e; \
+    cd /mrpanel-in; \
+    set -- panel-api-*.jar; \
+    if [ "$#" -ne 1 ]; then \
+        echo "Expected exactly one target/panel-api-*.jar, found: $*" >&2; \
+        exit 1; \
+    fi; \
+    mkdir -p /mrpanel-out/extracted; \
+    mv "$1" /mrpanel-out/application.jar; \
+    cd /mrpanel-out; \
+    java -Djarmode=tools \
+         -jar application.jar \
+          extract --layers \
+          --launcher \
+          --destination extracted
+
+# ---------------------------------------------------------------------------
+# 2. Runtime: JRE 25, non-root user, curl + jq for the healthcheck script.
+# ---------------------------------------------------------------------------
+FROM eclipse-temurin:25-jre-jammy
+
+ARG GIT_TAG=unknown
+LABEL org.opencontainers.image.vendor="Stowarzyszenie Młodzi Razem"
+LABEL org.mlodzirazem.panel.service="panel-api"
+LABEL org.mlodzirazem.panel.stage.release="${GIT_TAG}"
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates curl jq && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd --system --gid 10001 mrpanel && \
+    useradd --system --uid 10001 --gid mrpanel --no-create-home \
+        --shell /usr/sbin/nologin mrpanel
+
+WORKDIR /application
+
+# Default JAR layers (see the extraction above).
+COPY --from=builder --chown=mrpanel:mrpanel /mrpanel-out/extracted/dependencies ./
+COPY --from=builder --chown=mrpanel:mrpanel /mrpanel-out/extracted/snapshot-dependencies ./
+COPY --from=builder --chown=mrpanel:mrpanel /mrpanel-out/extracted/spring-boot-loader ./
+COPY --from=builder --chown=mrpanel:mrpanel /mrpanel-out/extracted/application ./
+
+# Entrypoint and healthcheck reused from the repo's own scripts
+# (services/panel-api/docker/). They are invoked through `sh`, so the source
+# files do not need the executable bit in the layer.
+USER 10001:10001
+COPY --chown=mrpanel:mrpanel docker/launch.sh ./
+COPY --chown=mrpanel:mrpanel docker/healthcheck.sh ./
+
+# JAVA_OPTS is a knob for small VPS tuning (see /mrpanel launch flags:
+# MaxRAMPercentage=80 respects container memory limits).
+ENV JAVA_OPTS=""
+
+# API (server.port) and actuator (management.server.port).
+EXPOSE 8080
+EXPOSE 9080
+
+ENTRYPOINT ["/bin/sh", "/application/launch.sh"]
+HEALTHCHECK --interval=10s \
+            --timeout=5s \
+            --retries=10 \
+            --start-period=5s \
+    CMD ["sh", "/application/healthcheck.sh"]
