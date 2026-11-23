@@ -263,6 +263,7 @@ const plMessages: typeof enMessages = {
             AUDIT_COMMISSION: "Krajowa Komisja Rewizyjna",
             ELECTORAL_COMMISSION: "Krajowa Komisja Wyborcza",
             PRESS_SPOKESPERSON: "Osoba rzecznicza",
+            NATIONAL_IT_PROXY: "Pełnomocnik ZK ds. IT",
             TEAM: "Zespół lub komisja",
             DISTRICT: "Okręg",
             DISTRICT_ASSEMBLY: "Walne Zebranie Okręgu",

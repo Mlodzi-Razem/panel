@@ -61,6 +61,22 @@ class BreakGlassAssigner {
         @Nullable String reason,
         boolean apply
     ) {
+        return run(function, memberIdentifier, operator, reason, null, apply);
+    }
+
+    /**
+     * @param decisionReference the resolution(s) the function rests on, stored on the membership when given
+     *                          (e.g. the ZK resolution granting a power of attorney and the RK approval)
+     */
+    @Transactional
+    public BreakGlassReport run(
+        @Nullable String function,
+        @Nullable String memberIdentifier,
+        @Nullable String operator,
+        @Nullable String reason,
+        @Nullable String decisionReference,
+        boolean apply
+    ) {
         List<String> lines = new ArrayList<>();
         List<String> problems = new ArrayList<>();
 
@@ -141,6 +157,7 @@ class BreakGlassAssigner {
             + memberType.getId() + ")");
         lines.add("Member: " + identifier);
         lines.add("Valid from: " + today + ", open-ended; Art. 20/21/52 checks and the lockout guard are bypassed");
+        lines.add("Decision reference: " + (isBlank(decisionReference) ? "none" : "recorded"));
 
         if (current != null) {
             lines.add("Result: member already holds this function (membership " + current.getId() + "), nothing to do");
@@ -158,6 +175,7 @@ class BreakGlassAssigner {
         membership.setMemberType(memberType);
         membership.setValidFrom(today);
         membership.setValidTo(null);
+        membership.setDecisionReference(isBlank(decisionReference) ? null : decisionReference.trim());
         memberships.saveAndFlush(membership);
 
         events.publishEvent(new BodyMembershipChanged(
@@ -174,7 +192,9 @@ class BreakGlassAssigner {
                                                   .withId("memberId", member.getId())
                                                   .withId("bodyId", body.getId())
                                                   .withId("memberTypeId", memberType.getId())
-                                                  .withFields(List.of("validFrom"))
+                                                  .withFields(membership.getDecisionReference() == null
+                                                      ? List.of("validFrom")
+                                                      : List.of("validFrom", "decisionReference"))
                                                   .withOutcome("operator: " + operator.trim() + "; reason: "
                                                       + reason.trim()));
 

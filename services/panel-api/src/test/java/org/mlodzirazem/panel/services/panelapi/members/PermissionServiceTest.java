@@ -109,6 +109,23 @@ class PermissionServiceTest extends DomainTestSupport {
     }
 
     @Test
+    void nationalItProxyHoldsTheFullScopeButNeverApprovesAdmissions() {
+        TMember proxy = newMember("Ida", "Proxy", "pomorskie");
+        TMember target = newMember("Tara", "Target", "opolskie");
+        grant(proxy, body("national-it-proxy"), "PROXY");
+
+        EffectivePermissions permissions = permissionService.of(proxy.getId());
+
+        assertThat(permissions.global()).containsExactlyInAnyOrder(CONTACT_PERSONAL_DATA_READ,
+            PermissionType.CONTACT_PERSONAL_DATA_MANAGE, FORMAL_PERSONAL_DATA_READ, FORMAL_PERSONAL_DATA_MANAGE,
+            BODIES_MANAGE, PermissionType.DIRECTORY_GROUPS_MANAGE, PermissionType.DIRECTORY_USERS_MANAGE, FEES_READ,
+            FEES_MANAGE, RECRUITMENT_READ);
+        assertThat(permissions.canGlobally(PermissionType.RECRUITMENT_APPROVE)).isFalse();
+        assertThat(permissionService.can(proxy.getId(), FORMAL_PERSONAL_DATA_MANAGE, target.getId())).isTrue();
+        assertThat(permissions.perDistrict()).hasSize(17);
+    }
+
+    @Test
     void supportingDistrictBoardSeesContactDataOnly() {
         TMember coordinator = newMember("Cora", "Board", "mazowieckie");
         TMember visitor = newMember("Vic", "Visitor", "slaskie");

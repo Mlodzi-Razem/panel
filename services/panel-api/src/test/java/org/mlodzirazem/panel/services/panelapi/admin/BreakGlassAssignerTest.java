@@ -106,6 +106,25 @@ class BreakGlassAssignerTest extends DomainTestSupport {
     }
 
     @Test
+    void recordsTheDecisionReferenceOnTheMembershipWithoutPrintingIt() {
+        String reference = "Uchwała ZK nr 12/2026; zatwierdzona uchwałą RK nr 3/2026";
+
+        BreakGlassReport report = assigner.run("national-it-proxy:PROXY", "9001", "Alice Operator",
+            "lockout recovery", reference, true);
+
+        assertThat(report.exitCode()).isZero();
+        assertThat(report.render()).contains("Decision reference: recorded").doesNotContain("12/2026");
+
+        TBodyMembership created = bodyMembershipRepository.findAllByMemberIdAndBodyId(member.getId(),
+            body("national-it-proxy").getId()).getFirst();
+
+        assertThat(created.getDecisionReference()).isEqualTo(reference);
+        assertThat(created.getMemberType().getCode()).isEqualTo("PROXY");
+        assertThat(auditPayloads("admin :: break-glass")).contains("decisionReference").doesNotContain("12/2026");
+        assertThat(run(FUNCTION, "9001", false).render()).contains("Decision reference: none");
+    }
+
+    @Test
     void bootstrapsTheFirstNationalBoardMemberAndRepeatedApplyIsANoOp() {
         assertThat(run(FUNCTION, "9001", true).exitCode()).isZero();
 

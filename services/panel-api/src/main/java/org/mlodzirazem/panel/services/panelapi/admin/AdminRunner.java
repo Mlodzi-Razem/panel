@@ -44,6 +44,7 @@ class AdminRunner implements ApplicationRunner, ExitCodeGenerator {
                 properties.member(),
                 properties.operator(),
                 properties.reason(),
+                properties.decisionReference(),
                 properties.apply()
             );
 

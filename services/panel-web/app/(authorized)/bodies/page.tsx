@@ -31,7 +31,7 @@ import { Body } from "@/panel-api/members/types";
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 const NATIONAL_ORDER = ['GENERAL_ASSEMBLY', 'NATIONAL_BOARD', 'PEER_COURT', 'AUDIT_COMMISSION', 'ELECTORAL_COMMISSION',
-    'PRESS_SPOKESPERSON', 'TEAM'];
+    'PRESS_SPOKESPERSON', 'NATIONAL_IT_PROXY', 'TEAM'];
 const DISTRICT_ORDER = ['DISTRICT_ASSEMBLY', 'DISTRICT_BOARD', 'DISTRICT_TREASURER', 'DISTRICT_COMMISSIONER',
     'LOCAL_CIRCLE'];
 
