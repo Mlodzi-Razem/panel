@@ -2,9 +2,11 @@
 # (owner's VPS, dev.panel.mlodzirazem.org).
 #
 # Flow: push to `release/stage` (or tag v*) →
-#   verify panel-api (full `mvn verify`, Testcontainers on the runner Docker) →
+#   verify panel-api (full `mvn verify`, Testcontainers on the runner Docker;
+#   the jar it packages is kept as the artifact `panel-api-jar`) →
 #   build both stage images for linux/amd64 and push to GHCR (short-sha tag,
-#   immutable, + branch tag + mutable `stage` pointer) →
+#   immutable, + branch tag + mutable `stage` pointer); panel-api is built
+#   from that very jar (Dockerfile.prebuilt), without a second Maven run →
 #   ssh to the VPS, rsync the deploy/stage bundle, run ci/deploy-on-vps.sh
 #   (pull + up -d --wait + healthcheck + last-stable for rollback).
 #
@@ -57,6 +59,11 @@ jobs:
   # 1. panel-api: full verify (Testcontainers uses the runner's Docker).
   #    junit-platform.properties has parallel enabled with same_thread default,
   #    which is CI-safe; runners have enough RAM, so no argLine overrides.
+  #    The jar packaged here is the one the panel-api image ships (job 2).
+  #    Maven Central throttles the shared runner IPs (HTTP 429): the resolver
+  #    retries 429/503 (Retry-After, else count × interval). Maven 3.9 =
+  #    Resolver 1.9 → `aether.connector.http.*`; Maven 4 renames the keys to
+  #    `aether.transport.http.*`.
   # --------------------------------------------------------------------------
   verify-panel-api:
     name: panel-api verify
@@ -75,8 +82,36 @@ jobs:
         env:
           STAGE_ENV_FILE: .env.stage.example
         run: docker compose -f docker-compose.stage.yaml --env-file .env.stage.example config -q
+      - name: Runtime stages of both panel-api Dockerfiles are identical
+        run: |
+          runtime() {
+            sed -n '/^# 2\. Runtime/,$p' "$1" | sed 's#services/panel-api/docker/#docker/#'
+          }
+          for f in services/panel-api/Dockerfile services/panel-api/Dockerfile.prebuilt; do
+            grep -q '^# 2\. Runtime' "$f" || { echo "::error file=$f::missing '# 2. Runtime' marker"; exit 1; }
+          done
+          diff -u <(runtime services/panel-api/Dockerfile) <(runtime services/panel-api/Dockerfile.prebuilt)
       - name: Maven verify (panel-api with upstream modules)
-        run: mvn --batch-mode --update-snapshots -pl services/panel-api -am verify
+        run: >-
+          mvn --batch-mode --update-snapshots
+          -Daether.connector.http.retryHandler.count=6
+          -Daether.connector.http.retryHandler.interval=10000
+          -pl services/panel-api -am verify
+      - name: Digest of the verified jar
+        if: github.event_name == 'push'
+        run: sha256sum services/panel-api/target/panel-api-*.jar
+      - name: Keep the verified jar for the image build
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v7
+        with:
+          name: panel-api-jar
+          path: services/panel-api/target/panel-api-*.jar
+          if-no-files-found: error
+          retention-days: 3
+          # A jar is already a zip; recompressing only costs time.
+          compression-level: 0
+          # A re-run of this job replaces the artifact of the earlier attempt.
+          overwrite: true
 
   # --------------------------------------------------------------------------
   # 2. Build + push both images to GHCR. Tags per docker/metadata-action:
@@ -84,6 +119,9 @@ jobs:
   #      <branch-or-tag>      e.g. release-stage or v0.1.2
   #      stage                mutable pointer, only from release/stage
   #    platform: linux/amd64 only (the VPS is x86_64).
+  #    panel-api: no Maven here. The image wraps the jar from job 1
+  #    (artifact panel-api-jar, digest-checked on download) with
+  #    services/panel-api/Dockerfile.prebuilt, context services/panel-api.
   # --------------------------------------------------------------------------
   build-images:
     name: Build and push images
@@ -94,13 +132,22 @@ jobs:
       matrix:
         include:
           - service: panel-api
-            context: .
-            file: services/panel-api/Dockerfile
+            context: services/panel-api
+            file: services/panel-api/Dockerfile.prebuilt
           - service: panel-web
             context: services/panel-web
             file: services/panel-web/Dockerfile
     steps:
       - uses: actions/checkout@v5
+      - name: Fetch the jar that passed verify
+        if: matrix.service == 'panel-api'
+        uses: actions/download-artifact@v8
+        with:
+          name: panel-api-jar
+          path: services/panel-api/target
+      - name: Digest of the jar going into the image
+        if: matrix.service == 'panel-api'
+        run: sha256sum services/panel-api/target/panel-api-*.jar
       - uses: docker/setup-buildx-action@v3
       - name: Log in to GHCR
         uses: docker/login-action@v3

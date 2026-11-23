@@ -270,7 +270,8 @@ Destrukcyjne (drop schematów → load → up → healthcheck) — używać świ
 Celem jest: **push na branch `release/stage` = deploy na stage** (jawny,
 przewidywalny); osobno tagi `v*` robią to samo (wersjonowane wydanie).
 Workflow: `.github/workflows/stage.yml` (verify panel-api → build 2 obrazów
-linux/amd64 → GHCR → ssh deploy → healthcheck → `last-stable`).
+linux/amd64 → GHCR → ssh deploy → healthcheck → `last-stable`). Obraz
+panel-api powstaje z jara, który przeszedł verify — szczegóły w §6.6.
 
 **6.1. Repozytorium GitHub** — istnieje już jako **private**:
 `github.com/Mlodzi-Razem/panel` (remote `origin` jest w configu; wypchnięte
@@ -322,6 +323,54 @@ ssh panel-vps 'echo <PAT-READ-PACKAGES> | docker login ghcr.io -u <LOGIN-GITHUB>
 **6.5. Odpalenie:** `git push github release/stage` (albo PR + merge → push).
 Obserwuj zakładkę *Actions*: **verify → build+push → deploy**; deploy kończy
 się healthcheckiem i dopisem do `last-stable.txt` na VPS.
+
+**6.6. Jak powstaje obraz panel-api (od 2026-11-23).** Maven działa w CI
+**raz**: w jobie „panel-api verify". Job obrazów nie pobiera już zależności.
+
+| krok | job | co się dzieje |
+|---|---|---|
+| 1 | panel-api verify | `mvn verify` (cache `setup-java`); retry resolvera na 429/503: `-Daether.connector.http.retryHandler.count=6`, `…interval=10000` |
+| 2 | panel-api verify | tylko przy push: `sha256sum` jara + artefakt `panel-api-jar` (retencja 3 dni, `overwrite: true` na re-run) |
+| 3 | Build and push images (panel-api) | `download-artifact` (digest sprawdzany, niezgodność = błąd) → `services/panel-api/target/` → `sha256sum` (ma się zgadzać z krokiem 2) |
+| 4 | Build and push images (panel-api) | `docker build -f services/panel-api/Dockerfile.prebuilt services/panel-api`: sam rozkład jara na warstwy + runtime |
+
+- **Dlaczego:** wcześniej `services/panel-api/Dockerfile` budował jar drugi raz
+  w `docker build`. Warstwa `dependency:go-offline` nie pokrywała wszystkiego,
+  więc build obrazu pobierał zależności z Maven Central z IP współdzielonych
+  runnerów. Release `33b3783` padł na `429 Too Many Requests`.
+- **Gwarancja:** do obrazu trafia bajt w bajt ten jar, który przeszedł testy.
+- **Etap runtime** (JRE 25 jammy, `USER 10001:10001`, warstwy
+  `jarmode=tools`, `launch.sh`/`healthcheck.sh`, porty 8080/9080,
+  `HEALTHCHECK`) jest identyczny w obu Dockerfile'ach. Krok verify „Runtime
+  stages of both panel-api Dockerfiles are identical" robi `diff` od znacznika
+  `# 2. Runtime` i przerywa pipeline przy rozjeździe. Zmieniasz runtime → zmień
+  oba pliki.
+- **Re-run:** „Re-run failed jobs" na samym buildzie obrazów pobiera artefakt
+  z udanego verify tego samego runu (retencja 3 dni). Gdy krok „Fetch the jar
+  that passed verify" zgłosi brak artefaktu (np. po 3 dniach) — „Re-run all
+  jobs".
+- **Build lokalny** (Mac, legacy builder bez buildx) — dwie drogi, oba pliki
+  są bez składni BuildKit:
+
+```bash
+# a) z gotowego jara (to samo co CI); jar recepturą Docker-Maven, z katalogu repo:
+docker run --rm -v "$PWD":/workspace -w /workspace -v maven-home-panel:/m2 \
+  --user 501:20 --group-add 991 -e MAVEN_OPTS=-Xmx512m maven:3.9-eclipse-temurin-25 \
+  mvn -B -Dmaven.repo.local=/m2/repository -pl services/panel-api -am package -DskipTests
+docker build -f services/panel-api/Dockerfile.prebuilt \
+  -t panel-api:$(git rev-parse --short HEAD) \
+  --build-arg GIT_TAG=$(git rev-parse --short HEAD) services/panel-api
+
+# b) od źródeł, wszystko w docker build (Makefile `deploy/stage`, ci/release-local.sh):
+docker build -f services/panel-api/Dockerfile \
+  -t panel-api:$(git rev-parse --short HEAD) \
+  --build-arg GIT_TAG=$(git rev-parse --short HEAD) .
+```
+
+Kontekst w (a) to `services/panel-api`, nie root repo: root `.dockerignore`
+wycina `**/target`. `services/panel-api/.dockerignore` zawęża kontekst do
+`target/panel-api-*.jar` i dwóch skryptów z `docker/`. W `target/` musi być
+**dokładnie jeden** `panel-api-*.jar`, inaczej build przerywa się z komunikatem.
 
 ---
 
@@ -750,7 +799,8 @@ deploy starych obrazów.
 
 ### 11.10. Co NIE zmienia się przy przejściu na K
 
-- obrazy: te same Dockerfile'e i GHCR (workflow build bez zmian);
+- obrazy: te same Dockerfile'e i GHCR (CI: panel-api z jara po verify,
+  `Dockerfile.prebuilt`, §6.6);
 - sekrety: te same wartości co tor C; jawny plik różni się formatem
   (values.yaml zamiast .env);
 - SSO: checklista §9 działa po przeniesieniu wartości Entra do

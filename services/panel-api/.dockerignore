@@ -1,0 +1,8 @@
+# Build context of Dockerfile.prebuilt only (`docker build … services/panel-api`):
+# the prebuilt jar and the two scripts, nothing else (no src/, no classes).
+# services/panel-api/Dockerfile builds from the repo root and uses the root
+# .dockerignore instead; this file does not apply to it.
+*
+!docker/launch.sh
+!docker/healthcheck.sh
+!target/panel-api-*.jar
