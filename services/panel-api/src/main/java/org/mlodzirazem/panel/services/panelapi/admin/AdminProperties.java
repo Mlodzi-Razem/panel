@@ -27,6 +27,7 @@ public record AdminProperties(
     @Nullable String member,
     @Nullable String operator,
     @Nullable String reason,
+    @Nullable String decisionReference,
     @DefaultValue("false") boolean apply
 ) {
 }
