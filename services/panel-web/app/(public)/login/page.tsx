@@ -41,10 +41,12 @@ export default async function Login() {
             <div className={styles.card}>
                 <div className={styles.cardText}>
                     <h1>{t('title')}</h1>
-                    <p>{microsoft ? t('subtitleBoth') : t('subtitle')}</p>
+                    <p>{t('subtitle')}</p>
                 </div>
-                <LoginPageSignInButton microsoft={microsoft}/>
-                <p className={styles.note}>{microsoft ? t('organisationOnly') : t('workspaceOnly')}</p>
+                {microsoft
+                    ? <LoginPageSignInButton/>
+                    : <p className={styles.note} role="status">{t('notConfigured')}</p>}
+                <p className={styles.note}>{t('organisationOnly')}</p>
             </div>
         </section>
     </main>;

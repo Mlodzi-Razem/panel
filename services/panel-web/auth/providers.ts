@@ -20,6 +20,3 @@ export const TEAMS_SSO_PROVIDER = 'teams-sso';
 
 /** Provider ID of the browser sign-in with a Microsoft 365 account. */
 export const ENTRA_PROVIDER = 'azure-ad';
-
-/** Provider ID of the browser sign-in with a Google Workspace account. */
-export const GOOGLE_PROVIDER = 'google';

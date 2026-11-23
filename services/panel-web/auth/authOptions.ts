@@ -15,32 +15,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import GoogleProvider, { GoogleProfile } from "next-auth/providers/google";
 import AzureADProvider from "next-auth/providers/azure-ad";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { CookiesOptions, getServerSession, NextAuthOptions, Session } from "next-auth";
 import { Provider } from "next-auth/providers/index";
-import env, { entraConfig } from "@/config/env";
+import { entraConfig } from "@/config/env";
 import { verifyTeamsSsoToken } from "@/auth/teamsSso";
-import { ENTRA_PROVIDER, GOOGLE_PROVIDER, TEAMS_SSO_PROVIDER } from "@/auth/providers";
+import { ENTRA_PROVIDER, TEAMS_SSO_PROVIDER } from "@/auth/providers";
 import { DEV_LOGIN_PROVIDER, devLoginProvider } from "@/auth/devLogin";
 import { CLIENT_ASSERTION_TYPE, entraClientAssertion } from "@/auth/entraClientAssertion";
 
-const googleClientId = env.PANEL_GOOGLE_CLIENT_ID;
-const googleClientSecret = env.PANEL_GOOGLE_CLIENT_SECRET;
-const workspaceDomain = env.PANEL_GOOGLE_WORKSPACE_DOMAIN.trim().toLowerCase();
+// Panel runs on the association's Microsoft 365 tenant only: Microsoft 365 in the browser and Teams SSO.
 const entra = entraConfig();
-
-if (!googleClientId || !googleClientSecret || !workspaceDomain) {
-    throw new Error("PANEL_GOOGLE_CLIENT_ID, PANEL_GOOGLE_CLIENT_SECRET and PANEL_GOOGLE_WORKSPACE_DOMAIN environment variables must be set")
-}
-
-export function isWorkspaceAccount(profile: Partial<GoogleProfile> | undefined): boolean {
-    return !!profile
-        && profile.email_verified === true
-        && typeof profile.hd === 'string'
-        && profile.hd.toLowerCase() === workspaceDomain;
-}
 
 export function isEntraSignInEnabled(): boolean {
     return !!(entra?.clientCertificate || entra?.clientSecret);
@@ -89,18 +75,7 @@ function entraBrowserProvider(config: NonNullable<typeof entra>): Provider | und
 }
 
 function providers(): Provider[] {
-    const list: Provider[] = [
-        GoogleProvider({
-            clientId: googleClientId,
-            clientSecret: googleClientSecret,
-            authorization: {
-                params: {
-                    hd: workspaceDomain,
-                    prompt: 'select_account',
-                },
-            },
-        }),
-    ];
+    const list: Provider[] = [];
 
     const entraBrowser = entra ? entraBrowserProvider(entra) : undefined;
     if (entraBrowser) {
@@ -159,8 +134,6 @@ const authOptions = {
     callbacks: {
         async signIn({account, profile}) {
             switch (account?.provider) {
-                case GOOGLE_PROVIDER:
-                    return isWorkspaceAccount(profile as Partial<GoogleProfile> | undefined);
                 case ENTRA_PROVIDER:
                     return !!entra && (profile as { tid?: string } | undefined)?.tid === entra.tenantId;
                 case TEAMS_SSO_PROVIDER:
@@ -187,6 +160,8 @@ const authOptions = {
                     token.sub = user.id;
                     token.idp = 'entra';
                 } else {
+                    // dev-login (non-production only): panel-api links it by the domain e-mail, the path
+                    // its 'google' identity provider still takes
                     token.sub = profile?.sub ?? user.id ?? token.sub;
                     token.idp = 'google';
                 }

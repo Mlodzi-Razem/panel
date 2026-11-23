@@ -46,14 +46,12 @@ const enMessages = {
         loading: "Loading...",
     },
     login: {
-        loginWithGoogle: "Login with Google",
         loginWithMicrosoft: "Sign in with Microsoft 365",
         title: "Sign in",
-        subtitle: "Use your organisation Google account to open the panel.",
-        subtitleBoth: "Use your association account in Microsoft 365 or Google to open the panel.",
+        subtitle: "Use your association account in Microsoft 365 to open the panel.",
         pitch: "Association panel: members, bodies, fees",
-        workspaceOnly: "Only accounts from the association's Google Workspace can sign in.",
-        organisationOnly: "Only the association's Microsoft 365 or Google Workspace accounts can sign in.",
+        organisationOnly: "Only the association's Microsoft 365 accounts can sign in.",
+        notConfigured: "Microsoft 365 sign-in is not configured on this server.",
         logout: "Logout"
     },
     menu: {

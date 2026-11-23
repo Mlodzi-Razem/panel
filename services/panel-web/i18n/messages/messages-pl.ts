@@ -48,14 +48,12 @@ const plMessages: typeof enMessages = {
         loading: "Ładowanie..."
     },
     login: {
-        loginWithGoogle: "Zaloguj się za pomocą Google",
         loginWithMicrosoft: "Zaloguj się kontem Microsoft 365",
         title: "Zaloguj się",
-        subtitle: "Użyj organizacyjnego konta Google, aby otworzyć panel.",
-        subtitleBoth: "Użyj konta stowarzyszenia w Microsoft 365 albo Google, aby otworzyć panel.",
+        subtitle: "Użyj konta stowarzyszenia w Microsoft 365, aby otworzyć panel.",
         pitch: "Panel stowarzyszenia: członkowie, organy, składki",
-        workspaceOnly: "Zalogować się mogą tylko konta z Google Workspace stowarzyszenia.",
-        organisationOnly: "Zalogować się mogą tylko konta stowarzyszenia w Microsoft 365 albo Google Workspace.",
+        organisationOnly: "Zalogować się mogą tylko konta stowarzyszenia w Microsoft 365.",
+        notConfigured: "Logowanie kontem Microsoft 365 nie jest skonfigurowane na tym serwerze.",
         logout: "Wyloguj się"
     },
     menu: {
