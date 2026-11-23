@@ -67,7 +67,8 @@ export default async function RecruitmentCasePage({params}: { params: Promise<{ 
     }
 
     const candidateCase = detail.data;
-    const open = candidateCase.closedAt === null;
+    // the API omits null fields (NON_NULL), so an open case has no closedAt at all
+    const open = candidateCase.closedAt == null;
     const postDeclaration = POST_DECLARATION_STATUSES.includes(candidateCase.status);
     const transitionsResult = await getCaseTransitions(caseId);
     const bodiesResult = await listBodies();
@@ -144,7 +145,7 @@ export default async function RecruitmentCasePage({params}: { params: Promise<{ 
                         ? {status: 500, code: "INVALID_RESPONSE", message: ""}
                         : bodiesResult.error)
                     : transitionsResult.error}/>}            {canManage && open && <div className={styles.actions}>
-                <ActionButton action={() => sendCaseReminderAction(caseId)}
+                <ActionButton action={sendCaseReminderAction.bind(null, caseId)}
                               label={t("sendReminder")}
                               variant="outline"
                               ariaLabel={t("sendReminderAria")}/>
@@ -163,7 +164,7 @@ export default async function RecruitmentCasePage({params}: { params: Promise<{ 
             </Card>}
 
         {canManage && open && <Card title={t("editCard")} hint={t("editHint")}>
-            <ActionForm action={formData => updateRecruitmentCaseAction(caseId, formData)}
+            <ActionForm action={updateRecruitmentCaseAction.bind(null, caseId)}
                         submitLabel={t("save")}
                         successMessage={t("saved")}>
                 <TextField name="candidateFirstName"
@@ -195,7 +196,7 @@ export default async function RecruitmentCasePage({params}: { params: Promise<{ 
         </Card>}
 
         {canManage && <Card title={t("noteCard")} hint={t("noteHint")}>
-            <ActionForm action={formData => addCaseNoteAction(caseId, formData)}
+            <ActionForm action={addCaseNoteAction.bind(null, caseId)}
                         submitLabel={t("addNote")}
                         successMessage={t("noteAdded")}>
                 <TextAreaField name="note" label={t("noteLabel")} required maxLength={2000}/>
