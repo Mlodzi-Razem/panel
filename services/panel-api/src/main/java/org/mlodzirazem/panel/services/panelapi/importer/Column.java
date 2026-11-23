@@ -33,7 +33,8 @@ enum Column {
     PHONES("nr tel", false),
     PRIVATE_EMAILS("Prywatny adres e-mail", false),
     PRIMARY_DISTRICT("Okręg stowarzyszenia", true),
-    VOTING_DISTRICT("Okręg wyborczy", false),
+    /** The Sejm constituency number (1–41), not an MR district: recognised but never imported. */
+    SEJM_CONSTITUENCY("Okręg wyborczy", false),
     PROVINCE("powiat", false),
     CITY("miasto", false),
     ADDRESS("adres", false),

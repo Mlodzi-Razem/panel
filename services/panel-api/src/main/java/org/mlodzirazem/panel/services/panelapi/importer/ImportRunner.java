@@ -41,7 +41,7 @@ class ImportRunner implements ApplicationRunner, ExitCodeGenerator {
         try {
             ImportReport report = importer.run(
                 Path.of(String.valueOf(properties.file())),
-                new ImportOptions(properties.apply(), properties.skipInvalidRows())
+                new ImportOptions(properties.apply(), properties.skipInvalidRows(), properties.highestIssuedNumber())
             );
 
             out.print(report.render());

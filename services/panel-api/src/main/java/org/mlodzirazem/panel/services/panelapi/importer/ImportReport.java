@@ -28,6 +28,7 @@ public record ImportReport(
     int updated,
     int unchanged,
     int skipped,
+    long nextMemberNumber,
     List<RowProblem> problems
 ) {
     public ImportReport {
@@ -62,6 +63,7 @@ public record ImportReport(
         out.append("Skipped (rows with errors): ").append(skipped).append('\n');
         out.append("Errors: ").append(errors().size()).append('\n');
         out.append("Warnings: ").append(warnings().size()).append('\n');
+        out.append("Next member number for admissions: ").append(nextMemberNumber).append('\n');
 
         if (aborted) {
             out.append("Result: ABORTED, errors found, nothing was written\n");

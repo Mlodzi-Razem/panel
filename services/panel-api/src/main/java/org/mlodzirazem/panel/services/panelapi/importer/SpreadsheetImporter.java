@@ -17,6 +17,7 @@
 
 package org.mlodzirazem.panel.services.panelapi.importer;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.mlodzirazem.panel.services.panelapi.audit.AuditLog;
@@ -24,13 +25,12 @@ import org.mlodzirazem.panel.services.panelapi.audit.AuditPayload;
 import org.mlodzirazem.panel.services.panelapi.bodies.BodyService;
 import org.mlodzirazem.panel.services.panelapi.members.AffiliationService;
 import org.mlodzirazem.panel.services.panelapi.members.ElectoralRightsService;
-import org.mlodzirazem.panel.services.panelapi.members.MemberDistricts;
 import org.mlodzirazem.panel.services.panelapi.members.MemberField;
 import org.mlodzirazem.panel.services.panelapi.members.MemberRules;
 import org.mlodzirazem.panel.services.panelapi.members.MemberService;
 import org.mlodzirazem.panel.services.panelapi.members.MemberUpdate;
 import org.mlodzirazem.panel.services.panelapi.members.NewMember;
-import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBody;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.MembershipType;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMemberRepository;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
@@ -54,6 +54,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 class SpreadsheetImporter {
     static final String AUDIT_OPERATION = "importer :: apply";
+    private static final String NUMBER_SEQUENCE = "seq_member_number_allocation";
     private static final String FILE_LABEL = "file";
     private static final Set<String> YES = Set.of("tak", "t", "yes", "y", "true", "1", "prawda", "x");
     private static final Set<String> NO = Set.of("nie", "n", "no", "false", "0", "falsz");
@@ -66,8 +67,18 @@ class SpreadsheetImporter {
     private final AuditLog auditLog;
     private final Clock clock;
     private final PlatformTransactionManager transactionManager;
+    private final EntityManager entityManager;
 
     ImportReport run(Path file, ImportOptions options) {
+        Long highestIssued = options.highestIssuedNumber();
+
+        if (highestIssued != null
+            && (highestIssued < 1 || highestIssued >= MemberRules.RESERVED_TEST_MEMBER_NUMBER_FROM)) {
+            throw new ImportFatalException("HIGHEST_ISSUED_NUMBER",
+                "the highest issued member number must be between 1 and %d"
+                    .formatted(MemberRules.RESERVED_TEST_MEMBER_NUMBER_FROM - 1));
+        }
+
         CsvTable table = CsvTable.read(file);
         String fileName = String.valueOf(file.getFileName());
 
@@ -122,6 +133,8 @@ class SpreadsheetImporter {
             checkVotingRight(plan, outcome.memberDbId, problems);
         }
 
+        long nextMemberNumber = alignNumberSequence(plans, options, write);
+
         if (write) {
             Map<String, Long> counts = new LinkedHashMap<>();
             counts.put("rows", (long) plans.size());
@@ -129,11 +142,74 @@ class SpreadsheetImporter {
             counts.put("updated", (long) updated);
             counts.put("unchanged", (long) unchanged);
             counts.put("skipped", (long) skipped);
+            counts.put("nextMemberNumber", nextMemberNumber);
             auditLog.record(AUDIT_OPERATION, new AuditPayload(counts, List.of(), null));
         }
 
         return new ImportReport(fileName, options.apply(), aborted, plans.size(), created, updated, unchanged,
-            skipped, problems);
+            skipped, nextMemberNumber, problems);
+    }
+
+    /**
+     * Moves the admission number sequence past every number already issued, so an admission never hands out the
+     * number of a current or former member. Migration 0.0.6 set the sequence from the register present at that
+     * time only, so a register imported later would otherwise leave it at 1. The sequence only ever moves forward
+     * ({@code setval} is not rolled back with the transaction, and a gap is harmless where a reuse is not).
+     *
+     * @return the number the next admission will get (in a dry run: would get after this import)
+     */
+    private long alignNumberSequence(List<Plan> plans, ImportOptions options, boolean write) {
+        long highest = Math.max(highestStoredNumber(), Objects.requireNonNullElse(options.highestIssuedNumber(), 0L));
+
+        if (!options.apply()) {
+            for (Plan plan : plans) {
+                if (!plan.hasErrors()) {
+                    highest = Math.max(highest, numberOf(plan.values.get(MemberField.MEMBER_ID)));
+                }
+            }
+        }
+
+        long next = ((Number) entityManager.createNativeQuery(
+            "SELECT CASE WHEN is_called THEN last_value + 1 ELSE last_value END FROM " + NUMBER_SEQUENCE)
+            .getSingleResult()).longValue();
+
+        if (highest + 1 <= next) {
+            return next;
+        }
+
+        if (write) {
+            entityManager.createNativeQuery("SELECT setval('" + NUMBER_SEQUENCE + "', :value)")
+                         .setParameter("value", highest)
+                         .getSingleResult();
+        }
+
+        return highest + 1;
+    }
+
+    private long highestStoredNumber() {
+        // CASE keeps the cast behind the digit check whatever order the planner evaluates the conditions in
+        return ((Number) entityManager.createNativeQuery("""
+                SELECT COALESCE(MAX(n), 0) FROM (
+                    SELECT CASE WHEN member_id ~ '^[0-9]{1,15}$' AND ltrim(member_id, '0') <> ''
+                                THEN CAST(ltrim(member_id, '0') AS BIGINT) END AS n
+                    FROM members
+                ) numbers
+                WHERE n < :reserved
+                """)
+            .setParameter("reserved", (long) MemberRules.RESERVED_TEST_MEMBER_NUMBER_FROM)
+            .getSingleResult()).longValue();
+    }
+
+    private static long numberOf(@Nullable Object memberId) {
+        String key = memberId instanceof String text ? numberKey(text) : null;
+
+        if (key == null || key.isEmpty()) {
+            return 0;
+        }
+
+        long number = Long.parseLong(key);
+
+        return number < MemberRules.RESERVED_TEST_MEMBER_NUMBER_FROM ? number : 0;
     }
 
     private Plan plan(CsvTable table, CsvTable.Row row, DistrictMatcher matcher, Seen seen) {
@@ -146,7 +222,7 @@ class SpreadsheetImporter {
         } else {
             values.put(MemberField.MEMBER_ID, memberId);
 
-            if (!seen.memberIds.add(memberId)) {
+            if (!seen.memberIds.add(Objects.requireNonNullElse(numberKey(memberId), memberId))) {
                 plan.add(Column.MEMBER_ID, ProblemCode.DUPLICATE_IN_FILE);
             }
         }
@@ -277,20 +353,15 @@ class SpreadsheetImporter {
                 plan.add(Column.PRIMARY_DISTRICT, ProblemCode.UNKNOWN_DISTRICT);
             }
         }
-
-        String voting = table.get(row, Column.VOTING_DISTRICT);
-
-        if (voting != null) {
-            plan.votingId = matcher.match(voting).orElse(null);
-
-            if (plan.votingId == null) {
-                plan.add(Column.VOTING_DISTRICT, ProblemCode.UNKNOWN_DISTRICT);
-            }
-        }
     }
 
     private void planChecks(CsvTable table, CsvTable.Row row, Plan plan, @Nullable LocalDate birthDate) {
         LocalDate today = LocalDate.now(clock);
+
+        // Statute 2026 art. 48 ust. 1: an under-16 supporting membership granted before the statute stays in force
+        // (ordinary membership needs 16, art. 7, and then a ZO resolution), so such a person has no vote.
+        plan.transitionalSupporting = birthDate != null
+            && MemberRules.ageOn(birthDate, today) < MemberRules.ORDINARY_MIN_AGE;
 
         if (birthDate != null && today.isAfter(MemberRules.membershipEndDate(birthDate))) {
             plan.add(Column.BIRTH_DATE, ProblemCode.MEMBERSHIP_AGE_LIMIT_EXCEEDED);
@@ -319,12 +390,21 @@ class SpreadsheetImporter {
         Map<Long, TMember> found = new LinkedHashMap<>();
         boolean multiple = false;
 
-        try {
-            if (memberId != null) {
-                members.findByMemberId(memberId).ifPresent(m -> found.put(m.getId(), m));
+        String number = memberId != null ? numberKey(memberId) : null;
+
+        if (number != null) {
+            // numeric numbers match regardless of leading zeros: the register's 205 is the 000205 set elsewhere
+            List<TMember> byNumber = members.findByMemberNumber(number);
+            multiple = byNumber.size() > 1;
+            byNumber.forEach(m -> found.put(m.getId(), m));
+        } else {
+            try {
+                if (memberId != null) {
+                    members.findByMemberId(memberId).ifPresent(m -> found.put(m.getId(), m));
+                }
+            } catch (IncorrectResultSizeDataAccessException ex) {
+                multiple = true;
             }
-        } catch (IncorrectResultSizeDataAccessException ex) {
-            multiple = true;
         }
 
         try {
@@ -351,13 +431,32 @@ class SpreadsheetImporter {
         if (found.size() == 1) {
             TMember existing = found.values().iterator().next();
 
-            if (memberId != null && existing.getMemberId() != null && !existing.getMemberId().equals(memberId)) {
+            String stored = existing.getMemberId();
+
+            if (memberId != null && stored != null && !sameMemberNumber(stored, memberId)) {
                 plan.add(Column.MEMBER_ID, ProblemCode.MEMBER_ID_CONFLICT);
                 return;
             }
 
+            if (stored != null) {
+                // keep the stored spelling: rewriting 000205 as 205 is no change of the member's number
+                plan.values.put(MemberField.MEMBER_ID, stored);
+            }
+
             plan.existing = existing;
         }
+    }
+
+    /** The member number without leading zeros, or {@code null} when it is not purely numeric. */
+    static @Nullable String numberKey(String memberId) {
+        return memberId.matches("\\d{1,15}") ? memberId.replaceFirst("^0+", "") : null;
+    }
+
+    private static boolean sameMemberNumber(String a, String b) {
+        String keyA = numberKey(a);
+        String keyB = numberKey(b);
+
+        return keyA != null && keyB != null ? keyA.equals(keyB) : a.equals(b);
     }
 
     private Outcome diff(Plan plan) {
@@ -368,7 +467,7 @@ class SpreadsheetImporter {
         }
 
         boolean changed = plan.values.entrySet().stream().anyMatch(e -> differs(e.getKey(), existing, e.getValue()))
-            || affiliationsDiffer(existing.getId(), plan);
+            || !Objects.equals(affiliations.districtsOf(existing.getId()).primaryDistrictId(), plan.primaryId);
 
         return new Outcome(changed ? Kind.UPDATED : Kind.UNCHANGED, existing.getId());
     }
@@ -379,33 +478,17 @@ class SpreadsheetImporter {
         return !Objects.equals(current, value) && !(current instanceof List<?> list && list.isEmpty() && value == null);
     }
 
-    private boolean affiliationsDiffer(long id, Plan plan) {
-        MemberDistricts districts = affiliations.districtsOf(id);
-
-        if (!Objects.equals(districts.primaryDistrictId(), plan.primaryId)) {
-            return true;
-        }
-
-        if (plan.votingId == null) {
-            return false;
-        }
-
-        Long votingNow = votingNow(id);
-
-        if (plan.votingId.equals(plan.primaryId)) {
-            return !plan.votingId.equals(votingNow);
-        }
-
-        return !districts.supportingDistrictIds().contains(plan.votingId) || !plan.votingId.equals(votingNow);
-    }
-
     private Outcome write(Plan plan) {
         Objects.requireNonNull(plan.primaryId);
         TMember existing = plan.existing;
 
         if (existing == null) {
+            if (plan.transitionalSupporting) {
+                // only on creation: an existing member's type is Panel's record, changed by its own procedure
+                plan.values.put(MemberField.MEMBERSHIP_TYPE, MembershipType.SUPPORTING);
+            }
+
             TMember created = memberService.create(new NewMember(plan.values, plan.primaryId, false));
-            applyVoting(created.getId(), plan);
 
             return new Outcome(Kind.CREATED, created.getId());
         }
@@ -419,36 +502,7 @@ class SpreadsheetImporter {
             changed = true;
         }
 
-        changed |= applyVoting(id, plan);
-
         return new Outcome(changed ? Kind.UPDATED : Kind.UNCHANGED, id);
-    }
-
-    private boolean applyVoting(long id, Plan plan) {
-        Long target = plan.votingId;
-
-        if (target == null) {
-            return false;
-        }
-
-        MemberDistricts districts = affiliations.districtsOf(id);
-        Long votingNow = votingNow(id);
-
-        if (target.equals(districts.primaryDistrictId()) || districts.supportingDistrictIds().contains(target)) {
-            if (target.equals(votingNow)) {
-                return false;
-            }
-
-            affiliations.setVotingDistrict(id, target);
-            return true;
-        }
-
-        affiliations.addSupportingDistrict(id, target, true);
-        return true;
-    }
-
-    private @Nullable Long votingNow(long id) {
-        return affiliations.votingDistrict(id).map(TBody::getId).orElse(null);
     }
 
     private void checkVotingRight(Plan plan, @Nullable Long memberDbId, List<RowProblem> problems) {
@@ -464,7 +518,9 @@ class SpreadsheetImporter {
             return;
         }
 
-        boolean computed = memberDbId == null || electoralRights.rightsOf(memberDbId).eligible();
+        boolean computed = memberDbId == null
+            ? !plan.transitionalSupporting
+            : electoralRights.rightsOf(memberDbId).eligible();
 
         if (computed != sheet) {
             problems.add(new RowProblem(plan.label, Column.CAN_VOTE.label(), ProblemCode.VOTING_RIGHT_MISMATCH));
@@ -505,10 +561,10 @@ class SpreadsheetImporter {
         final Map<MemberField, @Nullable Object> values = new EnumMap<>(MemberField.class);
         final List<RowProblem> problems = new ArrayList<>();
         @Nullable Long primaryId;
-        @Nullable Long votingId;
         @Nullable TMember existing;
         @Nullable LocalDate birthDate;
         @Nullable String canVoteText;
+        boolean transitionalSupporting;
 
         Plan(String label) {
             this.label = label;

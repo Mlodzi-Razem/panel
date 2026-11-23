@@ -25,6 +25,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record ImportProperties(
     @Nullable String file,
     @DefaultValue("false") boolean apply,
-    @DefaultValue("false") boolean skipInvalidRows
+    @DefaultValue("false") boolean skipInvalidRows,
+    @Nullable Long highestIssuedNumber
 ) {
 }

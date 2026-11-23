@@ -17,10 +17,13 @@
 
 package org.mlodzirazem.panel.services.panelapi.importer;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mlodzirazem.panel.services.panelapi.members.AffiliationService;
 import org.mlodzirazem.panel.services.panelapi.members.MemberDistricts;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.MembershipType;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember;
 import org.mlodzirazem.panel.services.panelapi.test.DomainTestSupport;
 import org.mlodzirazem.panel.services.panelapi.test.db.PostgresTest;
@@ -29,6 +32,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -51,8 +55,25 @@ class SpreadsheetImporterTest extends DomainTestSupport {
     @Autowired
     AffiliationService affiliationService;
 
+    @Autowired
+    Clock clock;
+
     @TempDir
     Path dir;
+
+    private Map<String, Object> sequenceBefore;
+
+    @BeforeEach
+    void rememberNumberSequence() {
+        sequenceBefore = jdbc.queryForMap("SELECT last_value, is_called FROM seq_member_number_allocation");
+    }
+
+    @AfterEach
+    void restoreNumberSequence() {
+        // setval is not transactional: put the shared sequence back for the other test classes
+        jdbc.queryForObject("SELECT setval('seq_member_number_allocation', ?, ?)", Long.class,
+            sequenceBefore.get("last_value"), sequenceBefore.get("is_called"));
+    }
 
     private ImportReport dryRun(Sheet sheet) throws IOException {
         return importer.run(sheet.write(dir), ImportOptions.dryRun());
@@ -237,7 +258,7 @@ class SpreadsheetImporterTest extends DomainTestSupport {
         Map<String, String> full = Sheet.row("1", "Pierwsza", "Osoba", "Mazowiecki");
         full.put("nr tel", "111;222");
         full.put("Prywatny adres e-mail", "x@example.org");
-        full.put("Okręg wyborczy", "Śląski");
+        full.put("Okręg wyborczy", "19");
         full.put("pesel", Sheet.pesel(LocalDate.of(2005, 5, 5), 4321));
         full.put("data przyjęcia", "01/02/2024");
         full.put("Adres konta w organizacji", "pierwsza.osoba@example.org");
@@ -261,24 +282,95 @@ class SpreadsheetImporterTest extends DomainTestSupport {
     }
 
     @Test
-    void electoralDistrictBecomesSupportingAffiliationWithVotes() throws IOException {
-        Map<String, String> row = Sheet.row("1", "Pierwsza", "Osoba", "Mazowiecki");
-        row.put("Okręg wyborczy", "Okręg Śląski");
-        Map<String, String> same = Sheet.row("2", "Druga", "Osoba", "Mazowiecki");
-        same.put("Okręg wyborczy", "mazowieckie");
+    void sejmConstituencyColumnIsRecognisedButNotImported() throws IOException {
+        Map<String, String> numbered = Sheet.row("1", "Pierwsza", "Osoba", "Mazowiecki");
+        numbered.put("Okręg wyborczy", "19");
+        Map<String, String> abroad = Sheet.row("2", "Druga", "Osoba", "Zagranica");
+        abroad.put("Okręg wyborczy", "nie dotyczy");
+        Map<String, String> ambiguous = Sheet.row("3", "Trzecia", "Osoba", "Śląskie");
+        ambiguous.put("Okręg wyborczy", "34/35");
 
-        apply(new Sheet().add(row).add(same));
+        ImportReport report = apply(new Sheet().add(numbered).add(abroad).add(ambiguous));
+
+        assertThat(report.problems()).isEmpty();
+        assertThat(report.created()).isEqualTo(3);
 
         long first = byMemberId("1").getId();
         MemberDistricts districts = affiliationService.districtsOf(first);
         assertThat(districts.primaryDistrictId()).isEqualTo(district("mazowieckie").getId());
-        assertThat(districts.supportingDistrictIds()).containsExactly(district("slaskie").getId());
-        assertThat(affiliationService.votingDistrict(first).orElseThrow().getCode()).isEqualTo("district-slaskie");
-
-        long second = byMemberId("2").getId();
-        assertThat(affiliationService.districtsOf(second).supportingDistrictIds()).isEmpty();
-        assertThat(affiliationService.votingDistrict(second).orElseThrow().getCode())
+        assertThat(districts.supportingDistrictIds()).isEmpty();
+        assertThat(affiliationService.votingDistrict(first).orElseThrow().getCode())
             .isEqualTo("district-mazowieckie");
+    }
+
+    @Test
+    void matchesMemberNumbersIgnoringLeadingZerosAndKeepsTheStoredSpelling() throws IOException {
+        TMember padded = newMember("Ala", "Alfa", "mazowieckie");
+        padded.setMemberId("000205");
+        memberRepository.saveAndFlush(padded);
+
+        ImportReport report = apply(new Sheet().add("205", "Ala", "Alfa", "Mazowiecki"));
+
+        assertThat(report.problems()).isEmpty();
+        assertThat(report.created()).isZero();
+        assertThat(memberRepository.count()).isEqualTo(1);
+        assertThat(byMemberId("000205").getId()).isEqualTo(padded.getId());
+        assertThat(memberRepository.findByMemberId("205")).isEmpty();
+
+        ImportReport duplicate = dryRun(new Sheet().add("205", "A", "Pierwsza", "Mazowiecki")
+                                                   .add("0205", "B", "Druga", "Mazowiecki"));
+
+        assertThat(lines(duplicate)).containsExactly("0205: member_id → DUPLICATE_IN_FILE");
+    }
+
+    @Test
+    void applyMovesTheNumberSequencePastTheRegister() throws IOException {
+        jdbc.queryForObject("SELECT setval('seq_member_number_allocation', 1, false)", Long.class);
+
+        ImportReport report = apply(new Sheet().add("7", "A", "Pierwsza", "Mazowiecki")
+                                               .add("1548", "B", "Druga", "Mazowiecki"));
+
+        assertThat(report.nextMemberNumber()).isEqualTo(1549);
+        assertThat(report.render()).contains("Next member number for admissions: 1549");
+        assertThat(auditPayloads("importer :: apply")).contains("\"nextMemberNumber\": 1549");
+        assertThat(jdbc.queryForObject("SELECT nextval('seq_member_number_allocation')", Long.class))
+            .isEqualTo(1549);
+    }
+
+    @Test
+    void dryRunReportsTheNextNumberWithoutMovingTheSequence() throws IOException {
+        jdbc.queryForObject("SELECT setval('seq_member_number_allocation', 1, false)", Long.class);
+
+        ImportReport report = dryRun(new Sheet().add("7", "A", "Pierwsza", "Mazowiecki")
+                                                .add("1548", "B", "Druga", "Mazowiecki")
+                                                .add("960001", "C", "Testowa", "Mazowiecki"));
+
+        assertThat(report.nextMemberNumber()).isEqualTo(1549);
+        assertThat(jdbc.queryForObject("SELECT nextval('seq_member_number_allocation')", Long.class))
+            .isEqualTo(1);
+    }
+
+    @Test
+    void sequenceCoversTheHighestIssuedNumberAndNeverMovesBack() throws IOException {
+        jdbc.queryForObject("SELECT setval('seq_member_number_allocation', 1, false)", Long.class);
+
+        ImportReport former = importer.run(new Sheet().add("7", "A", "Pierwsza", "Mazowiecki").write(dir),
+            new ImportOptions(true, false, 2000L));
+
+        assertThat(former.nextMemberNumber()).isEqualTo(2001);
+
+        jdbc.queryForObject("SELECT setval('seq_member_number_allocation', 3000)", Long.class);
+
+        ImportReport later = apply(new Sheet().add("1548", "B", "Druga", "Mazowiecki"));
+
+        assertThat(later.nextMemberNumber()).isEqualTo(3001);
+        assertThat(jdbc.queryForObject("SELECT nextval('seq_member_number_allocation')", Long.class))
+            .isEqualTo(3001);
+
+        assertThatThrownBy(() -> importer.run(new Sheet().add("8", "C", "Trzecia", "Mazowiecki").write(dir),
+            new ImportOptions(false, false, 950_000L)))
+            .isInstanceOf(ImportFatalException.class)
+            .satisfies(e -> assertThat(((ImportFatalException) e).code()).isEqualTo("HIGHEST_ISSUED_NUMBER"));
     }
 
     @Test
@@ -344,6 +436,25 @@ class SpreadsheetImporterTest extends DomainTestSupport {
             "1: Czy może głosować → VOTING_RIGHT_MISMATCH",
             "2: Data urodzenia → MEMBERSHIP_AGE_LIMIT_EXCEEDED");
         assertThat(report.exitCode()).isZero();
+    }
+
+    @Test
+    void underSixteenIsATransitionalSupportingMemberWithoutAVote() throws IOException {
+        Map<String, String> young = Sheet.row("1", "Mloda", "Osoba", "Mazowiecki");
+        young.put("Data urodzenia", LocalDate.now(clock).minusYears(15).toString());
+        young.put("Czy może głosować", "nie");
+        Map<String, String> adult = Sheet.row("2", "Dorosla", "Osoba", "Mazowiecki");
+        adult.put("Czy może głosować", "tak");
+        Sheet sheet = new Sheet().add(young).add(adult);
+
+        assertThat(dryRun(sheet).problems()).isEmpty();
+
+        ImportReport applied = apply(sheet);
+
+        assertThat(applied.problems()).isEmpty();
+        assertThat(byMemberId("1").getMembershipType()).isEqualTo(MembershipType.SUPPORTING);
+        assertThat(byMemberId("2").getMembershipType()).isEqualTo(MembershipType.ORDINARY);
+        assertThat(apply(sheet).unchanged()).isEqualTo(2);
     }
 
     @Test

@@ -17,7 +17,17 @@
 
 package org.mlodzirazem.panel.services.panelapi.importer;
 
-public record ImportOptions(boolean apply, boolean skipInvalidRows) {
+import org.jspecify.annotations.Nullable;
+
+/**
+ * @param highestIssuedNumber the highest member number ever issued, when it is above every number in the register
+ *                            (a former member's), so admissions continue after it
+ */
+public record ImportOptions(boolean apply, boolean skipInvalidRows, @Nullable Long highestIssuedNumber) {
+    public ImportOptions(boolean apply, boolean skipInvalidRows) {
+        this(apply, skipInvalidRows, null);
+    }
+
     public static ImportOptions dryRun() {
         return new ImportOptions(false, false);
     }
