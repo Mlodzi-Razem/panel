@@ -16,7 +16,7 @@
  */
 
 import * as z from "zod";
-import { apiCall } from "@/panel-api/members/client";
+import { apiCall, apiMultipartCall } from "@/panel-api/members/client";
 import { ApiResult } from "@/panel-api/members/types";
 
 /**
@@ -38,8 +38,8 @@ export const rejectionReasonSchema = z.enum([
 ]);
 export const caseEventTypeSchema = z.enum([
     'CASE_CREATED', 'STATUS_CHANGED', 'REMINDER_SENT', 'ZK_NOTIFIED_PROBATION_START',
-    'DECLARATION_RECORDED', 'RECOMMENDATION_SENT', 'VOTE_STARTED', 'DECISION_RECORDED',
-    'CASE_CLOSED', 'NOTE_ADDED',
+    'DECLARATION_RECORDED', 'DECLARATION_LINK_CREATED', 'RECOMMENDATION_SENT', 'VOTE_STARTED',
+    'DECISION_RECORDED', 'CASE_CLOSED', 'NOTE_ADDED', 'CANDIDATE_DATA_CORRECTED',
 ]);
 
 /** Post-declaration metadata served by the M3 engine (statute clocks and collegial decisions). */
@@ -110,6 +110,13 @@ export const caseDetailSchema = z.object({
     candidatePhone: z.string().nullish(),
     candidateSocialProfileUrl: z.string().nullish(),
     candidateBirthDate: z.string().nullish(),
+    // Formal data of the declaration. The PESEL itself is never served — only whether it is on file.
+    candidateFormalFirstName: z.string().nullish(),
+    candidateFormalLastName: z.string().nullish(),
+    candidatePreferredFirstName: z.string().nullish(),
+    candidatePreferredLastName: z.string().nullish(),
+    candidatePronouns: z.string().nullish(),
+    formalIdentifierPresent: z.boolean().default(false),
     status: caseStatusSchema,
     source: caseSourceSchema,
     rejectionReason: rejectionReasonSchema.nullish(),
@@ -276,6 +283,35 @@ export function recordCaseDecision(
 export function generateDeclarationLink(id: number): Promise<ApiResult<DeclarationLink>> {
     return apiCall({method: 'POST', path: `/recruitment-cases/${id}/declaration-link`, body: {}},
         declarationLinkSchema);
+}
+
+/** POST /recruitment-cases/{id}/declaration-scan: the file part plus the declaration data as text parts. */
+export const declarationScanResultSchema = z.object({status: z.string()});
+
+export function uploadDeclarationScan(id: number, body: FormData): Promise<ApiResult<{ status: string }>> {
+    return apiMultipartCall(`/recruitment-cases/${id}/declaration-scan`, body, declarationScanResultSchema);
+}
+
+/** Candidate data correction: only the given fields change; blank preferred names / pronouns clear them. */
+export type CandidateDataCorrectionInput = {
+    formalFirstName?: string;
+    formalLastName?: string;
+    preferredFirstName?: string;
+    preferredLastName?: string;
+    pronouns?: string;
+    personalId?: string;
+    reason: string;
+};
+
+export function correctCandidateData(
+    id: number,
+    correction: CandidateDataCorrectionInput,
+): Promise<ApiResult<CaseDetail>> {
+    return apiCall({
+        method: 'POST',
+        path: `/recruitment-cases/${id}/candidate-data-corrections`,
+        body: correction,
+    }, caseDetailSchema);
 }
 
 export function addCaseNote(id: number, note: string): Promise<ApiResult<CaseDetail>> {

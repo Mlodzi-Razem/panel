@@ -51,6 +51,7 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.Per
 import org.mlodzirazem.panel.services.panelapi.recruitment.NewRecruitmentCase;
 import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentAdmissionService;
 import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentCaseService;
+import org.mlodzirazem.panel.services.panelapi.recruitment.eform.RecruitmentEformService;
 import org.mlodzirazem.panel.services.panelapi.recruitment.workflow.RecruitmentRules;
 import org.mlodzirazem.panel.services.panelapi.recruitment.workflow.RecruitmentWorkflowService;
 import org.springframework.http.HttpStatus;
@@ -90,6 +91,7 @@ public class RecruitmentCasesController {
     private final RecruitmentCaseService recruitment;
     private final RecruitmentWorkflowService workflow;
     private final RecruitmentAdmissionService admission;
+    private final RecruitmentEformService eform;
     private final RecruitmentCaseSearch search;
     private final RecruitmentCandidateParser parser;
     private final TRecruitmentCaseRepository cases;
@@ -127,6 +129,17 @@ public class RecruitmentCasesController {
     }
 
     public record NoteRequest(@Nullable String note) {
+    }
+
+    public record CandidateDataCorrectionRequest(
+        @Nullable String formalFirstName,
+        @Nullable String formalLastName,
+        @Nullable String preferredFirstName,
+        @Nullable String preferredLastName,
+        @Nullable String pronouns,
+        @Nullable String personalId,
+        @Nullable String reason
+    ) {
     }
 
     @GetMapping
@@ -387,6 +400,22 @@ public class RecruitmentCasesController {
                 candidateCase.getDistrict().getId()));
     }
 
+    /** Reasoned correction of the candidate's formal data; the permission is checked by the e-form service. */
+    @PostMapping("/{id}/candidate-data-corrections")
+    public CaseDetailResponse correctCandidateData(
+        @PathVariable("id") long id,
+        @RequestBody CandidateDataCorrectionRequest request
+    ) {
+        Caller caller = callers.require();
+
+        recruitment.get(id);
+        eform.correctCandidateData(id, caller.id(), new RecruitmentEformService.CandidateDataCorrection(
+            request.formalFirstName(), request.formalLastName(), request.preferredFirstName(),
+            request.preferredLastName(), request.pronouns(), request.personalId(), request.reason()));
+
+        return detail(recruitment.get(id), recruitment.timeline(id));
+    }
+
     @PostMapping("/{id}/notes")
     public CaseDetailResponse addNote(@PathVariable("id") long id, @RequestBody NoteRequest request) {
         Caller caller = callers.require();
@@ -450,6 +479,13 @@ public class RecruitmentCasesController {
             candidateCase.getCandidatePhone(),
             candidateCase.getCandidateSocialProfileUrl(),
             candidateCase.getCandidateBirthDate(),
+            candidateCase.getCandidateFormalFirstName(),
+            candidateCase.getCandidateFormalLastName(),
+            candidateCase.getCandidatePreferredFirstName(),
+            candidateCase.getCandidatePreferredLastName(),
+            candidateCase.getCandidatePronouns(),
+            candidateCase.getCandidateFormalIdentifier() != null
+                && !candidateCase.getCandidateFormalIdentifier().isBlank(),
             candidateCase.getStatus(),
             candidateCase.getSource(),
             candidateCase.getRejectionReason(),

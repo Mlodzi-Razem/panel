@@ -70,6 +70,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
@@ -93,6 +94,8 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
         ELECTRONIC_FORM = org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.DeclarationForm.ELECTRONIC;
     private static final org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.DeclarationForm
         SCAN_FORM = org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.DeclarationForm.SCAN;
+
+    private static final int MAX_CORRECTION_REASON = 500;
 
     private static final String CODE_TOKEN_INVALID = "TOKEN_INVALID";
     private static final String CODE_TOKEN_EXPIRED = "TOKEN_EXPIRED";
@@ -237,51 +240,7 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
                 "The declaration of this form has already been signed");
         }
 
-        RecruitmentEformRules.assertNamePair(submission.formalFirstName(), submission.formalLastName(),
-            "NAMES_ARE_A_PAIR");
-        RecruitmentEformRules.assertNamePair(submission.preferredFirstName(),
-            submission.preferredLastName(), "NAMES_ARE_A_PAIR");
-        requirePresent(submission.formalFirstName(), "The formal first name is required");
-        requirePresent(submission.formalLastName(), "The formal last name is required");
-        requirePresent(submission.personalId(), "The personal identifier is required");
-
-        // art. 9 ust. 2 lit. c: the special-category consent is a precondition of the declaration
-        if (!submission.specialCategoryConsent()) {
-            throw new RuleViolationException("FIELD_REQUIRED",
-                "The special-category data consent decision is required");
-        }
-
-        String personalId = RecruitmentEformRules.normalizePersonalId(submission.personalId(),
-            candidateCase.getCandidateBirthDate());
-        LocalDate birthDate = RecruitmentEformRules.peselBirthDate(personalId)
-            .orElseThrow(() -> new RuleViolationException("PERSONAL_ID_INVALID",
-                "The personal identifier is not valid"));
-
-        RecruitmentEformRules.assertAdmissionAge(birthDate, LocalDate.now(clock));
-        requireNotBlocked(personalId, candidateCase);
-
-        candidateCase.setCandidateFormalFirstName(submission.formalFirstName().strip());
-        candidateCase.setCandidateFormalLastName(submission.formalLastName().strip());
-
-        if (filled(submission.preferredFirstName())) {
-            candidateCase.setCandidatePreferredFirstName(submission.preferredFirstName().strip());
-            candidateCase.setCandidatePreferredLastName(submission.preferredLastName().strip());
-        }
-
-        if (filled(submission.pronouns())) {
-            candidateCase.setCandidatePronouns(submission.pronouns().strip());
-        }
-
-        if (filled(submission.phone())) {
-            candidateCase.setCandidatePhone(submission.phone().strip());
-        }
-
-        if (filled(submission.email())) {
-            candidateCase.setCandidateEmail(submission.email().strip());
-        }
-
-        candidateCase.setCandidateFormalIdentifier(personalId);
-        cases.saveAndFlush(candidateCase);
+        applyDeclarationData(candidateCase, submission);
 
         byte[] template = pdfRenderer.render(candidateCase, null);
         TDeclarationArtifact templateArtifact = new TDeclarationArtifact();
@@ -293,7 +252,7 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
         templateArtifact.setTemplateVersion(RecruitmentEformRules.TEMPLATE_VERSION);
         artifacts.saveAndFlush(templateArtifact);
 
-        recordConsents(candidateCase, submission, templateArtifact);
+        recordConsents(candidateCase, submission, templateArtifact, "self");
 
         session.setStatus(DeclarationFormSessionStatus.FILLED);
 
@@ -319,6 +278,68 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
                 .withOutcome(session.getStatus().name()));
 
         return formView(session, token);
+    }
+
+    /**
+     * The one validation + apply path of the declaration data, shared by the e-form and the paper scan
+     * so that both refuse and accept identically: name pairs, required formal names and PESEL, the
+     * special-category consent, PESEL checksum, admission age and the generic block rules; then the
+     * case columns are set.
+     */
+    private void applyDeclarationData(TRecruitmentCase candidateCase, DeclarationFormSubmission submission) {
+        RecruitmentEformRules.assertNamePair(submission.formalFirstName(), submission.formalLastName(),
+            "NAMES_ARE_A_PAIR");
+        RecruitmentEformRules.assertNamePair(submission.preferredFirstName(),
+            submission.preferredLastName(), "NAMES_ARE_A_PAIR");
+        requirePresent(submission.formalFirstName(), "The formal first name is required");
+        requirePresent(submission.formalLastName(), "The formal last name is required");
+        requirePresent(submission.personalId(), "The personal identifier is required");
+
+        // art. 9 ust. 2 lit. c: the special-category consent is a precondition of the declaration
+        if (!submission.specialCategoryConsent()) {
+            throw new RuleViolationException("FIELD_REQUIRED",
+                "The special-category data consent decision is required");
+        }
+
+        String personalId = validPersonalId(candidateCase, submission.personalId(), LocalDate.now(clock));
+
+        requireNotBlocked(personalId, candidateCase);
+
+        candidateCase.setCandidateFormalFirstName(submission.formalFirstName().strip());
+        candidateCase.setCandidateFormalLastName(submission.formalLastName().strip());
+
+        if (filled(submission.preferredFirstName())) {
+            candidateCase.setCandidatePreferredFirstName(submission.preferredFirstName().strip());
+            candidateCase.setCandidatePreferredLastName(submission.preferredLastName().strip());
+        }
+
+        if (filled(submission.pronouns())) {
+            candidateCase.setCandidatePronouns(submission.pronouns().strip());
+        }
+
+        if (filled(submission.phone())) {
+            candidateCase.setCandidatePhone(submission.phone().strip());
+        }
+
+        if (filled(submission.email())) {
+            candidateCase.setCandidateEmail(submission.email().strip());
+        }
+
+        candidateCase.setCandidateFormalIdentifier(personalId);
+        cases.saveAndFlush(candidateCase);
+    }
+
+    /** PESEL checksum, match with a known birth date and the statutory admission age at {@code ageDate}. */
+    private static String validPersonalId(TRecruitmentCase candidateCase, @Nullable String raw, LocalDate ageDate) {
+        String personalId = RecruitmentEformRules.normalizePersonalId(raw,
+            candidateCase.getCandidateBirthDate());
+        LocalDate birthDate = RecruitmentEformRules.peselBirthDate(personalId)
+            .orElseThrow(() -> new RuleViolationException("PERSONAL_ID_INVALID",
+                "The personal identifier is not valid"));
+
+        RecruitmentEformRules.assertAdmissionAge(birthDate, ageDate);
+
+        return personalId;
     }
 
     @Override
@@ -400,7 +421,12 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
 
     @Override
     @Transactional
-    public DeclarationForm attachScan(long caseId, long actorMemberId, byte[] pdfBytes) {
+    public DeclarationForm attachScan(
+        long caseId,
+        long actorMemberId,
+        byte[] pdfBytes,
+        @Nullable DeclarationFormSubmission data
+    ) {
         TRecruitmentCase candidateCase = cases.findByIdForUpdate(caseId)
             .orElseThrow(() -> new NotFoundException("recruitment case", caseId));
 
@@ -414,18 +440,46 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
 
         requirePdf(pdfBytes);
 
+        boolean formalDataPresent = filled(candidateCase.getCandidateFormalIdentifier());
+
+        if (formalDataPresent) {
+            // the candidate already filled the e-form: data changes are a reasoned correction, not a scan side effect
+            if (data != null && (filled(data.formalFirstName()) || filled(data.formalLastName())
+                || filled(data.preferredFirstName()) || filled(data.preferredLastName())
+                || filled(data.pronouns()) || filled(data.personalId()))) {
+                throw new ConflictException("FORMAL_DATA_PRESENT",
+                    "The case already has the formal data; correct it through a data correction with a reason");
+            }
+        } else {
+            // a missing data block fails the same required-field checks as an empty e-form
+            applyDeclarationData(candidateCase, data != null ? data
+                : new DeclarationFormSubmission(null, null, null, null, null, null, null, null, false, false));
+        }
+
+        // no electronic signature can arrive once the paper declaration is recorded
+        expireLiveSessions(caseId);
+
         TDeclarationArtifact scanArtifact = new TDeclarationArtifact();
         scanArtifact.setRecruitmentCase(candidateCase);
         scanArtifact.setArtifactKind(DeclarationArtifactKind.SCAN);
         scanArtifact.setContentSha256(RecruitmentEformRules.sha256Hex(pdfBytes));
         scanArtifact.setStorageRef(artifactStore.save(pdfBytes));
         scanArtifact.setSignatureType(DeclarationSignatureType.SCAN);
-        scanArtifact.setSignerName((candidateCase.getCandidateFirstName() + " "
-            + candidateCase.getCandidateLastName()).strip());
+        scanArtifact.setSignerName((candidateCase.getCandidateFormalFirstName() + " "
+            + candidateCase.getCandidateFormalLastName()).strip());
         scanArtifact.setValidatedAt(ZonedDateTime.now(clock));
         scanArtifact.setValidationResult(signatureNamesOnly(new DeclarationSignatureValidator.ValidatedSignature(
             true, null, null, List.of("PAPER_SCAN_FALLBACK"), List.of())));
         artifacts.saveAndFlush(scanArtifact);
+
+        List<String> fields = new ArrayList<>(List.of("signature_type", "storage_ref", "content_sha256"));
+
+        if (!formalDataPresent) {
+            recordConsents(candidateCase, data, scanArtifact, "paper");
+            fields.addAll(List.of("candidate_formal_first_name", "candidate_formal_last_name",
+                "candidate_preferred_first_name", "candidate_preferred_last_name", "candidate_pronouns",
+                "candidate_formal_identifier", "candidate_phone", "candidate_email", "recruitment_consents"));
+        }
 
         workflow.recordDeclaration(caseId, actorMemberId, SCAN_FORM,
             candidateCase.getAssessmentTrack(), LocalDate.now(clock));
@@ -433,11 +487,122 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
         auditLog.record("recruitment :: declaration-scan",
             AuditPayload.of("caseId", caseId)
                 .withId("actorId", actorMemberId)
-                .withFields(List.of("signature_type", "storage_ref", "content_sha256"))
+                .withFields(fields)
                 .withOutcome(DeclarationArtifactKind.SCAN.name()));
 
         return new DeclarationForm(DeclarationFormSessionStatus.SIGNED.name(), null,
             greeting(candidateCase), null);
+    }
+
+    @Override
+    @Transactional
+    public void correctCandidateData(long caseId, long actorMemberId, CandidateDataCorrection correction) {
+        TRecruitmentCase candidateCase = cases.findByIdForUpdate(caseId)
+            .orElseThrow(() -> new NotFoundException("recruitment case", caseId));
+
+        requireCaseManage(actorMemberId, candidateCase);
+
+        if (candidateCase.getClosedAt() != null) {
+            throw new ConflictException("CASE_NOT_OPEN", "A closed recruitment case is read-only");
+        }
+
+        if (!filled(candidateCase.getCandidateFormalIdentifier())) {
+            throw new ConflictException("FORMAL_DATA_MISSING",
+                "The case has no formal data to correct — record the declaration first");
+        }
+
+        String reason = correction.reason() == null ? "" : correction.reason().strip();
+
+        if (reason.isEmpty() || reason.length() > MAX_CORRECTION_REASON) {
+            throw new RuleViolationException("CORRECTION_REQUIRES_REASON",
+                "A correction needs a reason of 1-%d characters".formatted(MAX_CORRECTION_REASON));
+        }
+
+        List<String> changed = new ArrayList<>();
+
+        if (correction.formalFirstName() != null || correction.formalLastName() != null) {
+            RecruitmentEformRules.assertNamePair(correction.formalFirstName(), correction.formalLastName(),
+                "NAMES_ARE_A_PAIR");
+            requirePresent(correction.formalFirstName(), "The formal first name cannot be cleared");
+            requirePresent(correction.formalLastName(), "The formal last name cannot be cleared");
+
+            String first = correction.formalFirstName().strip();
+            String last = correction.formalLastName().strip();
+
+            if (!first.equals(candidateCase.getCandidateFormalFirstName())) {
+                candidateCase.setCandidateFormalFirstName(first);
+                changed.add("candidate_formal_first_name");
+            }
+
+            if (!last.equals(candidateCase.getCandidateFormalLastName())) {
+                candidateCase.setCandidateFormalLastName(last);
+                changed.add("candidate_formal_last_name");
+            }
+        }
+
+        if (correction.preferredFirstName() != null || correction.preferredLastName() != null) {
+            RecruitmentEformRules.assertNamePair(correction.preferredFirstName(),
+                correction.preferredLastName(), "NAMES_ARE_A_PAIR");
+
+            String first = filled(correction.preferredFirstName()) ? correction.preferredFirstName().strip() : null;
+            String last = filled(correction.preferredLastName()) ? correction.preferredLastName().strip() : null;
+
+            if (!java.util.Objects.equals(first, candidateCase.getCandidatePreferredFirstName())) {
+                candidateCase.setCandidatePreferredFirstName(first);
+                changed.add("candidate_preferred_first_name");
+            }
+
+            if (!java.util.Objects.equals(last, candidateCase.getCandidatePreferredLastName())) {
+                candidateCase.setCandidatePreferredLastName(last);
+                changed.add("candidate_preferred_last_name");
+            }
+        }
+
+        if (correction.pronouns() != null) {
+            String pronouns = filled(correction.pronouns()) ? correction.pronouns().strip() : null;
+
+            if (!java.util.Objects.equals(pronouns, candidateCase.getCandidatePronouns())) {
+                candidateCase.setCandidatePronouns(pronouns);
+                changed.add("candidate_pronouns");
+            }
+        }
+
+        if (correction.personalId() != null) {
+            LocalDate ageDate = candidateCase.getDeclarationReceivedOn() != null
+                ? candidateCase.getDeclarationReceivedOn() : LocalDate.now(clock);
+            String personalId = validPersonalId(candidateCase, correction.personalId(), ageDate);
+
+            if (!personalId.equals(candidateCase.getCandidateFormalIdentifier())) {
+                requireNotBlocked(personalId, candidateCase);
+                candidateCase.setCandidateFormalIdentifier(personalId);
+                changed.add("candidate_formal_identifier");
+            }
+        }
+
+        if (changed.isEmpty()) {
+            throw new RuleViolationException("NO_CHANGES", "The correction changes nothing");
+        }
+
+        cases.saveAndFlush(candidateCase);
+
+        ObjectNode payload = jsonMapper.createObjectNode();
+        ArrayNode fields = payload.putArray("fields");
+        changed.forEach(fields::add);
+        payload.put("reason", reason);
+
+        TRecruitmentCaseEvent event = new TRecruitmentCaseEvent();
+        event.setRecruitmentCase(candidateCase);
+        event.setEventType(RecruitmentCaseEventType.CANDIDATE_DATA_CORRECTED);
+        event.setPayload(jsonMapper.writeValueAsString(payload));
+        event.setCreatedBy(members.getReferenceById(actorMemberId));
+        caseEvents.saveAndFlush(event);
+
+        // the audit trail carries the field names only — neither the values nor the reason
+        auditLog.record("recruitment :: candidate-data-correction",
+            AuditPayload.of("caseId", caseId)
+                .withId("actorId", actorMemberId)
+                .withFields(changed)
+                .withOutcome("CORRECTED"));
     }
 
     private void expireLiveSessions(long caseId) {
@@ -482,15 +647,16 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
     private void recordConsents(
         TRecruitmentCase candidateCase,
         DeclarationFormSubmission submission,
-        TDeclarationArtifact templateArtifact
+        TDeclarationArtifact templateArtifact,
+        String grantedBy
     ) {
         List<TRecruitmentConsent> existing = consents.findAllByRecruitmentCaseId(candidateCase.getId());
 
         recordConsent(candidateCase, existing, RecruitmentConsentKind.SPECIAL_CATEGORY_9_2D,
-            templateArtifact);
+            templateArtifact, grantedBy);
 
         if (submission.imageConsent()) {
-            recordConsent(candidateCase, existing, RecruitmentConsentKind.IMAGE, templateArtifact);
+            recordConsent(candidateCase, existing, RecruitmentConsentKind.IMAGE, templateArtifact, grantedBy);
         }
     }
 
@@ -498,7 +664,8 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
         TRecruitmentCase candidateCase,
         List<TRecruitmentConsent> existing,
         RecruitmentConsentKind kind,
-        TDeclarationArtifact templateArtifact
+        TDeclarationArtifact templateArtifact,
+        String grantedBy
     ) {
         boolean grantedBefore = existing.stream()
             .anyMatch(consent -> consent.getConsentKind() == kind);
@@ -510,7 +677,7 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
         TRecruitmentConsent consent = new TRecruitmentConsent();
         consent.setRecruitmentCase(candidateCase);
         consent.setConsentKind(kind);
-        consent.setGrantedBy("self");
+        consent.setGrantedBy(grantedBy);
         consent.setGrantedAt(ZonedDateTime.now(clock));
         consent.setArtifact(templateArtifact);
         consents.saveAndFlush(consent);

@@ -29,5 +29,6 @@ public enum RecruitmentCaseEventType {
     VOTE_STARTED,
     DECISION_RECORDED,
     CASE_CLOSED,
-    NOTE_ADDED
+    NOTE_ADDED,
+    CANDIDATE_DATA_CORRECTED
 }

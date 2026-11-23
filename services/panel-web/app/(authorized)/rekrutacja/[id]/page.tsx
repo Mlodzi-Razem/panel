@@ -27,7 +27,9 @@ import CaseClocks from "@/components/recruitment/CaseClocks";
 import CaseDecisions from "@/components/recruitment/CaseDecisions";
 import CaseTimeline from "@/components/recruitment/CaseTimeline";
 import CaseTransitions, { DecidingBodyOption } from "@/components/recruitment/CaseTransitions";
+import CandidateDataCorrection from "@/components/recruitment/CandidateDataCorrection";
 import DeclarationLinkButton from "@/components/recruitment/DeclarationLinkButton";
+import DeclarationScanButton from "@/components/recruitment/DeclarationScanButton";
 import { candidateName, caseStatusTone, FormattedCaseDate } from "@/components/recruitment/format";
 import styles from "@/components/recruitment/recruitment.module.scss";
 import {
@@ -151,8 +153,31 @@ export default async function RecruitmentCasePage({params}: { params: Promise<{ 
                               ariaLabel={t("sendReminderAria")}/>
                 {candidateCase.status === "AWAITING_DECLARATION" && canManage
                     && <DeclarationLinkButton caseId={caseId}/>}
+                {candidateCase.status === "AWAITING_DECLARATION" && canManage
+                    && <DeclarationScanButton caseId={caseId}
+                                              formalIdentifierPresent={candidateCase.formalIdentifierPresent}/>}
             </div>}
         </Card>
+
+        {candidateCase.formalIdentifierPresent && <Card title={t("formalDataCard")} hint={t("formalDataHint")}>
+            <DescriptionList>
+                <div><dt>{t("correction.formalFirstName")}</dt><dd>{candidateCase.candidateFormalFirstName ?? "—"}</dd></div>
+                <div><dt>{t("correction.formalLastName")}</dt><dd>{candidateCase.candidateFormalLastName ?? "—"}</dd></div>
+                <div><dt>{t("correction.preferredFirstName")}</dt><dd>{candidateCase.candidatePreferredFirstName ?? "—"}</dd></div>
+                <div><dt>{t("correction.preferredLastName")}</dt><dd>{candidateCase.candidatePreferredLastName ?? "—"}</dd></div>
+                <div><dt>{t("correction.pronouns")}</dt><dd>{candidateCase.candidatePronouns ?? "—"}</dd></div>
+                <div><dt>{t("correction.personalId")}</dt><dd>{t("personalIdOnFile")}</dd></div>
+            </DescriptionList>
+            {canManage && open && <div className={styles.actions}>
+                <CandidateDataCorrection caseId={caseId} data={{
+                    formalFirstName: candidateCase.candidateFormalFirstName ?? "",
+                    formalLastName: candidateCase.candidateFormalLastName ?? "",
+                    preferredFirstName: candidateCase.candidatePreferredFirstName ?? "",
+                    preferredLastName: candidateCase.candidatePreferredLastName ?? "",
+                    pronouns: candidateCase.candidatePronouns ?? "",
+                }}/>
+            </div>}
+        </Card>}
 
         {postDeclaration && candidateCase.status !== "REJECTED" && candidateCase.status !== "ACCEPTED"
             && <Card title={t("decisionsCard")} hint={t("decisionsCardHint")}>

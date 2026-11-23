@@ -63,7 +63,7 @@ function headers(req: PanelApiRequest, config: PanelApiRequestConfig) {
     } satisfies HeadersInit;
 }
 
-function body(req: PanelApiRequest): string | Blob | undefined {
+function body(req: PanelApiRequest): string | Blob | FormData | undefined {
     if (!BodyHttpMethods.includes(req.method as unknown as BodyHttpMethod)) {
         if ('body' in req) {
             throw new Error(`Method ${req.method} does not support body`);
@@ -76,7 +76,7 @@ function body(req: PanelApiRequest): string | Blob | undefined {
         return undefined;
     }
 
-    if (req.body instanceof Blob || typeof req.body === 'string') {
+    if (req.body instanceof Blob || req.body instanceof FormData || typeof req.body === 'string') {
         return req.body;
     }
 

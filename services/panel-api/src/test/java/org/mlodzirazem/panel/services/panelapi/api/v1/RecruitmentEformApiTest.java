@@ -244,24 +244,102 @@ class RecruitmentEformApiTest extends ApiTestSupport {
         long caseId = awaitingCase("edek-skan@example.org");
         byte[] scan = "%PDF-1.4 skan deklaracji".getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
+        Map<String, String> data = scanData(SyntheticPesel.of(java.time.LocalDate.of(2007, 4, 1), 31));
+
         Res mine = multipart("/recruitment-cases/" + caseId + "/declaration-scan",
-            token(sub(zoA), zoA.getDomainEmail()), scan);
+            token(sub(zoA), zoA.getDomainEmail()), scan, data);
         assertThat(mine.status()).isEqualTo(200);
         assertThat(mine.body().path("status").asString()).isEqualTo("SIGNED");
 
         long anotherCase = awaitingCase("edek-drugi@example.org");
         assertThat(multipart("/recruitment-cases/" + anotherCase + "/declaration-scan",
-            token(sub(plain), plain.getDomainEmail()), scan).status()).isEqualTo(403);
+            token(sub(plain), plain.getDomainEmail()), scan, data).status()).isEqualTo(403);
 
         long secondCase = awaitingCase("edek-trzeci@example.org");
+        Map<String, String> otherData = scanData(SyntheticPesel.of(java.time.LocalDate.of(2007, 4, 1), 32));
         Res firstScan = multipart("/recruitment-cases/" + secondCase + "/declaration-scan",
-            token(sub(zoA), zoA.getDomainEmail()), scan);
+            token(sub(zoA), zoA.getDomainEmail()), scan, otherData);
         assertThat(firstScan.status()).isEqualTo(200);
         assertThat(multipart("/recruitment-cases/" + secondCase + "/declaration-scan",
-            token(sub(zoA), zoA.getDomainEmail()), scan).status()).isEqualTo(409);
+            token(sub(zoA), zoA.getDomainEmail()), scan, otherData).status()).isEqualTo(409);
+    }
+
+    private static Map<String, String> scanData(String pesel) {
+        return Map.of(
+            "formalFirstName", "Edmunda",
+            "formalLastName", "Elektroniczna",
+            "personalId", pesel,
+            "specialCategoryConsent", "true",
+            "imageConsent", "false");
+    }
+
+    @Test
+    void scanWithoutDataIsRefusedAndTheDetailExposesTheFormalDataWithoutThePesel() {
+        long caseId = awaitingCase("edek-skan-bez@example.org");
+        byte[] scan = "%PDF-1.4 skan deklaracji".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        String bearer = token(sub(zoA), zoA.getDomainEmail());
+
+        Res missing = multipart("/recruitment-cases/" + caseId + "/declaration-scan", bearer, scan, Map.of());
+        assertThat(missing.status()).isEqualTo(422);
+        assertThat(missing.code()).isEqualTo("FIELD_REQUIRED");
+
+        assertThat(get(zoA, "/recruitment-cases/" + caseId).body().path("formalIdentifierPresent").asBoolean())
+            .isFalse();
+
+        String pesel = SyntheticPesel.of(java.time.LocalDate.of(2007, 4, 1), 33);
+        assertThat(multipart("/recruitment-cases/" + caseId + "/declaration-scan", bearer, scan,
+            scanData(pesel)).status()).isEqualTo(200);
+
+        Res detail = get(zoA, "/recruitment-cases/" + caseId);
+        assertThat(detail.body().path("formalIdentifierPresent").asBoolean()).isTrue();
+        assertThat(detail.body().path("candidateFormalFirstName").asString()).isEqualTo("Edmunda");
+        assertThat(detail.body().toString()).doesNotContain(pesel);
+    }
+
+    @Test
+    void correctionEndpointRecordsTheReasonInTheTimelineAndChecksThePermission() {
+        long caseId = awaitingCase("edek-korekta@example.org");
+        byte[] scan = "%PDF-1.4 skan deklaracji".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+        multipart("/recruitment-cases/" + caseId + "/declaration-scan", token(sub(zoA), zoA.getDomainEmail()),
+            scan, scanData(SyntheticPesel.of(java.time.LocalDate.of(2007, 4, 1), 34)));
+
+        String path = "/recruitment-cases/" + caseId + "/candidate-data-corrections";
+
+        assertThat(post(plain, path, Map.of("formalFirstName", "Edmund", "formalLastName", "Elektroniczny",
+            "reason", "Literówka")).status()).isEqualTo(403);
+
+        Res noReason = post(zoA, path, Map.of("formalFirstName", "Edmund", "formalLastName", "Elektroniczny"));
+        assertThat(noReason.status()).isEqualTo(422);
+        assertThat(noReason.code()).isEqualTo("CORRECTION_REQUIRES_REASON");
+
+        Res ok = post(zoA, path, Map.of("formalFirstName", "Edmund", "formalLastName", "Elektroniczny",
+            "reason", "Literówka w papierowej deklaracji"));
+        assertThat(ok.status()).isEqualTo(200);
+        assertThat(ok.body().path("candidateFormalFirstName").asString()).isEqualTo("Edmund");
+
+        boolean recorded = false;
+
+        for (var event : ok.body().path("events")) {
+            if ("CANDIDATE_DATA_CORRECTED".equals(event.path("eventType").asString())) {
+                recorded = true;
+                assertThat(event.path("payload").path("reason").asString())
+                    .isEqualTo("Literówka w papierowej deklaracji");
+                assertThat(event.path("payload").path("fields").toString())
+                    .contains("candidate_formal_first_name").doesNotContain("Edmund");
+            }
+        }
+
+        assertThat(recorded).isTrue();
+        assertThat(post(zoA, path, Map.of("formalFirstName", "Edmund", "formalLastName", "Elektroniczny",
+            "reason", "Jeszcze raz")).code()).isEqualTo("NO_CHANGES");
     }
 
     private Res multipart(String path, String token, byte[] pdf) {
+        return multipart(path, token, pdf, Map.of());
+    }
+
+    private Res multipart(String path, String token, byte[] pdf, Map<String, String> fields) {
         ByteArrayResource filePart = new ByteArrayResource(pdf) {
             @Override
             public String getFilename() {
@@ -271,6 +349,7 @@ class RecruitmentEformApiTest extends ApiTestSupport {
 
         MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
         parts.add("file", filePart);
+        fields.forEach(parts::add);
 
         var spec = anon.post().uri("http://localhost:" + port + path);
 

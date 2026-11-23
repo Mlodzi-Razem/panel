@@ -69,8 +69,40 @@ public interface RecruitmentEformService {
     /** PAdES upload: validates the signature, stores the artifact and records the declaration. */
     DeclarationForm attachSignedDeclaration(String token, byte[] pdfBytes);
 
-    /** Paper fallback for the back office: stores the scan and records the declaration. */
-    DeclarationForm attachScan(long caseId, long actorMemberId, byte[] pdfBytes);
+    /**
+     * Paper fallback for the back office: stores the scan and records the declaration. A case that has
+     * no formal data yet takes it from {@code data} (validated exactly like the e-form; the consents are
+     * recorded as given on paper); a case that already has it (the candidate filled the e-form) refuses
+     * data with 409 {@code FORMAL_DATA_PRESENT} — changes go through {@link #correctCandidateData}.
+     * Live e-form sessions of the case are expired.
+     */
+    DeclarationForm attachScan(long caseId, long actorMemberId, byte[] pdfBytes,
+                               @Nullable DeclarationFormSubmission data);
+
+    /**
+     * Reasoned correction of the candidate's formal data (RECRUITMENT_MANAGE in the case district or a
+     * global RECRUITMENT_APPROVE). Only non-null fields change; the event of the case history carries the
+     * changed column names and the reason, never the values.
+     */
+    void correctCandidateData(long caseId, long actorMemberId, CandidateDataCorrection correction);
+
+    /**
+     * @param formalFirstName    with the last name: replaces the formal names (never cleared)
+     * @param preferredFirstName with the last name: replaces the preferred names, blank for both clears them
+     * @param pronouns           blank clears
+     * @param personalId         re-validated like on the declaration
+     * @param reason             required, 1-500 characters
+     */
+    record CandidateDataCorrection(
+        @Nullable String formalFirstName,
+        @Nullable String formalLastName,
+        @Nullable String preferredFirstName,
+        @Nullable String preferredLastName,
+        @Nullable String pronouns,
+        @Nullable String personalId,
+        @Nullable String reason
+    ) {
+    }
 
     /**
      * @param emailDispatch a {@code MailDispatch} name for the e-mail carrying the link, or {@code NO_EMAIL}

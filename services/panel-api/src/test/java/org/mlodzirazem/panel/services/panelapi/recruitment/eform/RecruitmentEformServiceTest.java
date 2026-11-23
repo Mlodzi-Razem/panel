@@ -32,6 +32,8 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TR
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TRecruitmentCaseEventRepository;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TRecruitmentCaseRepository;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember;
+import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentAdmissionService;
+import org.mlodzirazem.panel.services.panelapi.recruitment.workflow.RecruitmentWorkflowService;
 import org.mlodzirazem.panel.services.panelapi.test.DomainTestSupport;
 import org.mlodzirazem.panel.services.panelapi.test.db.PostgresTest;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +63,12 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
 
     @Autowired
     RecruitmentEformService eform;
+
+    @Autowired
+    RecruitmentWorkflowService workflow;
+
+    @Autowired
+    RecruitmentAdmissionService admission;
 
     @Autowired
     TRecruitmentCaseRepository caseRepository;
@@ -588,7 +596,7 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
         oversized[2] = 'D';
         oversized[3] = 'F';
 
-        assertThatThrownBy(() -> eform.attachScan(candidateCase.getId(), actor, oversized))
+        assertThatThrownBy(() -> eform.attachScan(candidateCase.getId(), actor, oversized, null))
             .isInstanceOf(RuleViolationException.class)
             .extracting("code").isEqualTo("FILE_TOO_LARGE");
     }
@@ -598,9 +606,9 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
         long actor = districtActor();
         TRecruitmentCase candidateCase = awaitingCase("papierowa@example.org");
 
-        byte[] scan = "%PDF-1.4 papierowy skan".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] scan = SCAN;
         RecruitmentEformService.DeclarationForm result = eform.attachScan(candidateCase.getId(),
-            actor, scan);
+            actor, scan, submission(submissionPesel(), "Felicja"));
 
         assertThat(result.status()).isEqualTo("SIGNED");
         assertThat(result.greeting()).isEqualTo("Kolendra Kowalska");
@@ -608,17 +616,275 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
         TRecruitmentCase stored = caseRepository.findById(candidateCase.getId()).orElseThrow();
         assertThat(stored.getStatus()).isEqualTo(RecruitmentCaseStatus.DECLARATION_RECEIVED);
         assertThat(stored.getDeclarationForm().name()).isEqualTo("SCAN");
+        assertThat(stored.getCandidateFormalFirstName()).isEqualTo("Felicja");
+        assertThat(stored.getCandidateFormalLastName()).isEqualTo("Formalna");
+        assertThat(stored.getCandidateFormalIdentifier()).isEqualTo(submissionPesel());
 
         String signerName = jdbc.queryForObject(
             "SELECT signer_name FROM declaration_artifacts WHERE case_id = ? AND artifact_kind = 'SCAN'",
             String.class, candidateCase.getId());
 
-        assertThat(signerName).isEqualTo("Kolendra Kowalska");
+        assertThat(signerName).isEqualTo("Felicja Formalna");
 
-        assertThatThrownBy(() -> eform.attachScan(candidateCase.getId(), actor, scan))
+        assertThatThrownBy(() -> eform.attachScan(candidateCase.getId(), actor, scan, null))
             .isInstanceOf(ConflictException.class)
             .extracting("code").isEqualTo("NOT_AWAITING_DECLARATION");
 
         assertThat(auditCount("recruitment :: declaration-scan")).isGreaterThanOrEqualTo(1);
+    }
+
+    private static final byte[] SCAN = "%PDF-1.4 papierowy skan".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+    @Test
+    void scanWithoutDataOnACaseLackingFormalDataIsRefused() {
+        long actor = districtActor();
+        TRecruitmentCase candidateCase = awaitingCase("bez-danych@example.org");
+
+        assertThatThrownBy(() -> eform.attachScan(candidateCase.getId(), actor, SCAN, null))
+            .isInstanceOf(RuleViolationException.class)
+            .extracting("code").isEqualTo("FIELD_REQUIRED");
+
+        // no special-category consent ticked on the paper declaration: the same refusal as in the e-form
+        assertThatThrownBy(() -> eform.attachScan(candidateCase.getId(), actor, SCAN,
+            new RecruitmentEformService.DeclarationFormSubmission("Felicja", "Formalna", null, null, null,
+                submissionPesel(), null, null, true, false)))
+            .isInstanceOf(RuleViolationException.class)
+            .extracting("code").isEqualTo("FIELD_REQUIRED");
+
+        assertThat(caseRepository.findById(candidateCase.getId()).orElseThrow().getStatus())
+            .isEqualTo(RecruitmentCaseStatus.AWAITING_DECLARATION);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM declaration_artifacts WHERE case_id = ?",
+            Integer.class, candidateCase.getId())).isZero();
+    }
+
+    @Test
+    void scanWithDataFillsTheCaseRecordsPaperConsentsAndExpiresLiveSessions() {
+        long actor = districtActor();
+        TRecruitmentCase candidateCase = awaitingCase("skan-dane@example.org");
+        RecruitmentEformService.DeclarationLink link = eform.createDeclarationLink(candidateCase.getId(), actor);
+
+        eform.attachScan(candidateCase.getId(), actor, SCAN, new RecruitmentEformService.DeclarationFormSubmission(
+            "Felicja", "Formalna", "Fela", "Falkowa", "ona", submissionPesel(), "+48 600 100 200",
+            "skan.kontakt@example.org", false, true));
+
+        TRecruitmentCase stored = caseRepository.findById(candidateCase.getId()).orElseThrow();
+        assertThat(stored.getCandidatePreferredFirstName()).isEqualTo("Fela");
+        assertThat(stored.getCandidatePreferredLastName()).isEqualTo("Falkowa");
+        assertThat(stored.getCandidatePronouns()).isEqualTo("ona");
+        assertThat(stored.getCandidatePhone()).isEqualTo("+48 600 100 200");
+        assertThat(stored.getCandidateEmail()).isEqualTo("skan.kontakt@example.org");
+
+        // only the special-category consent was ticked; both rest on the SCAN artifact and say "paper"
+        List<java.util.Map<String, Object>> consentRows = jdbc.queryForList(
+            "SELECT c.consent_kind::text AS kind, c.granted_by, a.artifact_kind::text AS artifact"
+                + " FROM recruitment_consents c JOIN declaration_artifacts a ON a.id = c.artifact_id"
+                + " WHERE c.case_id = ?", candidateCase.getId());
+
+        assertThat(consentRows).hasSize(1);
+        assertThat(consentRows.get(0)).containsEntry("kind", "SPECIAL_CATEGORY_9_2D")
+            .containsEntry("granted_by", "paper").containsEntry("artifact", "SCAN");
+
+        assertThat(jdbc.queryForList("SELECT status::text FROM declaration_form_sessions WHERE case_id = ?",
+            String.class, candidateCase.getId())).containsExactly("EXPIRED");
+
+        // the e-form link is dead: no electronic signature can arrive after the paper declaration
+        assertThatThrownBy(() -> eform.getForm(link.token()))
+            .isInstanceOf(DeclarationFormAccessException.class);
+
+        String audit = auditPayloads("recruitment :: declaration-scan");
+        assertThat(audit).contains("candidate_formal_identifier", "recruitment_consents")
+            .doesNotContain(submissionPesel(), "Felicja", "Formalna", "skan.kontakt@example.org");
+    }
+
+    @Test
+    void scanDataIsValidatedExactlyLikeTheEForm() {
+        long actor = districtActor();
+        // no known birth date: the age check, not the PESEL/birth-date match, decides
+        TRecruitmentCase candidateCase = awaitingCase("skan-bledy@example.org", null);
+
+        assertThatThrownBy(() -> eform.attachScan(candidateCase.getId(), actor, SCAN,
+            submission("00000000000", "Felicja")))
+            .isInstanceOf(RuleViolationException.class).extracting("code").isEqualTo("PERSONAL_ID_INVALID");
+
+        assertThatThrownBy(() -> eform.attachScan(candidateCase.getId(), actor, SCAN,
+            submission(SyntheticPesel.of(LocalDate.of(1985, 3, 3), 5), "Felicja")))
+            .isInstanceOf(RuleViolationException.class).extracting("code").isEqualTo("ADMISSION_AGE");
+
+        assertThatThrownBy(() -> eform.attachScan(candidateCase.getId(), actor, SCAN,
+            new RecruitmentEformService.DeclarationFormSubmission("Felicja", null, null, null, null,
+                submissionPesel(), null, null, true, true)))
+            .isInstanceOf(RuleViolationException.class).extracting("code").isEqualTo("NAMES_ARE_A_PAIR");
+
+        TMember existing = newMember("Istniejaca", "Czlonkini", "slaskie");
+        existing.setFormalIdentifier(submissionPesel());
+        memberRepository.saveAndFlush(existing);
+
+        assertThatThrownBy(() -> eform.attachScan(candidateCase.getId(), actor, SCAN,
+            submission(submissionPesel(), "Felicja")))
+            .isInstanceOf(RuleViolationException.class)
+            .hasMessageNotContaining("Istniejaca")
+            .extracting("code").isEqualTo("DECLARATION_BLOCKED");
+
+        assertThat(caseRepository.findById(candidateCase.getId()).orElseThrow().getStatus())
+            .isEqualTo(RecruitmentCaseStatus.AWAITING_DECLARATION);
+    }
+
+    @Test
+    void scanAfterTheEFormRefusesNewDataButStillRecordsTheDeclaration() {
+        long actor = districtActor();
+        TRecruitmentCase candidateCase = awaitingCase("skan-po-eformie@example.org");
+        RecruitmentEformService.DeclarationLink link = eform.createDeclarationLink(candidateCase.getId(), actor);
+        eform.submitForm(link.token(), submission(submissionPesel(), "Felicja"));
+
+        assertThatThrownBy(() -> eform.attachScan(candidateCase.getId(), actor, SCAN,
+            submission(submissionPesel(), "Zmiana")))
+            .isInstanceOf(ConflictException.class).extracting("code").isEqualTo("FORMAL_DATA_PRESENT");
+
+        // without data the paper signature simply lands; consents given in the e-form stay
+        eform.attachScan(candidateCase.getId(), actor, SCAN, null);
+
+        TRecruitmentCase stored = caseRepository.findById(candidateCase.getId()).orElseThrow();
+        assertThat(stored.getStatus()).isEqualTo(RecruitmentCaseStatus.DECLARATION_RECEIVED);
+        assertThat(stored.getCandidateFormalFirstName()).isEqualTo("Felicja");
+        assertThat(jdbc.queryForList("SELECT granted_by FROM recruitment_consents WHERE case_id = ?",
+            String.class, candidateCase.getId())).containsOnly("self");
+        assertThat(jdbc.queryForObject(
+            "SELECT signer_name FROM declaration_artifacts WHERE case_id = ? AND artifact_kind = 'SCAN'",
+            String.class, candidateCase.getId())).isEqualTo("Felicja Formalna");
+        assertThat(jdbc.queryForList("SELECT status::text FROM declaration_form_sessions WHERE case_id = ?",
+            String.class, candidateCase.getId())).containsExactly("EXPIRED");
+    }
+
+    private TRecruitmentCase caseWithFormalData(long actor, String email) {
+        TRecruitmentCase candidateCase = awaitingCase(email);
+        eform.attachScan(candidateCase.getId(), actor, SCAN, submission(submissionPesel(), "Felicja"));
+        return caseRepository.findById(candidateCase.getId()).orElseThrow();
+    }
+
+    private static RecruitmentEformService.CandidateDataCorrection correction(
+        String formalFirst, String formalLast, String preferredFirst, String preferredLast, String pronouns,
+        String personalId, String reason) {
+        return new RecruitmentEformService.CandidateDataCorrection(formalFirst, formalLast, preferredFirst,
+            preferredLast, pronouns, personalId, reason);
+    }
+
+    @Test
+    void correctionChangesOnlyGivenFieldsAndWritesReasonedHistoryWithoutValues() {
+        long actor = districtActor();
+        TRecruitmentCase candidateCase = caseWithFormalData(actor, "korekta@example.org");
+        long caseId = candidateCase.getId();
+        String newPesel = SyntheticPesel.of(LocalDate.of(2007, 4, 1), 9);
+
+        eform.correctCandidateData(caseId, actor, correction("Felicjana", "Formalna", "", "", "oni", newPesel,
+            "  Literówka w papierowej deklaracji  "));
+
+        TRecruitmentCase stored = caseRepository.findById(caseId).orElseThrow();
+        assertThat(stored.getCandidateFormalFirstName()).isEqualTo("Felicjana");
+        assertThat(stored.getCandidateFormalLastName()).isEqualTo("Formalna");
+        assertThat(stored.getCandidatePreferredFirstName()).isNull();
+        assertThat(stored.getCandidatePreferredLastName()).isNull();
+        assertThat(stored.getCandidatePronouns()).isEqualTo("oni");
+        assertThat(stored.getCandidateFormalIdentifier()).isEqualTo(newPesel);
+
+        String payload = jdbc.queryForObject(
+            "SELECT payload::text FROM recruitment_case_events WHERE case_id = ?"
+                + " AND event_type = 'CANDIDATE_DATA_CORRECTED'", String.class, caseId);
+
+        assertThat(payload).contains("Literówka w papierowej deklaracji")
+            .contains("candidate_formal_first_name", "candidate_formal_identifier", "candidate_pronouns",
+                "candidate_preferred_first_name")
+            .doesNotContain("candidate_formal_last_name", newPesel, "Felicjana");
+
+        String audit = auditPayloads("recruitment :: candidate-data-correction");
+        assertThat(audit).contains("candidate_formal_first_name")
+            .doesNotContain("Literówka", newPesel, "Felicjana");
+    }
+
+    @Test
+    void correctionNeedsAReasonAndAChange() {
+        long actor = districtActor();
+        long caseId = caseWithFormalData(actor, "korekta-powod@example.org").getId();
+
+        for (String reason : new String[]{null, "", "   ", "x".repeat(501)}) {
+            assertThatThrownBy(() -> eform.correctCandidateData(caseId, actor,
+                correction("Inna", "Formalna", null, null, null, null, reason)))
+                .isInstanceOf(RuleViolationException.class)
+                .extracting("code").isEqualTo("CORRECTION_REQUIRES_REASON");
+        }
+
+        assertThatThrownBy(() -> eform.correctCandidateData(caseId, actor,
+            correction("Felicja", "Formalna", null, null, null, submissionPesel(), "Bez zmian")))
+            .isInstanceOf(RuleViolationException.class).extracting("code").isEqualTo("NO_CHANGES");
+
+        assertThatThrownBy(() -> eform.correctCandidateData(caseId, actor,
+            correction("Inna", null, null, null, null, null, "Połowa pary")))
+            .isInstanceOf(RuleViolationException.class).extracting("code").isEqualTo("NAMES_ARE_A_PAIR");
+
+        assertThatThrownBy(() -> eform.correctCandidateData(caseId, actor,
+            correction("", "", null, null, null, null, "Czyszczenie")))
+            .isInstanceOf(RuleViolationException.class).extracting("code").isEqualTo("FIELD_REQUIRED");
+
+        assertThatThrownBy(() -> eform.correctCandidateData(caseId, actor,
+            correction(null, null, null, null, null, "00000000000", "Zły numer")))
+            .isInstanceOf(RuleViolationException.class).extracting("code").isEqualTo("PERSONAL_ID_INVALID");
+
+        assertThat(auditCount("recruitment :: candidate-data-correction")).isZero();
+    }
+
+    @Test
+    void correctionIsRefusedForAClosedCaseAMissingFormalDataAndAForeignDistrict() {
+        long actor = districtActor();
+        TRecruitmentCase noData = awaitingCase("korekta-brak@example.org");
+
+        assertThatThrownBy(() -> eform.correctCandidateData(noData.getId(), actor,
+            correction("Inna", "Formalna", null, null, null, null, "Powód")))
+            .isInstanceOf(ConflictException.class).extracting("code").isEqualTo("FORMAL_DATA_MISSING");
+
+        long caseId = caseWithFormalData(actor, "korekta-uprawnienia@example.org").getId();
+        TMember outsider = newMember("Obcy", "Okregowy", "slaskie");
+        grant(outsider, board("slaskie"), "COORDINATOR");
+
+        assertThatThrownBy(() -> eform.correctCandidateData(caseId, outsider.getId(),
+            correction("Inna", "Formalna", null, null, null, null, "Powód")))
+            .isInstanceOf(ForbiddenException.class);
+
+        jdbc.update("UPDATE recruitment_cases SET status = 'REJECTED', rejection_reason = 'NOT_FIT',"
+            + " closed_at = CURRENT_DATE WHERE id = ?", caseId);
+
+        assertThatThrownBy(() -> eform.correctCandidateData(caseId, actor,
+            correction("Inna", "Formalna", null, null, null, null, "Powód")))
+            .isInstanceOf(ConflictException.class).extracting("code").isEqualTo("CASE_NOT_OPEN");
+    }
+
+    @Test
+    void aScanOnlyCaseWalksToAcceptedAndGetsAMember() {
+        long actor = districtActor();
+        TMember zkMember = newMember("Bogna", "Krajowa", "mazowieckie");
+        grant(zkMember, body("national-board"), "CO_CHAIR");
+        long zk = zkMember.getId();
+
+        long caseId = caseWithFormalData(actor, "skan-e2e@example.org").getId();
+
+        // the scan was recorded today: move the clocks of the case back so the decisions are in the past
+        jdbc.update("UPDATE recruitment_cases SET declaration_received_on = CURRENT_DATE - 80,"
+            + " assessment_not_before_on = CURRENT_DATE - 18, assessment_not_later_on = CURRENT_DATE - 4"
+            + " WHERE id = ?", caseId);
+
+        TRecruitmentCase probation = workflow.startProbation(caseId, actor);
+        workflow.recordZoRecommendation(probation.getId(), actor, board("mazowieckie").getId(),
+            LocalDate.now().minusDays(15), "ZO/MZ/REC/27", null);
+        workflow.startZkVoting(caseId, zk);
+        workflow.recordZkApproval(caseId, zk, body("national-board").getId(), LocalDate.now().minusDays(2),
+            "ZK/91/2027", null);
+        workflow.recordAdmissionResolution(caseId, zk, board("mazowieckie").getId(),
+            LocalDate.now().minusDays(1), "ZO/MZ/92/2027", null);
+
+        TMember member = admission.admit(caseId, zk).member();
+
+        assertThat(member.getFormalNameFirst()).isEqualTo("Felicja");
+        assertThat(member.getFormalNameLast()).isEqualTo("Formalna");
+        assertThat(member.getFormalIdentifier()).isEqualTo(submissionPesel());
+        assertThat(caseRepository.findById(caseId).orElseThrow().getStatus())
+            .isEqualTo(RecruitmentCaseStatus.ACCEPTED);
     }
 }

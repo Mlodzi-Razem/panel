@@ -108,6 +108,32 @@ export async function apiCall<T>(request: ApiRequest, schema: z.ZodType<T>): Pro
         return failure({status: 503, code: 'UNAVAILABLE', message: 'The panel API is unavailable'});
     }
 
+    return readResponse(response, `${request.method} ${request.path}`, schema);
+}
+
+/**
+ * Multipart POST (file uploads): the body is the caller's FormData and the Content-Type header is
+ * left out on purpose — fetch adds the multipart boundary itself.
+ */
+export async function apiMultipartCall<T>(path: string, body: FormData, schema: z.ZodType<T>): Promise<ApiResult<T>> {
+    const session = await getPanelServerSession();
+    if (!session?.user?.id) {
+        return failure(UNAUTHENTICATED);
+    }
+
+    let response: Response;
+    try {
+        response = await client.callApi(
+            {url: path, method: 'POST', headers: {'Accept': 'application/json'}, body},
+            {user: session.user, cache: 'no-store'});
+    } catch {
+        return failure({status: 503, code: 'UNAVAILABLE', message: 'The panel API is unavailable'});
+    }
+
+    return readResponse(response, `POST ${path}`, schema);
+}
+
+async function readResponse<T>(response: Response, label: string, schema: z.ZodType<T>): Promise<ApiResult<T>> {
     if (!response.ok) {
         return failure(await parseError(response));
     }
@@ -122,7 +148,7 @@ export async function apiCall<T>(request: ApiRequest, schema: z.ZodType<T>): Pro
 
     const parsed = schema.safeParse(json);
     if (!parsed.success) {
-        console.error(`panel-api ${request.method} ${request.path}: unexpected response shape at ${
+        console.error(`panel-api ${label}: unexpected response shape at ${
             parsed.error.issues.map(i => i.path.join('.')).join(', ')}`);
         return failure({status: 502, code: 'INVALID_RESPONSE', message: 'Unexpected response from the panel API'});
     }

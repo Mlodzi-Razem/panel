@@ -30,11 +30,13 @@ import { denyUnlessSignedIn, fail, idSchema, invalid, parseId, text } from "@/ap
 import { ActionResult } from "@/panel-api/members/types";
 import {
     addCaseNote,
+    CandidateDataCorrectionInput,
     CandidateInput,
     CASE_SOURCES,
     CASE_STATUSES,
     CaseSource,
     CaseStatus,
+    correctCandidateData,
     createRecruitmentCase,
     DecisionInput,
     DecisionKind,
@@ -49,6 +51,7 @@ import {
     sendCaseReminder,
     transitionRecruitmentCase,
 } from "@/panel-api/members/recruitment";
+import { isValidPesel } from "@/util/pesel";
 import { submitDeclarationForm, submissionValuesSchema } from "@/panel-api/recruitment/declarationForm";
 
 const NOTE_MAX_LENGTH = 2000;
@@ -181,6 +184,76 @@ export async function updateRecruitmentCaseAction(id: number, formData: FormData
     }
 
     const result = await patchRecruitmentCase(id, changes);
+    if (!result.ok) {
+        return fail(result.error);
+    }
+    refresh(id);
+    return {ok: true};
+}
+
+const CORRECTION_REASON_MAX_LENGTH = 500;
+
+/**
+ * Reasoned correction of the candidate's formal data. The form is prefilled with the current
+ * values, so only what differs is sent (the API changes only what it receives); the PESEL field
+ * is empty by design — the value is never served — and is sent only when filled in.
+ */
+export async function correctCandidateDataAction(id: number, formData: FormData): Promise<ActionResult> {
+    const denied = await denyUnlessSignedIn();
+    if (denied) {
+        return denied;
+    }
+    if (!idSchema.safeParse(id).success) {
+        return invalid('id');
+    }
+
+    const reason = text(formData, 'reason');
+    if (reason.length === 0 || reason.length > CORRECTION_REASON_MAX_LENGTH) {
+        return fail({
+            status: 422, code: 'CORRECTION_REQUIRES_REASON', message: 'A correction needs a reason', fields: ['reason'],
+        });
+    }
+
+    const current = await getRecruitmentCase(id);
+    if (!current.ok) {
+        return fail(current.error);
+    }
+
+    const correction: CandidateDataCorrectionInput = {reason};
+
+    const formalFirst = text(formData, 'formalFirstName');
+    const formalLast = text(formData, 'formalLastName');
+    if (formalFirst !== (current.data.candidateFormalFirstName ?? '')
+        || formalLast !== (current.data.candidateFormalLastName ?? '')) {
+        correction.formalFirstName = formalFirst;
+        correction.formalLastName = formalLast;
+    }
+
+    const preferredFirst = text(formData, 'preferredFirstName');
+    const preferredLast = text(formData, 'preferredLastName');
+    if (preferredFirst !== (current.data.candidatePreferredFirstName ?? '')
+        || preferredLast !== (current.data.candidatePreferredLastName ?? '')) {
+        correction.preferredFirstName = preferredFirst;
+        correction.preferredLastName = preferredLast;
+    }
+
+    const pronouns = text(formData, 'pronouns');
+    if (pronouns !== (current.data.candidatePronouns ?? '')) {
+        correction.pronouns = pronouns;
+    }
+
+    const personalId = text(formData, 'personalId');
+    if (personalId.length > 0) {
+        if (!isValidPesel(personalId)) {
+            return fail({
+                status: 422, code: 'PERSONAL_ID_INVALID', message: 'Invalid personal identifier',
+                fields: ['personalId'],
+            });
+        }
+        correction.personalId = personalId;
+    }
+
+    const result = await correctCandidateData(id, correction);
     if (!result.ok) {
         return fail(result.error);
     }

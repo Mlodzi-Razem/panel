@@ -113,11 +113,24 @@ public class RecruitmentDeclarationFormsController {
     @PostMapping("/recruitment-cases/{caseId}/declaration-scan")
     public RecruitmentEformService.DeclarationForm attachScan(
         @PathVariable("caseId") long caseId,
-        @RequestParam("file") MultipartFile file
+        @RequestParam("file") MultipartFile file,
+        @RequestParam(name = "formalFirstName", required = false) @Nullable String formalFirstName,
+        @RequestParam(name = "formalLastName", required = false) @Nullable String formalLastName,
+        @RequestParam(name = "preferredFirstName", required = false) @Nullable String preferredFirstName,
+        @RequestParam(name = "preferredLastName", required = false) @Nullable String preferredLastName,
+        @RequestParam(name = "pronouns", required = false) @Nullable String pronouns,
+        @RequestParam(name = "personalId", required = false) @Nullable String personalId,
+        @RequestParam(name = "phone", required = false) @Nullable String phone,
+        @RequestParam(name = "email", required = false) @Nullable String email,
+        @RequestParam(name = "imageConsent", required = false) @Nullable Boolean imageConsent,
+        @RequestParam(name = "specialCategoryConsent", required = false) @Nullable Boolean specialCategoryConsent
     ) {
         long caller = callers.require().id();
 
-        return eform.attachScan(caseId, caller, read(file));
+        return eform.attachScan(caseId, caller, read(file),
+            new RecruitmentEformService.DeclarationFormSubmission(formalFirstName, formalLastName,
+                preferredFirstName, preferredLastName, pronouns, personalId, phone, email,
+                Boolean.TRUE.equals(imageConsent), Boolean.TRUE.equals(specialCategoryConsent)));
     }
 
     private static byte[] read(MultipartFile file) {

@@ -40,6 +40,21 @@ function payloadSummary(event: CaseEvent): string | null {
     return null;
 }
 
+/** A data correction: which fields changed (names, never values) and the reason the operator gave. */
+function CorrectionSummary({payload}: { payload: unknown }) {
+    const t = useTranslations("recruitment");
+    const data = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
+    const fields = Array.isArray(data["fields"]) ? data["fields"].map(f => String(f)) : [];
+    const reason = typeof data["reason"] === "string" ? data["reason"] : null;
+
+    return <>
+        {fields.length > 0 && <p className={styles.timelinePayload}>
+            {t("timelineCorrectionFields")}: {fields.map(f => t.has(`dataFields.${f}`) ? t(`dataFields.${f}`) : f).join(", ")}
+        </p>}
+        {reason && <p className={styles.timelinePayload}>{t("timelineCorrectionReason")}: {reason}</p>}
+    </>;
+}
+
 export default function CaseTimeline({events}: { events: CaseEvent[] }) {
     const t = useTranslations("recruitment");
     const tEnums = useTranslations("enums");
@@ -63,7 +78,9 @@ export default function CaseTimeline({events}: { events: CaseEvent[] }) {
                 </time>
                 {event.actor && <span className={styles.mutedText}>{event.actor.displayName}</span>}
             </div>
-            {payloadSummary(event) && <p className={styles.timelinePayload}>{payloadSummary(event)}</p>}
+            {event.eventType === "CANDIDATE_DATA_CORRECTED"
+                ? <CorrectionSummary payload={event.payload}/>
+                : payloadSummary(event) && <p className={styles.timelinePayload}>{payloadSummary(event)}</p>}
         </li>)}
     </ol>;
 }
