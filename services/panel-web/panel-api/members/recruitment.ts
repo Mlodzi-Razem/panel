@@ -167,7 +167,14 @@ export type CasePage = z.infer<typeof casePageSchema>;
 export type CaseDetail = z.infer<typeof caseDetailSchema>;
 export type CaseTransition = z.infer<typeof caseTransitionSchema>;
 
+/** Predefined list views of the recruitment procedure; the API owns the criteria. */
+export const CASE_VIEWS = ['TO_CONDUCT', 'PROBABLY_NO_DECLARATION', 'RECOMMENDED', 'ZK_VOTING', 'TO_DELETE'] as const;
+export type CaseView = typeof CASE_VIEWS[number];
+
+export const caseViewCountsSchema = z.record(z.string(), z.number());
+
 export type CaseFilters = {
+    view?: CaseView;
     page?: number;
     size?: number;
     district?: number;
@@ -214,8 +221,17 @@ export function listRecruitmentCases(filters: CaseFilters): Promise<ApiResult<Ca
             district: filters.district,
             status: filters.status,
             open: filters.open === undefined ? undefined : String(filters.open),
+            view: filters.view,
         },
     }, casePageSchema);
+}
+
+export function getRecruitmentViewCounts(district?: number): Promise<ApiResult<Record<string, number>>> {
+    return apiCall({
+        method: 'GET',
+        path: '/recruitment-cases/views',
+        query: {district},
+    }, caseViewCountsSchema);
 }
 
 export function getRecruitmentCase(id: number): Promise<ApiResult<CaseDetail>> {
