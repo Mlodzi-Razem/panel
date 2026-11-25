@@ -51,6 +51,37 @@ class MemberRulesTest {
     }
 
     @Test
+    void ordinaryAdmissionOnTheLastDayOfTheBirthdayYearIsStillValid() {
+        LocalDate bornOnNewYearsEve = LocalDate.of(2000, 12, 31);
+
+        // 26th birthday on 31 December — the declaration on that very day is the last statutory one.
+        assertThatCode(() -> MemberRules.validateAdmissionAge(bornOnNewYearsEve, MembershipType.ORDINARY,
+            LocalDate.of(2026, 12, 31))).doesNotThrowAnyException();
+
+        // One day later the candidacy is over, although the completed age is still 26
+        // (statute art. 7 ust. 1 pkt 2: the whole calendar year of the 26th birthday has ended).
+        assertThatThrownBy(() -> MemberRules.validateAdmissionAge(bornOnNewYearsEve, MembershipType.ORDINARY,
+            LocalDate.of(2027, 1, 1)))
+            .isInstanceOf(RuleViolationException.class)
+            .extracting("code").isEqualTo("ADMISSION_AGE");
+    }
+
+    @Test
+    void ordinaryAdmissionInDecemberIsFineWhenTheBirthdayWasMidYear() {
+        LocalDate bornMidYear = LocalDate.of(2000, 7, 1);
+
+        // Completed age 26 in December of the birthday year: the calendar year still runs.
+        assertThatCode(() -> MemberRules.validateAdmissionAge(bornMidYear, MembershipType.ORDINARY,
+            LocalDate.of(2026, 12, 20))).doesNotThrowAnyException();
+
+        // The next January is one calendar year too late despite the completed age still being 26.
+        assertThatThrownBy(() -> MemberRules.validateAdmissionAge(bornMidYear, MembershipType.ORDINARY,
+            LocalDate.of(2027, 1, 15)))
+            .isInstanceOf(RuleViolationException.class)
+            .extracting("code").isEqualTo("ADMISSION_AGE");
+    }
+
+    @Test
     void supportingMembershipRequiresAgeSixteenAndHonoraryHasNoLimit() {
         assertThatCode(() -> MemberRules.validateAdmissionAge(LocalDate.of(2010, 6, 1), MembershipType.SUPPORTING, admission))
             .doesNotThrowAnyException();

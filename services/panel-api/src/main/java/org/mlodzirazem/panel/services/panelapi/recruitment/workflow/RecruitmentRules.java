@@ -47,14 +47,16 @@ public final class RecruitmentRules {
 
     /**
      * Earlier assessment for candidates from affiliated organisations, after at least 14 days
-     * (statut jednolity 2026, art. 9 ust. 4 pkt 9). Anchored on the declaration date — the statute
-     * says „od wpłynięcia wniosku”, which the product owner still needs to confirm as anchor decision.
+     * (statut jednolity 2026, art. 9 ust. 4 pkt 9). Decision of the owner 2026-11-23: the anchor is
+     * the declaration date (art. 9 ust. 4 pkt 9, procedure says „od wpłynięcia wniosku”, but the
+     * whole assessment window runs from the declaration, so the shortcut tracks do too).
      */
     public static final int AFFILIATED_ASSESSMENT_NOT_BEFORE_DAYS = 14;
 
     /**
      * Earlier assessment for particularly engaged candidates, after at least 31 days
-     * (statut jednolity 2026, art. 9 ust. 4 pkt 9). Same anchor caveat as {@link #AFFILIATED_ASSESSMENT_NOT_BEFORE_DAYS}.
+     * (statut jednolity 2026, art. 9 ust. 4 pkt 9). Anchored on the declaration date like
+     * {@link #AFFILIATED_ASSESSMENT_NOT_BEFORE_DAYS} (decision of the owner 2026-11-23).
      */
     public static final int ENGAGED_ASSESSMENT_NOT_BEFORE_DAYS = 31;
 
