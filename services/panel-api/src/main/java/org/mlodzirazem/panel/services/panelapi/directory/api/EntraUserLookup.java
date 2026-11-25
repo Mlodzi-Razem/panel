@@ -36,8 +36,11 @@ public interface EntraUserLookup {
     /**
      * @param objectId       the Entra object ID
      * @param employeeId     the member number stored on the account, if any
-     * @param accountEnabled whether the account may sign in
+     * @param accountEnabled     whether the account may sign in
+     * @param userPrincipalName  the sign-in name ({@code userPrincipalName}); a member's account is
+     *                           linked only when its local part is the member number (SEC-20c)
      */
-    record EntraUser(String objectId, @Nullable String employeeId, boolean accountEnabled) {
+    record EntraUser(String objectId, @Nullable String employeeId, boolean accountEnabled,
+                     @Nullable String userPrincipalName) {
     }
 }

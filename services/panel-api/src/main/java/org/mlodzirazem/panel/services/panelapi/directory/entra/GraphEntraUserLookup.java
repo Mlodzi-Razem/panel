@@ -74,7 +74,7 @@ class GraphEntraUserLookup implements EntraUserLookup {
         Map<String, Object> user;
         try {
             user = restClient.get()
-                .uri(token.graphUrl() + "/v1.0/users/{id}?$select=id,employeeId,accountEnabled", objectId)
+                .uri(token.graphUrl() + "/v1.0/users/{id}?$select=id,employeeId,accountEnabled,userPrincipalName", objectId)
                 .header("Authorization", "Bearer " + token.bearer())
                 .accept(MediaType.APPLICATION_JSON)
                 .retrieve()
@@ -96,7 +96,8 @@ class GraphEntraUserLookup implements EntraUserLookup {
         return Optional.of(new EntraUser(
             objectId,
             employeeId instanceof String s && !s.isBlank() ? s.strip() : null,
-            Boolean.TRUE.equals(user.get("accountEnabled"))
+            Boolean.TRUE.equals(user.get("accountEnabled")),
+            user.get("userPrincipalName") instanceof String upn && !upn.isBlank() ? upn.strip() : null
         ));
     }
 
