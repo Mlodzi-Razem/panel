@@ -28,6 +28,7 @@ import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException
 import org.mlodzirazem.panel.services.panelapi.members.AffiliationService;
 import org.mlodzirazem.panel.services.panelapi.members.BodiesManagerGuard;
 import org.mlodzirazem.panel.services.panelapi.members.CurrentMemberResolver;
+import org.mlodzirazem.panel.services.panelapi.members.MemberFeeStateChanged;
 import org.mlodzirazem.panel.services.panelapi.members.MemberField;
 import org.mlodzirazem.panel.services.panelapi.members.MemberRules;
 import org.mlodzirazem.panel.services.panelapi.members.MemberService;
@@ -37,6 +38,7 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.MemberS
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.MembershipType;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMemberRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -85,11 +87,18 @@ class DefaultMemberService implements MemberService {
             List.of("domainEmail", "privateEmails"))
     );
 
+    private static final Set<MemberField> FEE_FIELDS = EnumSet.of(
+        MemberField.STATUS,
+        MemberField.MEMBERSHIP_TYPE,
+        MemberField.MEMBER_SINCE
+    );
+
     private final TMemberRepository members;
     private final AffiliationService affiliations;
     private final BodiesManagerGuard bodiesManagerGuard;
     private final CurrentMemberResolver currentMemberResolver;
     private final AuditLog auditLog;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
 
     @Override
@@ -138,6 +147,7 @@ class DefaultMemberService implements MemberService {
 
         auditLog.record("members :: create", AuditPayload.of("memberId", member.getId())
                                                          .withFields(names(newMember.values().keySet())));
+        events.publishEvent(new MemberFeeStateChanged(member.getId()));
 
         return member;
     }
@@ -171,6 +181,10 @@ class DefaultMemberService implements MemberService {
             }
 
             auditLog.record("members :: update", AuditPayload.of("memberId", memberId).withFields(names(changed)));
+
+            if (changed.stream().anyMatch(FEE_FIELDS::contains)) {
+                events.publishEvent(new MemberFeeStateChanged(memberId));
+            }
         }
 
         return new MemberUpdate(member, changed);

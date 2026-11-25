@@ -89,7 +89,8 @@ class PermissionServiceTest extends DomainTestSupport {
         EffectivePermissions permissions = permissionService.of(secretary.getId());
 
         assertThat(permissions.canGlobally(BODIES_MANAGE)).isTrue();
-        assertThat(permissions.canGlobally(FEES_READ)).isFalse();
+        assertThat(permissions.canGlobally(FEES_READ)).isTrue();
+        assertThat(permissions.canGlobally(FEES_MANAGE)).isFalse();
         assertThat(permissionService.can(secretary.getId(), FORMAL_PERSONAL_DATA_MANAGE, target.getId())).isTrue();
         assertThat(permissionService.districtsWith(secretary.getId(), FORMAL_PERSONAL_DATA_MANAGE)).hasSize(17);
         assertThat(permissions.perDistrict()).hasSize(17);
@@ -187,7 +188,8 @@ class PermissionServiceTest extends DomainTestSupport {
         EffectivePermissions permissions = permissionService.of(both.getId());
 
         assertThat(permissions.districtsWith(FORMAL_PERSONAL_DATA_MANAGE)).containsExactly(district("opolskie").getId());
-        assertThat(permissions.districtsWith(FEES_READ)).containsExactly(district("lodzkie").getId());
+        assertThat(permissions.districtsWith(FEES_READ)).containsExactlyInAnyOrder(district("opolskie").getId(),
+            district("lodzkie").getId());
         assertThat(permissions.perDistrict().keySet())
             .containsExactlyInAnyOrder(district("opolskie").getId(), district("lodzkie").getId());
     }

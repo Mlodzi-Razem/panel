@@ -92,13 +92,14 @@ class SeedMigrationTest extends DomainTestSupport {
     void seedsPermissionGroupsPerSpec() {
         assertThat(permissions("District board")).containsExactlyInAnyOrder("CONTACT_PERSONAL_DATA_READ",
             "CONTACT_PERSONAL_DATA_MANAGE", "FORMAL_PERSONAL_DATA_READ", "FORMAL_PERSONAL_DATA_MANAGE",
-            "RECRUITMENT_READ", "RECRUITMENT_MANAGE");
+            "RECRUITMENT_READ", "RECRUITMENT_MANAGE", "FEES_READ");
         assertThat(permissions("District treasurer")).containsExactlyInAnyOrder("CONTACT_PERSONAL_DATA_READ",
             "FEES_READ", "RECRUITMENT_READ");
         assertThat(permissions("National board")).containsExactlyInAnyOrder("CONTACT_PERSONAL_DATA_READ",
             "CONTACT_PERSONAL_DATA_MANAGE", "FORMAL_PERSONAL_DATA_READ", "FORMAL_PERSONAL_DATA_MANAGE",
             "BODIES_MANAGE", "DIRECTORY_GROUPS_MANAGE", "DIRECTORY_USERS_MANAGE",
-            "RECRUITMENT_READ", "RECRUITMENT_APPROVE");
+            "RECRUITMENT_READ", "RECRUITMENT_APPROVE", "FEES_READ");
+        assertThat(permissions("Audit commission")).containsExactly("FEES_READ");
         assertThat(permissions("National board treasurer")).hasSize(9).contains("FEES_READ", "FEES_MANAGE");
         assertThat(permissions("National IT proxy")).containsExactlyInAnyOrder("CONTACT_PERSONAL_DATA_READ",
             "CONTACT_PERSONAL_DATA_MANAGE", "FORMAL_PERSONAL_DATA_READ", "FORMAL_PERSONAL_DATA_MANAGE",
@@ -116,6 +117,8 @@ class SeedMigrationTest extends DomainTestSupport {
         assertThat(groupOf("DISTRICT_COMMISSIONER", "COMMISSIONER")).isEqualTo("LOCAL/District board");
         assertThat(groupOf("DISTRICT_TREASURER", "TREASURER")).isEqualTo("LOCAL/District treasurer");
         assertThat(groupOf("ELECTORAL_COMMISSION", "CHAIR")).isEqualTo("BODY/No permissions");
+        assertThat(groupOf("AUDIT_COMMISSION", "CHAIR")).isEqualTo("GLOBAL/Audit commission");
+        assertThat(groupOf("AUDIT_COMMISSION", "MEMBER")).isEqualTo("GLOBAL/Audit commission");
         assertThat(groupOf("LOCAL_CIRCLE", "COORDINATOR")).isEqualTo("BODY/No permissions");
     }
 
