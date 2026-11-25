@@ -19,6 +19,7 @@ package org.mlodzirazem.panel.services.panelapi.bodies;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mlodzirazem.panel.services.panelapi.core.error.ConflictException;
 import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.BodyKind;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBody;
@@ -398,6 +399,119 @@ class BodyMembershipServiceTest extends DomainTestSupport {
     private TBody commissionerBody(String districtSlug) {
         return bodyService.create(new NewBody(template(BodyKind.DISTRICT_COMMISSIONER).getId(),
             "Test Komisarz " + districtSlug, null, district(districtSlug).getId(), "test-commissioner-" + districtSlug));
+    }
+
+    @Test
+    void voidingAMandateKeepsTheRowAndPublishesAVoidedEvent() {
+        TMember member = newMember("Vic", "Voided", "mazowieckie");
+        TBodyMembership membership = grant(member, body("peer-court"), "MEMBER", today.minusMonths(1), null);
+
+        assertThatThrownBy(() -> service.voidMembership(membership.getId(), "  ", null))
+            .isInstanceOf(RuleViolationException.class)
+            .hasMessageContaining("requires a reason");
+
+        TBodyMembership voided = service.voidMembership(membership.getId(), "  wpis omyłkowy  ", null);
+
+        // Void is not end: the mandate never closed, it simply never existed.
+        assertThat(voided.getValidTo()).isNull();
+        assertThat(voided.isVoided()).isTrue();
+        assertThat(voided.getVoidReason()).isEqualTo("wpis omyłkowy");
+        assertThat(jdbc.queryForMap(
+            "SELECT status::text AS status, valid_to AS validTo, void_reason AS voidReason"
+                + " FROM body_memberships WHERE id = ?", membership.getId()))
+            .containsEntry("status", "VOIDED")
+            .containsEntry("validTo", null)
+            .containsEntry("voidReason", "wpis omyłkowy");
+
+        assertThat(events.events).singleElement().satisfies(e -> {
+            assertThat(e.change()).isEqualTo(BodyMembershipChanged.Change.VOIDED);
+            assertThat(e.bodyMembershipId()).isEqualTo(membership.getId());
+        });
+        // Unlike an ended mandate, a voided one disappears from the function history too.
+        assertThat(service.historyOf(member.getId())).isEmpty();
+        assertThat(service.activeOf(member.getId())).isEmpty();
+
+        assertThat(auditPayloads("bodies :: membership-void")).contains("\"fields\"", "voidReason")
+            .doesNotContain("wpis omyłkowy");
+
+        assertThatThrownBy(() -> service.voidMembership(membership.getId(), "znowu", null))
+            .isInstanceOf(ConflictException.class)
+            .hasMessageContaining("already voided");
+        assertThatThrownBy(() -> service.end(membership.getId(), null, null))
+            .isInstanceOf(ConflictException.class)
+            .hasMessageContaining("already voided");
+    }
+
+    @Test
+    void voidedMandatesDoNotCountInStatutoryRules() {
+        TMember member = newMember("Una", "Unblocked", "mazowieckie");
+        TBodyMembership ksk = grant(member, body("peer-court"), "MEMBER", today.minusMonths(6), null);
+
+        assertThat(service.check(assign(member, body("national-board"), "SECRETARY", today, null)).violations())
+            .isNotEmpty();
+
+        service.voidMembership(ksk.getId(), "nie ta osoba", null);
+
+        assertThat(service.check(assign(member, body("national-board"), "SECRETARY", today, null)).violations())
+            .isEmpty();
+        assertThat(service.assign(assign(member, body("national-board"), "SECRETARY", today, null), false)
+                       .membership().isVoided()).isFalse();
+    }
+
+    @Test
+    void theVoidedFunctionCanBeAssignedAgainInTheSameBody() {
+        TMember member = newMember("Rys", "Repeat", "mazowieckie");
+        TBody circle = bodyService.create(new NewBody(template(BodyKind.LOCAL_CIRCLE).getId(), "Koło testowe", null,
+            district("mazowieckie").getId(), "test-circle-void"));
+        TBodyMembership mistaken = grant(member, circle, "COORDINATOR", today.minusMonths(1), null);
+
+        service.voidMembership(mistaken.getId(), "wpis omyłkowy", null);
+
+        AssignmentResult second = service.assign(assign(member, circle, "COORDINATOR", today, null), false);
+
+        assertThat(second.membership().getId()).isNotEqualTo(mistaken.getId());
+        assertThat(service.historyOf(member.getId())).hasSize(1);
+        assertThat(jdbc.queryForObject(
+            "SELECT COUNT(*) FROM body_memberships WHERE member_id = ? AND status = 'VOIDED'", Integer.class,
+            member.getId())).isEqualTo(1);
+    }
+
+    @Test
+    void secondBodiesOfLimitedKindsAreRejected() {
+        TBody commissioners = commissionerBody("mazowieckie");
+
+        assertThatThrownBy(() -> bodyService.create(new NewBody(
+            template(BodyKind.DISTRICT_COMMISSIONER).getId(), "Drugi komisarz", null,
+            district("mazowieckie").getId(), "test-commissioner-duplicate")))
+            .isInstanceOf(ConflictException.class)
+            .hasMessageContaining("one organ of a kind");
+        assertThatThrownBy(() -> bodyService.create(new NewBody(
+            template(BodyKind.NATIONAL_BOARD).getId(), "Drugi ZK", null, null, "test-national-duplicate")))
+            .isInstanceOf(ConflictException.class)
+            .hasMessageContaining("one organ of a kind");
+
+        // Unlimited kinds stay unlimited — this is also what the stage hygiene (D11) relies on.
+        assertThat(bodyService.create(new NewBody(template(BodyKind.TEAM).getId(), "Zespół jeden", null, null,
+            "test-team-one")).getId()).isNotNull();
+        assertThat(bodyService.create(new NewBody(template(BodyKind.TEAM).getId(), "Zespół dwa", null, null,
+            "test-team-two")).getId()).isNotNull();
+        assertThat(commissioners.getId()).isNotNull();
+    }
+
+    @Test
+    void deletingABodyKeepsGuardedByItsMandatesChildrenAndSeeds() {
+        TBody team = bodyService.create(new NewBody(template(BodyKind.TEAM).getId(), "Zespół usuwany", null, null,
+            "test-team-delete"));
+        grant(newMember("Del", "Member", "mazowieckie"), team, "LEADER", today.minusMonths(1), null);
+
+        assertThatThrownBy(() -> bodyService.delete(team.getId()))
+            .isInstanceOf(ConflictException.class)
+            .hasMessageContaining("mandates in its history");
+
+        assertThatThrownBy(() -> bodyService.delete(body("national-board").getId()))
+            .isInstanceOf(ConflictException.class)
+            .hasMessageContaining("seeded");
+        jdbc.update("DELETE FROM body_memberships WHERE body_id = ?", team.getId());
     }
 
     private AssignMembership assign(TMember member, TBody body, String typeCode, LocalDate from, LocalDate to) {

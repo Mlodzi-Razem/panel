@@ -132,6 +132,8 @@ export const bodySchema = z.object({
     templateId: z.number().nullish(),
     templateName: z.string().nullish(),
     parentBodyId: z.number().nullish(),
+    // True when the migrations seeded the body: the panel never deletes it (A3).
+    seeded: z.boolean().default(false),
 });
 
 export const memberTypeSchema = z.object({

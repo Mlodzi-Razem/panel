@@ -63,6 +63,10 @@ public class TAdmissionBan extends TBaseEntity {
     @Column(name = "decision_signature", nullable = false)
     private String decisionSignature;
 
+    /** The statutory reason of the uchwała (art. 9 ust. 5); back-office only, never public. */
+    @Column(name = "reason", nullable = false)
+    private String reason;
+
     @Column(name = "effective_from", nullable = false)
     private LocalDate effectiveFrom;
 

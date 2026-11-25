@@ -45,6 +45,9 @@ import java.util.Optional;
 class BreakGlassAssigner {
     static final String OPERATION_ID = "admin :: break-glass";
 
+    /** Explicit marker for a database id; without it a number is always a member number (F0-1). */
+    static final String DATABASE_ID_PREFIX = "id:";
+
     private final TBodyRepository bodies;
     private final TBodyTemplateMemberTypeRepository memberTypes;
     private final TMemberRepository members;
@@ -155,7 +158,10 @@ class BreakGlassAssigner {
         lines.add("Mode: " + (apply ? "apply" : "dry run"));
         lines.add("Function: " + bodyCode + ":" + typeCode + " (body " + body.getId() + ", member type "
             + memberType.getId() + ")");
-        lines.add("Member: " + identifier);
+        // Report the record that was resolved, not the operator's input: the number and the database
+        // id only, never names or the e-mail address (F0-1, RODO).
+        lines.add("Member: resolved " + resolutionOf(identifier) + " (member number "
+            + member.getMemberId() + ", database id " + member.getId() + ")");
         lines.add("Valid from: " + today + ", open-ended; Art. 20/21/52 checks and the lockout guard are bypassed");
         lines.add("Decision reference: " + (isBlank(decisionReference) ? "none" : "recorded"));
 
@@ -202,24 +208,64 @@ class BreakGlassAssigner {
         return new BreakGlassReport(CliMode.EXIT_OK, lines);
     }
 
+    /**
+     * Resolves the member by domain email, member number or database id.
+     *
+     * <p>Member numbers are compared numerically ({@code 205} = {@code 000205}): the imported register keeps
+     * them unpadded, admissions allocate them zero-padded. Unpadded numbers overlap database ids after an
+     * import, so a leading zero marks a member number only, and an unpadded number that is both one member's
+     * number and another member's database id is rejected rather than guessed.
+     */
     private Optional<TMember> resolve(String identifier, List<String> problems) {
         if (identifier.contains("@")) {
             return members.findByDomainEmailIgnoreCase(identifier);
         }
 
-        Optional<TMember> byMemberId = members.findByMemberId(identifier);
-        Optional<TMember> byDatabaseId = identifier.chars().allMatch(Character::isDigit) && identifier.length() <= 18
-            ? members.findById(Long.parseLong(identifier))
-            : Optional.empty();
+        if (identifier.startsWith(DATABASE_ID_PREFIX)) {
+            // F0-1: a database id is used only when the operator writes the prefix explicitly.
+            String digits = identifier.substring(DATABASE_ID_PREFIX.length());
 
-        if (byMemberId.isPresent() && byDatabaseId.isPresent()
-            && !byMemberId.get().getId().equals(byDatabaseId.get().getId())) {
-            problems.add("Ambiguous member identifier " + identifier
-                + ": it is a member_id of one member and a database id of another");
+            if (digits.isEmpty() || digits.length() > 18 || !digits.chars().allMatch(c -> c >= '0' && c <= '9')) {
+                return Optional.empty();
+            }
+
+            return members.findById(Long.parseLong(digits));
+        }
+
+        if (identifier.isEmpty() || !identifier.chars().allMatch(c -> c >= '0' && c <= '9')) {
+            return members.findByMemberId(identifier);
+        }
+
+        // No fallback to a database id: a typo or a not-yet-issued number must never resolve to
+        // someone else's row (F0-1).
+        List<TMember> byNumber = members.findByMemberNumber(stripLeadingZeros(identifier));
+
+        if (byNumber.size() > 1) {
+            problems.add("Ambiguous member identifier " + identifier + ": " + byNumber.size()
+                + " members share this member number");
             return Optional.empty();
         }
 
-        return byMemberId.isPresent() ? byMemberId : byDatabaseId;
+        return byNumber.stream().findFirst();
+    }
+
+    /** How the identifier was resolved, printed in the report — never the identifier itself. */
+    private static String resolutionOf(String identifier) {
+        if (identifier.contains("@")) {
+            return "by domain email";
+        }
+
+        return identifier.startsWith(DATABASE_ID_PREFIX) ? "by database id" : "by member number";
+    }
+
+    private static String stripLeadingZeros(String digits) {
+        int start = 0;
+
+        while (start < digits.length() - 1 && digits.charAt(start) == '0') {
+            start++;
+        }
+
+        return digits.substring(start);
     }
 
     private static BreakGlassReport failed(List<String> problems) {

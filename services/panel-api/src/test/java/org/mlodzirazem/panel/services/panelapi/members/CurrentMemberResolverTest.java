@@ -18,6 +18,7 @@
 package org.mlodzirazem.panel.services.panelapi.members;
 
 import org.junit.jupiter.api.Test;
+import org.mlodzirazem.panel.services.panelapi.core.error.ConflictException;
 import org.mlodzirazem.panel.services.panelapi.core.user.IdentityProvider;
 import org.mlodzirazem.panel.services.panelapi.core.user.UserAuthInfo;
 import org.mlodzirazem.panel.services.panelapi.core.user.UserScopedValues;
@@ -30,7 +31,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
@@ -106,7 +115,7 @@ class CurrentMemberResolverTest extends DomainTestSupport {
     void linksEntraAccountByEmployeeIdIgnoringLeadingZeros() {
         TMember member = newMember("Ola", "Entra", "mazowieckie");
         memberNumber(member, "205");
-        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "000205", true)));
+        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "000205", true, upn("000205", member))));
 
         assertThat(resolver.resolve(entra(OID))).map(TMember::getId).contains(member.getId());
         assertThat(subject(member, "ENTRA")).isEqualTo(OID);
@@ -117,11 +126,80 @@ class CurrentMemberResolverTest extends DomainTestSupport {
     }
 
     @Test
+    void neverLinksTrialUnallocatedOrFixtureNumbers() {
+        for (String number : List.of("990001", "975001", "950001")) {
+            TMember member = newMember("Fay", "Band" + number, "mazowieckie");
+            memberNumber(member, number);
+            when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, number, true, upn(number, member))));
+
+            assertThat(resolver.resolve(entra(OID))).as(number).isEmpty();
+        }
+
+        assertThat(auditCount("members :: link-user")).isZero();
+    }
+
+    @Test
+    void theSignInNameMustBeTheMemberNumber() {
+        TMember member = newMember("Kira", "Upn", "mazowieckie");
+        memberNumber(member, "205");
+
+        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "000205", true,
+            "jan.kowalski@" + domainOf(member))));
+        assertThat(resolver.resolve(entra(OID))).isEmpty();
+
+        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "205", true, upn("000206", member))));
+        assertThat(resolver.resolve(entra(OID))).isEmpty();
+
+        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "205", true, null)));
+        assertThat(resolver.resolve(entra(OID))).isEmpty();
+
+        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "205", true, upn("000205", member))));
+        assertThat(resolver.resolve(entra(OID))).map(TMember::getId).contains(member.getId());
+    }
+
+    private static String upn(String localPart, TMember member) {
+        return localPart + "@" + domainOf(member);
+    }
+
+    private static String domainOf(TMember member) {
+        String email = member.getDomainEmail();
+        return email.substring(email.indexOf('@') + 1);
+    }
+
+    @Test
+    void disabledOrUnnumberedAccountsDoNotLinkEvenWithTheRightUpn() {
+        TMember member = newMember("Ewa", "Negative", "mazowieckie");
+        memberNumber(member, "208");
+        String upn = upn("000208", member);
+
+        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "208", false, upn)));
+        assertThat(resolver.resolve(entra(OID))).isEmpty();
+
+        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, null, true, upn)));
+        assertThat(resolver.resolve(entra(OID))).isEmpty();
+
+        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "2 08", true, upn)));
+        assertThat(resolver.resolve(entra(OID))).isEmpty();
+
+        assertThat(auditCount("members :: link-user")).isZero();
+    }
+
+    @Test
+    void aForeignDomainInTheUpnNeverLinks() {
+        TMember member = newMember("Oto", "Foreign", "mazowieckie");
+        memberNumber(member, "207");
+        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "207", true, "000207@evil.example")));
+
+        assertThat(resolver.resolve(entra(OID))).isEmpty();
+        assertThat(auditCount("members :: link-user")).isZero();
+    }
+
+    @Test
     void entraLinkingKeepsAnExistingGoogleIdentity() {
         TMember member = newMember("Gia", "Both", "mazowieckie");
         memberNumber(member, "000301");
         identity(member, "GOOGLE", "sub-gia");
-        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "301", true)));
+        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "301", true, upn("000301", member))));
 
         assertThat(resolver.resolve(entra(OID))).map(TMember::getId).contains(member.getId());
         assertThat(resolver.resolve(new UserAuthInfo("sub-gia", null, null))).map(TMember::getId)
@@ -133,16 +211,16 @@ class CurrentMemberResolverTest extends DomainTestSupport {
         TMember member = newMember("Dan", "Disabled", "mazowieckie");
         memberNumber(member, "777");
 
-        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "777", false)));
+        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "777", false, null)));
         assertThat(resolver.resolve(entra(OID))).isEmpty();
 
-        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, null, true)));
+        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, null, true, null)));
         assertThat(resolver.resolve(entra(OID))).isEmpty();
 
-        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "77 7", true)));
+        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "77 7", true, null)));
         assertThat(resolver.resolve(entra(OID))).isEmpty();
 
-        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "000000", true)));
+        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "000000", true, null)));
         assertThat(resolver.resolve(entra(OID))).isEmpty();
 
         when(entraUsers.find(OID)).thenReturn(Optional.empty());
@@ -156,9 +234,53 @@ class CurrentMemberResolverTest extends DomainTestSupport {
         TMember member = newMember("Sam", "Second", "mazowieckie");
         memberNumber(member, "412");
         identity(member, "ENTRA", "11111111-2222-3333-4444-555555555555");
-        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "412", true)));
+        when(entraUsers.find(OID)).thenReturn(Optional.of(new EntraUser(OID, "412", true, upn("000412", member))));
 
         assertThat(resolver.resolve(entra(OID))).isEmpty();
+    }
+
+    @Test
+    void concurrentFirstSignInsLinkTheMemberOnlyOnce() throws Exception {
+        TMember member = newMember("Ula", "Race", "mazowieckie");
+        memberNumber(member, "206");
+        String upn = upn("000206", member);
+        String first = "7d1f3a2b-0c4e-4f5a-9b8c-aaaaaaaaaaaa";
+        String second = "7d1f3a2b-0c4e-4f5a-9b8c-bbbbbbbbbbbb";
+        when(entraUsers.find(first)).thenReturn(Optional.of(new EntraUser(first, "206", true, upn)));
+        when(entraUsers.find(second)).thenReturn(Optional.of(new EntraUser(second, "206", true, upn)));
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<Long>> futures = new ArrayList<>();
+        try {
+            for (String oid : List.of(first, second)) {
+                Callable<Long> signIn = () -> {
+                    start.await();
+                    try {
+                        return resolver.resolve(entra(oid)).map(TMember::getId).orElse(null);
+                    } catch (ConflictException lost) {
+                        // the losing request of a race gets a conflict, never a 500 (SEC-23)
+                        return null;
+                    }
+                };
+                futures.add(pool.submit(signIn));
+            }
+            start.countDown();
+
+            long linked = 0;
+            for (Future<Long> future : futures) {
+                if (future.get(60, TimeUnit.SECONDS) != null) {
+                    linked++;
+                }
+            }
+            assertThat(linked).isEqualTo(1);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(jdbc.queryForObject(
+            "SELECT COUNT(*) FROM member_identities WHERE member_id = ? AND provider = 'ENTRA'::identity_provider",
+            Integer.class, member.getId())).isEqualTo(1);
     }
 
     @Test

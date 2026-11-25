@@ -53,14 +53,31 @@ public final class MemberRules {
         return birthDate.getYear() + MEMBERSHIP_END_AGE == year;
     }
 
+    /** NFKC-folded text: full-width and other compatibility digits become ASCII (BAN-1). */
+    public static String fold(String raw) {
+        return java.text.Normalizer.normalize(raw, java.text.Normalizer.Form.NFKC);
+    }
+
+    /**
+     * Canonical PESEL/member-number digits: NFKC-folded, spaces and hyphens removed. Only ASCII
+     * '0'..'9' pass {@link #isAsciiDigits}: Character.isDigit and parseInt accept other scripts (BAN-1).
+     */
+    public static String canonicalDigits(String raw) {
+        return fold(raw).replaceAll("[\\s-]", "");
+    }
+
+    public static boolean isAsciiDigits(String value) {
+        return value.chars().allMatch(ch -> ch >= '0' && ch <= '9');
+    }
+
     public static boolean isReservedTestMemberNumber(@Nullable String memberId) {
         if (memberId == null || memberId.isBlank()) {
             return false;
         }
 
-        String digits = memberId.strip();
+        String digits = fold(memberId.strip());
 
-        if (digits.chars().anyMatch(ch -> !Character.isDigit(ch))) {
+        if (!isAsciiDigits(digits)) {
             return false;
         }
 
@@ -96,6 +113,15 @@ public final class MemberRules {
                     throw new RuleViolationException("ADMISSION_AGE",
                         "Ordinary membership requires age %d-%d at admission".formatted(ORDINARY_MIN_AGE,
                             ORDINARY_MAX_AGE));
+                }
+
+                // Statute jednolity 2026, art. 7 ust. 1 pkt 2: candidacy is admissible only until the end of
+                // the calendar year of the 26th birthday (the same bound membership ends on, art. 11 ust. 1
+                // pkt 5). Completed age alone is not enough: someone born late in December is still 26 on
+                // the next 1 January, when the admissible year has already ended.
+                if (admissionDate.isAfter(membershipEndDate(birthDate))) {
+                    throw new RuleViolationException("ADMISSION_AGE",
+                        "Ordinary candidacy ends with the calendar year of the 26th birthday");
                 }
             }
             case SUPPORTING -> {

@@ -1,0 +1,38 @@
+Copyright (C) 2025 Stowarzyszenie Młodzi Razem
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http;//www.gnu.org/licenses/>.
+
+:20:STARTUMS
+:25:/PL61109010140000071219812874
+:28C:00012/001
+:60F:C250301PLN1000,00
+:61:2503030303C150,00NTRFNONREF//BANKREF0001
+:86:020~00Przelew przychodzacy~20Składka MR-12-3 za~21marzec 2025~32Zażółć Gęślą~33Jaźń Testowa~38PL86102010550000820123456789
+:61:2503050305D45,50NTRFNONREF//BANKREF0002
+:86:020~00Przelew wychodzacy~20Faktura za hosting~32Fikcyjna Firma Sp. z o.o.~38PL45124060690000100011112222
+:61:250306C20,00NTRF//BANKREF0003
+:86:Wpłata gotówkowa na rachunek
+bez struktury
+:61:2503100310RC10,00NTRF//BANKREF0004
+:86:020~00Zwrot~20Zwrot błędnej wpłaty~32Żaneta Źródłowa
+:61:2503110311RD5,00NTRFNONREF
+:86:020~00Storno~20Storno prowizji
+:61:2503120312D12,00NMSC
+:86:020~00Opłata~20Prowizja za prowadzenie
+~21rachunku w marcu~30~31~60 dalszy ciąg tytułu
+:61:2503120312D12,00NMSC
+:86:020~00Opłata~20Prowizja za prowadzenie
+~21rachunku w marcu~30~31~60 dalszy ciąg tytułu
+:62F:C250331PLN1095,50
+-

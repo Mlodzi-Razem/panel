@@ -1,0 +1,77 @@
+@startuml
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam usecase {
+    BackgroundColor #eef3ff
+    BorderColor #3a57a8
+}
+skinparam rectangle {
+    BackgroundColor #ffffff
+}
+
+title MR Panel on Microsoft 365 -- data flow diagram (level 1)
+
+rectangle "E1\nMember" as e1
+rectangle "E2\nDistrict coordinator" as e2
+rectangle "E3\nNational board, CFO,\naudit commission" as e3
+rectangle "E4\nElectoral commission,\ntrustees" as e4
+rectangle "E5\nBank\n(statement files)" as e5
+
+rectangle "TB1 Internet / Cloudflare edge" #line:c0392b;line.dashed;text:c0392b {
+    rectangle "TB2 MR server (microk8s)" #line:c0392b;line.dashed;text:c0392b {
+        usecase "P1\npanel-web" as p1
+        rectangle "TB3 private network (NetworkPolicy)" #line:c0392b;line.dashed;text:c0392b {
+            usecase "P2\npanel-api" as p2
+            database "DS1\nPostgreSQL:\nregister, ledger,\nevent log, audit" as ds1
+        }
+    }
+
+    rectangle "TB4 Microsoft 365 tenant" #line:c0392b;line.dashed;text:c0392b {
+        usecase "P3\nEntra ID" as p3
+        usecase "P4\nTeams, Engage,\nExchange" as p4
+        usecase "P5\nPower Automate\nharness" as p5
+        database "DS2\nSharePoint:\nfinance documents" as ds2
+    }
+
+    rectangle "TB5 Azure subscription" #line:c0392b;line.dashed;text:c0392b {
+        usecase "P6\nLogic Apps" as p6
+        database "DS3\nBlob Storage:\nbackups" as ds3
+    }
+
+    rectangle "TB6 Voting host" #line:c0392b;line.dashed;text:c0392b {
+        usecase "P7\nIdentity broker" as p7
+        usecase "P8\nBelenios" as p8
+        database "DS4\nElection data:\nballots, public credentials" as ds4
+    }
+}
+
+rectangle "TB7 Third parties" #line:c0392b;line.dashed;text:c0392b {
+    rectangle "E6\nAnthropic\nClaude API" as e6
+    rectangle "E7\nGoogle Workspace\n(migration only)" as e7
+}
+
+e1 --> p4 : DF1 messages, files
+p4 --> p1 : DF2 Teams SSO token,\nrequests for the MR tab
+e2 --> p1 : DF3 member data edits,\nchange-request decisions
+e3 --> p1 : DF4 bank statements,\napprovals, reports
+e5 ..> e3 : DF5 statement files\n(downloaded manually)
+p1 <--> p3 : DF6 OIDC: auth code,\nID token (oid)
+p1 <--> e7 : DF7 OIDC: ID token\n(enrollment, migration only)
+p1 --> p2 : DF8 API calls,\nservice token + user oid
+p2 <--> ds1 : DF9 personal and financial data,\nevents, audit records
+p2 <--> p3 : DF10 Graph: users, groups,\ninvitations, licences, TAP
+p2 --> p4 : DF11 notifications,\nannouncements
+p2 <--> e7 : DF12 Admin SDK:\nusers, groups (migration only)
+ds1 --> ds3 : DF13 encrypted backups,\nWAL
+p5 <--> p2 : DF14 process requests,\nmember lookups
+p6 <--> p2 : DF15 scheduled jobs
+p5 --> e6 : DF16 prompts with\nminimised member data
+p6 --> e6 : DF17 prompts with\nminimised member data
+p5 --> ds2 : DF18 invoices, scans
+e1 --> p8 : DF19 encrypted ballots
+p8 <--> p7 : DF20 OIDC: sub = member number
+p7 <--> p3 : DF21 OIDC, Graph:\nmember number lookup
+p8 <--> ds4 : DF22 ballots,\npublic credentials
+e4 --> p8 : DF23 voter list, public credentials,\npartial decryptions
+p1 --> e4 : DF24 voter list export\n(CSV download)
+@enduml

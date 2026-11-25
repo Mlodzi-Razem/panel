@@ -18,7 +18,7 @@
 @NullMarked
 @ApplicationModule(
     displayName = "Admin",
-    allowedDependencies = {"persistence::*", "audit", "bodies", "core::cli"}
+    allowedDependencies = {"persistence::*", "audit", "bodies", "recruitment", "core::cli"}
 )
 package org.mlodzirazem.panel.services.panelapi.admin;
 

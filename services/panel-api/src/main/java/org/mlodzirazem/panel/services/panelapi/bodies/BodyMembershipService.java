@@ -46,6 +46,16 @@ public interface BodyMembershipService {
      */
     TBodyMembership end(long membershipId, @Nullable LocalDate endDate, @Nullable String decisionReference);
 
+    /**
+     * Voids the membership as a mistaken entry ("wpis omyłkowy"): a completely different thing from
+     * {@link #end} — the mandate never happened, so it disappears from functions, permissions and
+     * statutory checks. The row is never deleted: it stays in {@code body_memberships} with status
+     * {@code VOIDED} and the reason, and the audit log keeps the record ({@code bodies ::
+     * membership-void}). The reason is required; the resolution reference ({@code decisionReference})
+     * is optional and, once given, overwrites nothing silently.
+     */
+    TBodyMembership voidMembership(long membershipId, String reason, @Nullable String decisionReference);
+
     List<TBodyMembership> activeIn(long bodyId);
 
     List<TBodyMembership> activeOf(long memberId);

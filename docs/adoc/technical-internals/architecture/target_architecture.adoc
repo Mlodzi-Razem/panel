@@ -1,0 +1,324 @@
+[#targetArchitecture]
+=== Target Architecture: Microsoft 365
+:includedir: _includes
+
+****
+NOTE: *Status: proposal (November 2026).* Nothing in this section is implemented yet
+unless it is explicitly marked as existing. The section is the input for threat modelling.
+****
+
+==== Context
+
+The association is moving from Google Workspace to a Microsoft 365 nonprofit tenant.
+MR Panel stays the single source of truth for members, bodies, districts and finances.
+Microsoft 365 provides identity, mail and collaboration, and Panel synchronises it, the same way
+it synchronises Google Workspace today.
+
+The planned licence model:
+
+[%autowidth]
+|===
+| Licence | Holders | Notes
+
+| Business Basic (nonprofit grant)
+| National bodies, IT commission, coordinators, active members, two harness service accounts
+| 300 seats: 298 members and 2 service accounts. Mailbox, Office for the web with editing.
+| Microsoft 365 F1
+| All other members (about 300)
+| 55 PLN per year gross. Teams, mail, SharePoint, Viva Engage, Office for the web, 2 GB OneDrive,
+  Entra ID P1 and Intune. These members receive internal mail and are not expected to send it.
+| Power Automate Premium
+| The two harness service accounts
+| Needed for the HTTP and Claude connectors.
+| none
+| Administrator accounts, two break-glass accounts
+| Separate cloud-only accounts; break-glass accounts use FIDO2 keys.
+|===
+
+There are no B2B guest accounts for members. The external accounting office is the only guest.
+
+The tenant uses Security Defaults and has no Conditional Access policies.
+The authentication methods policy allows passkeys only (Microsoft Authenticator, iCloud and Google synced passkeys);
+SMS, voice and e-mail codes are disabled. Passwords are random and unknown, self-service password reset is off,
+and a lost passkey is replaced through a Temporary Access Pass issued after a video identity check.
+Without Conditional Access the tenant cannot restrict downloads on unmanaged devices,
+so member data is kept in Panel and nowhere else.
+
+The register is _special category_ data under Art. 9 GDPR: membership of the association reveals
+political opinions, and some members are minors: ordinary and supporting members from 16,
+and supporting members younger than 16 who joined before the statute of 3 October 2026.
+Every decision below assumes this classification.
+
+==== Decisions
+
+[cols="1,4,4"]
+|===
+| ID | Decision | Rationale
+
+| AD-1
+| Panel remains the system of record. No Dataverse, no commercial ERP.
+| Open source (AGPL), runs on our own server, already models the statute.
+  Dataverse requires Power Apps Premium licences. Dolibarr is the fallback finance back office
+  if the finance module is not built.
+| AD-2
+| The Entra object ID (`oid`) identifies a user. It replaces the Google `sub`.
+  Panel never keys a user on an e-mail address or UPN.
+| `oid` is immutable and survives changes of licence, UPN and e-mail address.
+  E-mail addresses and UPNs change during the migration.
+| AD-3
+| A third directory provider, `Entra`, is added next to `Mock` and `Google`. It uses Microsoft Graph.
+| The reloadable directory (see <<reloadDirectroyImplementation>>) already supports
+  switching providers. During the migration panel-web accepts both sign-in providers,
+  and the directory provider is switched at the cutover.
+| AD-4
+| Panel gets an enrollment portal: Google sign-in, identity match, a one-time Temporary Access Pass,
+  then a passkey in Microsoft Authenticator, iCloud or Google. Panel assigns Business Basic or F1.
+| No passwords are created or handled. Accounts with administrative roles and members of the national
+  bodies are excluded from the portal and are activated in person.
+| AD-5
+| Panel is published as a Teams app with static tabs: _Home_, _My membership_, _District_ (role-based)
+  and _Votes_. It is pinned for everyone by an app setup policy and uses Teams SSO.
+  The same manifest makes Panel available in Outlook and the Microsoft 365 app. Panel cards
+  appear on the _Start_ home site, which is the tenant root site and, in Teams, the SharePoint app
+  (formerly Viva Connections).
+| Members find Panel where they already work. It requires `frame-ancestors` for Teams in the CSP
+  and a token exchange in panel-web.
+| AD-6
+| There is no Teams team for all members. Panel publishes national announcements (resolutions, deadlines,
+  election results) as news on the _Start_ home site and as posts in the _Ogłoszenia_ community in Viva Engage.
+  District announcements go to the _Ogólny_ channel of the district team through Workflows.
+  Viva Connections cards (SPFx) come later.
+| Viva Engage is the space for the whole association. Panel is the source of the announcements, so they are audited.
+| AD-7
+| Districts, bodies and thematic circles map to Entra security groups that the directory synchronisation maintains.
+  Working-group teams are public in the tenant and members join them themselves.
+  Access is enforced in panel-api, which is the only place that holds member data.
+| Group membership drives Teams and SharePoint access. The authorisation decision stays in Panel.
+| AD-8
+| A finance module: bank statement import (files), ledger, approvals by the CFO and a second board member,
+  read-only access for the audit commission, UEPiK reports using the 2026 templates.
+  Documents are stored in SharePoint with a retention policy.
+| No maintained open-source tool supports UEPiK. Statements are imported from files,
+  so Panel never holds bank credentials.
+| AD-9
+| Panel runs on the MR server (single-node microk8s), as it does today.
+  The Azure nonprofit grant pays for backups (immutable Blob Storage), Logic Apps and Key Vault.
+| Uses the existing Helm chart. Off-site backups survive the loss of the server.
+| AD-10
+| Voting uses Belenios on a separate host. An identity broker signs voters in with Entra ID and
+  issues `sub` equal to the member number, which Panel writes to the user's `employeeId`.
+  The voter list is exported from Panel. Trustees and the credential authority are not IT staff.
+| Belenios uses the OIDC `sub` as the login, and Entra's `sub` is pairwise per application,
+  so it cannot be known in advance. The broker reads the member number from Entra,
+  so the voting host does not need a connection to Panel.
+| AD-11
+| The process harness (Power Automate with two Premium licences, Logic Apps) calls Panel's process
+  endpoints and the Claude API. Prompts contain the minimum member data needed.
+  No decision with legal effect is taken automatically.
+| Art. 22 GDPR. The harness prepares, people decide.
+| AD-12
+| Panel has a _Pomoc IT_ form. Each request becomes a work item in Azure Boards, in an Azure DevOps organisation
+  connected to the tenant's Entra ID and located in the EU. panel-api creates the item with a service principal
+  and shows its state to the member. Simple questions go to the _Pomoc IT_ community in Viva Engage.
+| Azure Boards gives the IT commission epics, stories, sub-tasks and sprints. Basic access is free for five users
+  and Stakeholder access is free without a limit. Work items hold only the data needed for the request.
+| AD-13
+| A thematic circle has a public Viva Engage community. Members enrol in the circle through a form in Panel,
+  and Panel maintains the membership of the circle's Teams team when the circle has one.
+| A community created in Viva Engage has its own Microsoft 365 group with SharePoint, OneNote and Planner,
+  but that group cannot also be a Teams team. The team is a separate group.
+|===
+
+The body templates follow the statute of 15 September 2024 (see the Members feature).
+The proposed new governance structure would change the templates, but not this architecture.
+
+==== System Architecture
+
+.Target system architecture
+[plantuml, , svg]
+----
+include::{includedir}/target_architecture.puml[]
+----
+
+==== Components
+
+The component diagram shows panel-web and panel-api with the planned components highlighted.
+The existing request path (panel-web signs a short-lived HS256 service token, panel-api verifies it)
+does not change. panel-web adds the user's `oid` to every call.
+
+.Components of MR Panel
+[plantuml, , svg]
+----
+include::{includedir}/target_components.puml[]
+----
+
+==== Data Flow Diagram
+
+This diagram is the input for threat modelling (STRIDE per element and per data flow).
+Processes are ellipses, data stores are cylinders, external entities are rectangles,
+and trust boundaries are red dashed frames.
+
+.Data flow diagram, level 1
+[plantuml, , svg]
+----
+include::{includedir}/target_data_flow.puml[]
+----
+
+.Trust boundaries
+[cols="1,3,4"]
+|===
+| ID | Boundary | What crosses it
+
+| TB1 | Internet and the Cloudflare edge | All user traffic to Panel and to the voting host
+| TB2 | MR server | Traffic from Cloudflare to the gateway and panel-web
+| TB3 | Private network inside the cluster | Only panel-web (service token) and monitoring may reach panel-api
+| TB4 | Microsoft 365 tenant | OIDC, Microsoft Graph, Teams SSO, harness calls
+| TB5 | Azure subscription and Azure DevOps organisation | Backups, scheduled jobs, logs, Pomoc IT work items
+| TB6 | Voting host | Ballots, voter authentication
+| TB7 | Third parties outside our control | Prompts to the Claude API, Google Workspace during the migration
+|===
+
+Data classes used below: _Public_, _Internal_, _Personal_, _Special_ (Art. 9 GDPR or minors),
+_Financial_, _Secret_ (credentials, tokens, keys), _Ballot_.
+
+.Data flows
+[cols="1,3,4,2,3"]
+|===
+| ID | From -> to | Data | Class | Protection
+
+| DF1  | Member -> Teams, Engage, Exchange | Messages, files | Personal | Entra sign-in with a passkey, Security Defaults
+| DF2  | Teams -> panel-web | Teams SSO token, tab requests | Secret | TLS, token audience and issuer checks
+| DF3  | Coordinator -> panel-web | Member data edits, change-request decisions | Special | TLS, session, district scoping in panel-api
+| DF4  | Board -> panel-web | Bank statements, approvals, reports | Financial | TLS, session, two-person approval
+| DF5  | Bank -> board | Statement files, downloaded manually | Financial | Bank's own authentication
+| DF6  | panel-web <-> Entra ID | Authorisation code, ID token (`oid`) | Secret | OIDC with PKCE, tenant-specific issuer
+| DF7  | panel-web <-> Google | ID token, enrollment only | Secret | OIDC, `hd` check, removed after the cutover
+| DF8  | panel-web -> panel-api | API calls with the user's `oid` | Special | HS256 service token, NetworkPolicy
+| DF9  | panel-api <-> PostgreSQL | Register, ledger, events, audit | Special, Financial | Private network, credentials in secrets
+| DF10 | panel-api <-> Microsoft Graph | Users, groups, licences, TAP | Personal, Secret | App credential in Key Vault, least-privilege Graph permissions
+| DF11 | panel-api -> Teams, Engage, Exchange | Notifications, announcements | Internal | Graph or Workflows, no special-category content
+| DF12 | panel-api <-> Google Admin SDK | Users, groups, migration only | Personal | Service account, removed after the cutover
+| DF13 | PostgreSQL -> Blob Storage | Base backups, WAL | Special, Financial | Encryption before upload, immutable container
+| DF14 | Power Automate <-> panel-api | Process requests, member lookups | Personal | Dedicated service identity, scoped endpoints
+| DF15 | Logic Apps <-> panel-api | Scheduled jobs | Internal | Managed identity, scoped endpoints
+| DF16 | Power Automate -> Claude API | Prompts | Personal (minimised) | TLS, data minimisation, no Special data
+| DF17 | Logic Apps -> Claude API | Prompts | Personal (minimised) | TLS, data minimisation, no Special data
+| DF18 | Power Automate -> SharePoint | Invoices, scans | Financial | M365 connector, retention policy
+| DF19 | Member -> Belenios | Encrypted ballots | Ballot | Encryption in the browser, voting credential
+| DF20 | Belenios <-> identity broker | OIDC, `sub` = member number | Personal | OIDC
+| DF21 | Identity broker <-> Entra ID | OIDC, member number lookup | Personal, Secret | Tenant-specific issuer, read-only Graph permission
+| DF22 | Belenios <-> election data | Ballots, public credentials | Ballot | Threshold decryption by trustees
+| DF23 | Electoral commission -> Belenios | Voter list, public credentials, partial decryptions | Personal, Secret | Offline credential generation
+| DF24 | panel-web -> electoral commission | Voter list export (CSV download) | Personal | Role-restricted export, audit record
+| DF26 | panel-api <-> Azure Boards | Pomoc IT requests and their state | Personal (minimised) | Service principal, EU organisation, no Special data
+| DF27 | panel-api -> _Start_ home site | News: resolutions, deadlines, election results | Internal | Graph permission limited to the _Start_ site
+| DF28 | _Start_ (Viva Connections) -> panel-web | Panel cards: dues, open votes, pending matters | Personal | Microsoft 365 SSO token, same checks as DF2
+| DF29 | Entra ID, Microsoft 365 audit -> Log Analytics | Sign-in and audit logs | Personal | Diagnostic settings, 180-day retention, IT commission access only
+| DF30 | Log Analytics -> IT commission | Security alerts | Personal (minimised) | Action group to the IT mailbox and two private addresses
+| DF31 | Accounting office (guest) <-> SharePoint | Finance library | Financial | The only guest account, access to the Finance library only, processing agreement
+| DF32 | panel-api -> member's private mailbox | Activation, recovery, suspension and end of membership | Personal | Sent through Exchange, only the messages listed in the channels instruction
+| DF33 | panel-api -> IT commission's team | Reports from the _Zgłoś incydent_ form | Personal | Form without attachments, IT duty channel
+|===
+
+DF25 was the guest mailbox flow. It was removed together with guest accounts, and its number is not reused.
+
+==== Migration from Google Workspace
+
+. Create the tenant with its final `onmicrosoft.com` name. Verify the main domain with a TXT record only,
+  set it to _Internal Relay_ in Exchange, and add a routing subdomain with MX records pointing to Microsoft 365.
+. Implement the `Entra` directory provider and the Entra sign-in provider. Run them next to Google.
+. Create accounts with their final UPNs on the main domain: the six-digit member number is the UPN and the `employeeId`,
+  and `imie.nazwisko` (`imie.N.nazwisko` on a collision) is the primary address. Accounts of current members are created
+  as mail users, and the mail migration turns them into mailboxes. Panel links the Entra `oid` to the member
+  through `employeeId` (phase 1 of the integration plan below).
+. Pilot with the national board and the IT commission, then activate members in batches
+  through the enrollment portal.
+. Migrate mail, calendars and contacts with the Exchange Online Google Workspace migration,
+  and Drive with Migration Manager.
+. Cutover: switch the MX records, switch the directory provider to `Entra`, remove the Google sign-in provider,
+  and keep Google Workspace read-only for 30 days.
+
+[#m365IntegrationPlan]
+==== Microsoft 365 Integration Plan
+
+State on 21 November 2026:
+
+* The tenant exists. Its SharePoint host is `mloderazemki.sharepoint.com`.
+* Accounts follow the naming in the migration steps above. Accounts of current members are being created as mail users.
+* _Start_ is the home site. The org-wide app setup policy in Teams pins the SharePoint app first.
+* Panel signs in with Google only. It links a member through `directory_user_id` (the Google `sub`)
+  or, on the first sign-in, through the domain e-mail.
+
+The work is split into phases, in the order below. Each phase can be released on its own.
+
+[cols="1,2,6"]
+|===
+| Phase | Scope | Details
+
+| 0
+| Entra app registration
+| A single-tenant application _Panel MR_ with the web redirect URI
+  `https://panel.mlodzirazem.org/api/auth/callback/azure-ad`.
+  It exposes the API `api://panel.mlodzirazem.org/<client ID>` with the scope `access_as_user`,
+  and the Teams, Outlook and Microsoft 365 app clients are pre-authorised for it.
+  Graph application permissions are granted phase by phase, starting with `User.Read.All`.
+  The credential is a certificate kept in Key Vault.
+
+| 1
+| Entra sign-in next to Google
+| panel-web adds the Azure AD provider with the tenant-specific issuer.
+  A table `member_identities(provider, subject, member_id)` replaces `directory_user_id`,
+  so the Google `sub` and the Entra `oid` work side by side until the cutover.
+  On the first Entra sign-in panel-api reads the user's `employeeId` from Graph by `oid`
+  and links the member with that number. E-mail addresses and `preferred_username` are never used for linking (AD-2).
+
+| 2
+| Teams app
+| The static tabs _Strona główna_, _Moje członkostwo_, _Okręg_, _Głosowania_ and _Informacje_ load `/teams/*` routes,
+  which have no side navigation and take their theme from the Teams context.
+  _Okręg_ shows district information to every member and pending change requests to coordinators.
+  TeamsJS `getAuthToken()` sends the SSO token to `/api/auth/teams`. panel-web checks the issuer, audience,
+  signature and scope and opens a session. There is no on-behalf-of exchange, because panel-web does not call Graph as the user.
+  Inside the Teams frame the session cookie is `SameSite=None; Secure; Partitioned`.
+  The CSP gets `frame-ancestors` for the Teams, Outlook, Office and `*.cloud.microsoft` hosts.
+  The app is uploaded to the organisation catalogue and piloted with the national board and the IT commission
+  through a separate setup policy. It is then pinned in the global policy, directly below the SharePoint app.
+
+| 3
+| Panel to Microsoft 365
+| Activity feed notifications in Teams (dues, new votes, change requests to approve) use `TeamsActivity.Send`.
+  The app is pinned by policy, so it is installed for every recipient.
+  News for _Start_ is published with `Sites.Selected`, limited to that site (DF27).
+
+| 4
+| Entra directory provider
+| After the migration Panel creates new accounts through Graph: the number as the UPN, `imie.nazwisko`,
+  `employeeId` and a licence. It maintains the district and body groups (AD-7)
+  and issues Temporary Access Passes in the enrollment portal (AD-4).
+
+| 5
+| Cards on _Start_
+| SharePoint Framework Adaptive Card Extensions request a token for `api://panel.mlodzirazem.org/<client ID>`
+  and call a panel-web endpoint that allows CORS from `mloderazemki.sharepoint.com`.
+  This needs the tenant app catalogue and approval of API access in SharePoint. Until then _Start_ links to Panel.
+
+| 6
+| Cutover
+| As in the migration steps: the Google sign-in provider and DF7 are removed, and `Entra` becomes the directory provider.
+|===
+
+==== Open Questions
+
+These points must be verified in the pilot before they are relied on:
+
+* Whether F1 users can use the custom Teams app and Viva Engage communities without restrictions.
+* Whether Loop workspaces and the Viva Connections home site work for both Business Basic and F1 accounts.
+* Whether Panel cards on the home site need SPFx Adaptive Card Extensions or can come from the Teams app.
+* Whether Security Defaults require a Microsoft Authenticator push registration next to a passkey.
+* Whether Temporary Access Pass and administrative units need Entra ID P1 in our scenario.
+* Which claim Belenios 3.3 uses as the login, and whether the broker can issue `employeeId` as `sub`.
+* Whether the Engage API can publish posts, or whether Workflows must be used.
+* Whether community creation in Viva Engage can be limited to the IT commission.
+* Whether the Outlook app can be pinned in Teams for F1 and Business Basic accounts by an app setup policy.
+* Whether Stakeholder access in Azure Boards is enough for volunteers who triage requests.
+* Whether F licences may be assigned to members of the association (frontline worker eligibility).

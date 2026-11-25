@@ -91,6 +91,9 @@ public class BodiesController {
     ) {
     }
 
+    public record VoidMembershipRequest(@Nullable String reason, @Nullable String decisionReference) {
+    }
+
     @GetMapping
     public List<BodyResponse> list() {
         callers.require();
@@ -189,6 +192,34 @@ public class BodiesController {
         return membership(bodyMemberships.end(existing.getId(), endDate, decisionReference));
     }
 
+    @PostMapping("/{id}/memberships/{membershipId}/void")
+    public MembershipResponse voidMembership(
+        @PathVariable("id") long id,
+        @PathVariable("membershipId") long membershipId,
+        @RequestBody VoidMembershipRequest request
+    ) {
+        callers.requireBodiesManager();
+
+        TBodyMembership existing = membershipRepository.findById(membershipId)
+                                                       .filter(m -> m.getBody().getId() == id)
+                                                       .orElseThrow(() -> new NotFoundException("Membership",
+                                                           membershipId));
+
+        return membership(bodyMemberships.voidMembership(
+            existing.getId(),
+            request.reason(),
+            request.decisionReference()
+        ));
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable("id") long id) {
+        callers.requireBodiesManager();
+
+        bodies.delete(id);
+    }
+
     private AssignMembership assignment(long bodyId, AssignRequest request) {
         if (request.memberId() == null || request.memberTypeId() == null) {
             throw ApiException.badRequest("FIELD_REQUIRED", "memberId and memberTypeId are required",
@@ -222,7 +253,8 @@ public class BodiesController {
             template == null ? null : template.getScope(),
             template == null ? null : template.getId(),
             template == null ? null : template.getName(),
-            b.getParentBody() == null ? null : b.getParentBody().getId()
+            b.getParentBody() == null ? null : b.getParentBody().getId(),
+            b.isSeeded()
         );
     }
 

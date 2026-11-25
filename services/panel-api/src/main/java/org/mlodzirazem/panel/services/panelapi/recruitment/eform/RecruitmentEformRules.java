@@ -104,9 +104,9 @@ public final class RecruitmentEformRules {
      * dates must match — a mismatch is reported with the same generic code for phishing hygiene.
      */
     public static String normalizePersonalId(String personalId, @Nullable LocalDate knownBirthDate) {
-        String digits = personalId == null ? "" : personalId.replaceAll("[\\s-]", "");
+        String digits = personalId == null ? "" : MemberRules.canonicalDigits(personalId);
 
-        if (digits.length() != 11 || digits.chars().anyMatch(ch -> !Character.isDigit(ch))) {
+        if (digits.length() != 11 || !MemberRules.isAsciiDigits(digits)) {
             throw invalidPersonalId();
         }
 
@@ -133,6 +133,10 @@ public final class RecruitmentEformRules {
 
     /** Birth date encoded in the PESEL; empty when the date part is not a valid date. */
     public static Optional<LocalDate> peselBirthDate(String pesel) {
+        if (pesel.length() != 11 || !MemberRules.isAsciiDigits(pesel)) {
+            return Optional.empty();
+        }
+
         int rawYear = Integer.parseInt(pesel.substring(0, 2));
         int rawMonth = Integer.parseInt(pesel.substring(2, 4));
         int day = Integer.parseInt(pesel.substring(4, 6));

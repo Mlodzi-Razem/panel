@@ -1,0 +1,118 @@
+== Membership fees
+
+The fee register (_ewidencja składek_) is kept by the Treasurer of the national board (Art. 28.6).
+The national board sets the amounts, discounts and exemptions (Art. 29.1.12).
+This feature replaces the spreadsheet and the manual bank checks; the association's ledger and
+UEPiK reports (AD-8 in the target architecture) are a later feature built on top of it.
+
+=== Who pays
+
+* Only *ordinary* members pay fees (Art. 13.4). Supporting and honorary members are exempt
+  (Art. 15.3); a person in the introductory period holds supporting membership (Art. 10.3).
+* A member owes a due for every calendar month in which they are an ordinary member with status
+  `ACTIVE` or `SUSPENDED` on the first day of the month. The first due is for the month after
+  `member_since` (or that month when `member_since` is its first day). Removal stops new dues;
+  existing debt remains.
+
+=== Rates and tiers
+
+* The national board defines *fee tiers* (e.g. _Standardowa_, _Ulgowa_). Each tier has a history of
+  monthly amounts, each with `valid_from` and the reference of the resolution that set it.
+  The amount for a month is the one valid on the first day of that month.
+* *The fee changes over time.* A new amount is added as a new rate with its own `valid_from`;
+  the previous amounts stay in the history. A rate may start in any month for which no dues
+  exist yet (normally the next month, or a later one when a resolution is entered in advance).
+  Dues already generated keep the amount they were generated with, so a change never rewrites
+  past months and a member's history always shows what was owed at the time.
+* Every paying member is assigned to one tier (default: the tier marked as default).
+  Assignments have `valid_from`, so changing a tier never rewrites past dues.
+* No dues are generated until at least one rate exists.
+
+=== Adjustments
+
+Granted by the ZK Treasurer, with a reason category, a free-text justification and an optional
+resolution reference, for a range of months (the end month may be left open until revoked):
+
+[%autowidth]
+|===
+| Kind | Effect
+
+| Exemption (_zwolnienie_) | No due is charged for those months.
+| Discount (_ulga_) | The due for those months is reduced to a fixed amount.
+| Deferral (_odroczenie_) | Dues stay owed, but arrears for those months are *justified* until the deferral ends.
+|===
+
+Reason categories: `FINANCIAL_HARDSHIP` (_trudna sytuacja materialna_), `HEALTH`, `OTHER`.
+
+* *Exemption for financial difficulties.* The ZK Treasurer can exempt a member, fully or with a
+  discount, because of financial hardship. The exemption may also cover past months: open dues in
+  that range are cancelled, which also ends the arrears they caused (and restores electoral rights
+  under Art. 14). Dues already paid stay paid; refunds are out of scope.
+* *Confidentiality.* The reason category and justification are personal data about the member's
+  situation. Only the ZK Treasurer (`FEES_MANAGE`) and the member themself see them; everyone else
+  with `FEES_READ` sees only that an exemption, discount or deferral applies and for which months.
+  The audit log records that an adjustment was granted or revoked, never its reason.
+* Revoking an adjustment (or ending it earlier) affects only months from the revocation on;
+  months before keep their adjusted dues.
+
+Adjustments never change dues that are already paid; changing an unpaid due recalculates it.
+
+=== Payments and allocation
+
+* Sources: imported bank transactions (camt.053 or MT940 statement files) and payments recorded
+  by the ZK Treasurer (cash, other). Only the ZK Treasurer records or matches payments.
+* Every member has a personal *payment reference* `MR-<member number>-<check digit>`
+  (the check digit is the ISO 7064 mod 11-10 digit of the member number), shown on their fees page
+  together with the bank account and recipient name.
+* Matching an incoming transfer: a valid reference in the title (case, spaces and dashes ignored)
+  identifies the member; otherwise a sender IBAN previously confirmed for exactly one member does;
+  otherwise the transfer waits in the *unmatched queue* for the Treasurer, who assigns it to one or more
+  members (split) or marks it as not a fee. A manual match can remember the sender IBAN.
+* A payment is allocated to the member's oldest open dues first; any surplus is a credit used by
+  future dues. Reversing a payment (e.g. a wrong match) re-allocates the member's remaining payments.
+* Importing the same statement twice changes nothing (transactions are identified by the bank's
+  reference, or by account, date, amount and title when it is missing).
+
+=== Arrears
+
+* A due is *open* while it is not fully paid, and *overdue* after the last day of its month.
+* A member's arrears start at the due date of their oldest overdue due that is not covered by a deferral.
+* Arrears longer than 3 months suspend active and passive electoral rights (Art. 14).
+  This is the `FeeArrearsPolicy` used by the electoral rights.
+* Arrears longer than 4 months are grounds for exclusion by the national board (Art. 17.1.4b).
+  The panel lists them; excluding a member stays a board decision.
+
+=== Permissions
+
+[%autowidth]
+|===
+| Role | Scope | Fees access
+
+| ZK Treasurer | `GLOBAL` | `FEES_READ`, `FEES_MANAGE`: rates, tiers, adjustments, imports, matching, payments
+| Other ZK roles | `GLOBAL` | `FEES_READ` (added)
+| Audit commission (KKR) roles | `GLOBAL` | `FEES_READ` (added; read-only control, AD-8)
+| District Treasurer | `LOCAL` | `FEES_READ` for the district
+| District board (ZO) | `LOCAL` | `FEES_READ` for the district (added; arrears are needed for Art. 17.1.4c requests)
+| Every member | own record | balance, history and payment instructions
+|===
+
+=== Auditing
+
+Every rate, tier, assignment, adjustment, import, match, manual payment and reversal is audited
+with ids and field names only; amounts are stored in the fee tables, not in the audit log.
+
+=== User interface
+
+* *Składki / Fees* for members: balance, next due, open dues, payment history, and how to pay
+  (account, recipient, title with the personal reference).
+* *Finanse / Finance* for `FEES_READ`: overview (expected vs collected per month), arrears list with
+  the Art. 14 and Art. 17 thresholds, and each member's fee card (dues, payments, adjustments, balance).
+  District roles see their district only.
+* For the ZK Treasurer additionally: statement import (with a preview before saving),
+  the unmatched queue, recording a payment, tiers and rates, and adjustments.
+
+=== Out of scope
+
+* The association ledger, costs, documents and UEPiK reports (AD-8) -- next feature.
+* Reminders and notifications -- after the Microsoft 365 integration.
+* Online payments and payment QR codes.

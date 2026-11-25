@@ -144,15 +144,15 @@ class SpreadsheetImporterTest extends DomainTestSupport {
                          .add("4", "D", "Czwarta", "Zagranica")
                          .add("5", "E", "Piąta", "Warmińsko-Mazurskie"));
 
-        assertThat(affiliationService.primaryDistrict(byMemberId("1").getId()).orElseThrow().getCode())
+        assertThat(affiliationService.primaryDistrict(byMemberId("000001").getId()).orElseThrow().getCode())
             .isEqualTo("district-mazowieckie");
-        assertThat(affiliationService.primaryDistrict(byMemberId("2").getId()).orElseThrow().getCode())
+        assertThat(affiliationService.primaryDistrict(byMemberId("000002").getId()).orElseThrow().getCode())
             .isEqualTo("district-mazowieckie");
-        assertThat(affiliationService.primaryDistrict(byMemberId("3").getId()).orElseThrow().getCode())
+        assertThat(affiliationService.primaryDistrict(byMemberId("000003").getId()).orElseThrow().getCode())
             .isEqualTo("district-mazowieckie");
-        assertThat(affiliationService.primaryDistrict(byMemberId("4").getId()).orElseThrow().getCode())
+        assertThat(affiliationService.primaryDistrict(byMemberId("000004").getId()).orElseThrow().getCode())
             .isEqualTo("district-zagranica");
-        assertThat(affiliationService.primaryDistrict(byMemberId("5").getId()).orElseThrow().getCode())
+        assertThat(affiliationService.primaryDistrict(byMemberId("000005").getId()).orElseThrow().getCode())
             .isEqualTo("district-warminsko-mazurskie");
     }
 
@@ -179,7 +179,7 @@ class SpreadsheetImporterTest extends DomainTestSupport {
 
         apply(new Sheet().add(row));
 
-        TMember member = byMemberId("1");
+        TMember member = byMemberId("000001");
         assertThat(member.getPhoneNumbers()).containsExactly("+48 111 222 333", "+48 444 555 666", "+48 777");
         assertThat(member.getPrivateEmails()).containsExactly("a@example.org", "b@example.org", "c@example.org");
         assertThat(member.getPreferredNameFirst()).isEqualTo("Prefka");
@@ -213,7 +213,7 @@ class SpreadsheetImporterTest extends DomainTestSupport {
             "2: pesel → BIRTH_DATE_MISMATCH", "3: pesel → CHECKSUM", "4: pesel → FORMAT");
         assertThat(skipping.created()).isEqualTo(2);
         assertThat(skipping.skipped()).isEqualTo(2);
-        assertThat(byMemberId("2").getBirthDate()).isEqualTo(LocalDate.of(2005, 5, 5));
+        assertThat(byMemberId("000002").getBirthDate()).isEqualTo(LocalDate.of(2005, 5, 5));
         assertThat(memberRepository.findByMemberId("3")).isEmpty();
     }
 
@@ -244,8 +244,8 @@ class SpreadsheetImporterTest extends DomainTestSupport {
         assertThat(report.created()).isEqualTo(1);
         assertThat(report.updated()).isEqualTo(1);
         assertThat(report.unchanged()).isEqualTo(1);
-        assertThat(byMemberId("1").getPronouns()).isEqualTo("ona/jej");
-        assertThat(affiliationService.primaryDistrict(byMemberId("1").getId()).orElseThrow().getCode())
+        assertThat(byMemberId("000001").getPronouns()).isEqualTo("ona/jej");
+        assertThat(affiliationService.primaryDistrict(byMemberId("000001").getId()).orElseThrow().getCode())
             .isEqualTo("district-pomorskie");
         assertThat(auditCount("importer :: apply")).isEqualTo(2);
         assertThat(auditCount("members :: create")).isEqualTo(3);
@@ -295,7 +295,7 @@ class SpreadsheetImporterTest extends DomainTestSupport {
         assertThat(report.problems()).isEmpty();
         assertThat(report.created()).isEqualTo(3);
 
-        long first = byMemberId("1").getId();
+        long first = byMemberId("000001").getId();
         MemberDistricts districts = affiliationService.districtsOf(first);
         assertThat(districts.primaryDistrictId()).isEqualTo(district("mazowieckie").getId());
         assertThat(districts.supportingDistrictIds()).isEmpty();
@@ -321,6 +321,19 @@ class SpreadsheetImporterTest extends DomainTestSupport {
                                                    .add("0205", "B", "Druga", "Mazowiecki"));
 
         assertThat(lines(duplicate)).containsExactly("0205: member_id → DUPLICATE_IN_FILE");
+    }
+
+    @Test
+    void applyStoresNewNumbersZeroPadded() throws IOException {
+        Sheet sheet = new Sheet().add("17", "Nowa", "Osoba", "Mazowiecki");
+
+        ImportReport first = apply(sheet);
+
+        assertThat(first.problems()).isEmpty();
+        assertThat(first.created()).isEqualTo(1);
+        assertThat(byMemberId("000017").getFormalNameLast()).isEqualTo("Osoba");
+        assertThat(memberRepository.findByMemberId("17")).isEmpty();
+        assertThat(apply(sheet).unchanged()).isEqualTo(1);
     }
 
     @Test
@@ -452,8 +465,8 @@ class SpreadsheetImporterTest extends DomainTestSupport {
         ImportReport applied = apply(sheet);
 
         assertThat(applied.problems()).isEmpty();
-        assertThat(byMemberId("1").getMembershipType()).isEqualTo(MembershipType.SUPPORTING);
-        assertThat(byMemberId("2").getMembershipType()).isEqualTo(MembershipType.ORDINARY);
+        assertThat(byMemberId("000001").getMembershipType()).isEqualTo(MembershipType.SUPPORTING);
+        assertThat(byMemberId("000002").getMembershipType()).isEqualTo(MembershipType.ORDINARY);
         assertThat(apply(sheet).unchanged()).isEqualTo(2);
     }
 

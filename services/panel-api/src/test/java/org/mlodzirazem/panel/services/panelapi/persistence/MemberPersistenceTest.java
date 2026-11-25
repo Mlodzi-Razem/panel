@@ -158,7 +158,7 @@ class MemberPersistenceTest extends DomainTestSupport {
             assertThat(loaded.getPermissions()).containsExactlyInAnyOrder(PermissionType.FEES_READ,
                 PermissionType.BODIES_MANAGE);
             assertThat(permissionGroupRepository.findByScopeAndName(PermissionScope.LOCAL, "District board")
-                                                .orElseThrow().getPermissions()).hasSize(6);
+                                                .orElseThrow().getPermissions()).hasSize(7);
         } finally {
             permissionGroupRepository.delete(group);
         }
