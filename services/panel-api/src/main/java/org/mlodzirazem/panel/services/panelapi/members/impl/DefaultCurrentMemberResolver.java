@@ -22,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.mlodzirazem.panel.services.panelapi.audit.AuditLog;
 import org.mlodzirazem.panel.services.panelapi.audit.AuditPayload;
+import org.mlodzirazem.panel.services.panelapi.core.error.ConflictException;
 import org.mlodzirazem.panel.services.panelapi.core.user.IdentityProvider;
 import org.mlodzirazem.panel.services.panelapi.core.user.UserAuthInfo;
 import org.mlodzirazem.panel.services.panelapi.core.user.UserAuthInfoResolver;
@@ -32,6 +33,8 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMemberIdentity;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMemberIdentityRepository;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMemberRepository;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +53,13 @@ class DefaultCurrentMemberResolver implements CurrentMemberResolver {
     private final EntraUserLookup entraUsers;
     private final UserAuthInfoResolver userAuthInfoResolver;
     private final AuditLog auditLog;
+
+    /**
+     * Whether numbers from the fixture band 950000–969999 (dev seed personas) may be linked to Entra. Off
+     * by default: production never links them (SEC-20b). Trial and unallocated bands are never linkable.
+     */
+    @Value("${panel.members.fixture-numbers-linkable:false}")
+    private boolean fixtureNumbersLinkable;
 
     @Override
     @Transactional
@@ -93,7 +103,7 @@ class DefaultCurrentMemberResolver implements CurrentMemberResolver {
 
         String number = memberNumber(account.get().employeeId());
 
-        if (number == null) {
+        if (number == null || !linkableMemberNumber(number)) {
             return Optional.empty();
         }
 
@@ -113,6 +123,12 @@ class DefaultCurrentMemberResolver implements CurrentMemberResolver {
             return Optional.empty();
         }
 
+        // SEC-20c: the sign-in name must be the member number itself, so an administrator who sets
+        // employeeId on his own account cannot take over someone else's record.
+        if (!upnMatches(account.get().userPrincipalName(), number, member)) {
+            return Optional.empty();
+        }
+
         return Optional.of(link(member, IdentityProvider.ENTRA, userAuthInfo.userId()));
     }
 
@@ -121,7 +137,14 @@ class DefaultCurrentMemberResolver implements CurrentMemberResolver {
         identity.setMember(member);
         identity.setProvider(provider);
         identity.setSubject(subject);
-        identities.saveAndFlush(identity);
+
+        try {
+            identities.saveAndFlush(identity);
+        } catch (DataIntegrityViolationException lost) {
+            // SEC-23: a concurrent first sign-in won the unique (member, provider) or (provider, subject) index.
+            throw new ConflictException("IDENTITY_ALREADY_LINKED",
+                "The member already has a sign-in of this provider; retry the sign-in", List.of("identity"));
+        }
 
         auditLog.record("members :: link-user", AuditPayload.of("memberId", member.getId())
                                                             .withFields(List.of("identity"))
@@ -130,8 +153,44 @@ class DefaultCurrentMemberResolver implements CurrentMemberResolver {
         return member;
     }
 
+    /** Trial numbers (990000–999999) and unallocated ones (970000–989999) never link; fixtures only when enabled. */
+    private boolean linkableMemberNumber(String number) {
+        long value = Long.parseLong(number);
+
+        if (value >= 990000 && value <= 999999 || value >= 970000 && value <= 989999) {
+            return false;
+        }
+
+        return fixtureNumbersLinkable || value < 950000 || value > 969999;
+    }
+
+    /** UPN {@code %06d@<member domain>}: the local part is the six-digit member number. */
+    private static boolean upnMatches(@Nullable String upn, String number, TMember member) {
+        if (upn == null) {
+            return false;
+        }
+
+        int at = upn.lastIndexOf('@');
+
+        if (at <= 0) {
+            return false;
+        }
+
+        String memberEmail = member.getDomainEmail();
+
+        if (memberEmail == null || !memberEmail.contains("@")) {
+            return false;
+        }
+
+        String memberDomain = memberEmail.substring(memberEmail.lastIndexOf('@') + 1);
+
+        return upn.substring(0, at).equals(String.format("%06d", Long.parseLong(number)))
+            && upn.substring(at + 1).equalsIgnoreCase(memberDomain);
+    }
+
     /**
-     * The member number from an Entra {@code employeeId}, without leading zeros; null when it is not a positive number.
+     * The member number from an Entra {@code employeeId}, without leading zeros; null when it is not a positive number
+     * or is longer than the six digits a member number has.
      */
     static @Nullable String memberNumber(@Nullable String employeeId) {
         if (employeeId == null) {
@@ -145,6 +204,6 @@ class DefaultCurrentMemberResolver implements CurrentMemberResolver {
         }
 
         String number = digits.replaceFirst("^0+", "");
-        return number.isEmpty() ? null : number;
+        return number.isEmpty() || number.length() > 6 ? null : number;
     }
 }

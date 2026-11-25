@@ -68,7 +68,7 @@ class GraphEntraUserLookupTest {
     private static final String OID = "7d1f3a2b-0c4e-4f5a-9b8c-112233445566";
     private static final String TOKEN_URL = "https://login.example/tenant-1/oauth2/v2.0/token";
     private static final String USER_URL =
-        "https://graph.example/v1.0/users/" + OID + "?$select=id,employeeId,accountEnabled";
+        "https://graph.example/v1.0/users/" + OID + "?$select=id,employeeId,accountEnabled,userPrincipalName";
     private static final String CLIENT_ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
 
     private final Clock clock = Clock.fixed(Instant.parse("2026-11-21T12:00:00Z"), ZoneOffset.UTC);
@@ -123,8 +123,23 @@ class GraphEntraUserLookupTest {
 
         GraphEntraUserLookup lookup = lookup(secretConfigured());
 
-        assertThat(lookup.find(OID)).contains(new EntraUser(OID, "000205", true));
-        assertThat(lookup.find(OID)).contains(new EntraUser(OID, null, false));
+        assertThat(lookup.find(OID)).contains(new EntraUser(OID, "000205", true, null));
+        assertThat(lookup.find(OID)).contains(new EntraUser(OID, null, false, null));
+        server.verify();
+    }
+
+    @Test
+    void readsTheUserPrincipalNameForTheSignInCheck() {
+        server.expect(requestTo(TOKEN_URL))
+              .andRespond(withSuccess("{\"access_token\":\"tok\",\"expires_in\":3599}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(USER_URL))
+              .andExpect(header("Authorization", "Bearer tok"))
+              .andRespond(withSuccess("{\"id\":\"" + OID + "\",\"employeeId\":\"000205\",\"accountEnabled\":true,"
+                  + "\"userPrincipalName\":\" 000205@mlodzirazem.org \"}", MediaType.APPLICATION_JSON));
+
+        GraphEntraUserLookup lookup = lookup(secretConfigured());
+
+        assertThat(lookup.find(OID)).contains(new EntraUser(OID, "000205", true, "000205@mlodzirazem.org"));
         server.verify();
     }
 
@@ -142,7 +157,7 @@ class GraphEntraUserLookupTest {
               .andRespond(withSuccess("{\"id\":\"" + OID + "\",\"employeeId\":\"000205\",\"accountEnabled\":true}",
                   MediaType.APPLICATION_JSON));
 
-        assertThat(lookup(certificateConfigured(fixture)).find(OID)).contains(new EntraUser(OID, "000205", true));
+        assertThat(lookup(certificateConfigured(fixture)).find(OID)).contains(new EntraUser(OID, "000205", true, null));
 
         MultiValueMap<String, String> form = form(formBody.get());
 
@@ -187,7 +202,7 @@ class GraphEntraUserLookupTest {
 
         EntraProperties properties = certificateAndSecretConfigured(fixture, "secret-1");
 
-        assertThat(lookup(properties).find(OID)).contains(new EntraUser(OID, "301", true));
+        assertThat(lookup(properties).find(OID)).contains(new EntraUser(OID, "301", true, null));
 
         MultiValueMap<String, String> form = form(formBody.get());
 
