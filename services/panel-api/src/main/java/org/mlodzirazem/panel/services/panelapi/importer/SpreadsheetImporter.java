@@ -488,6 +488,18 @@ class SpreadsheetImporter {
                 plan.values.put(MemberField.MEMBERSHIP_TYPE, MembershipType.SUPPORTING);
             }
 
+            Object rawNumber = plan.values.get(MemberField.MEMBER_ID);
+
+            if (rawNumber instanceof String number) {
+                String key = numberKey(number);
+
+                if (key != null) {
+                    // admissions allocate %06d and the padded register keeps that spelling: a new record
+                    // normalizes to it, an existing one keeps its stored spelling (see match)
+                    plan.values.put(MemberField.MEMBER_ID, String.format("%06d", Long.parseLong(key)));
+                }
+            }
+
             TMember created = memberService.create(new NewMember(plan.values, plan.primaryId, false));
 
             return new Outcome(Kind.CREATED, created.getId());

@@ -141,15 +141,66 @@ class BreakGlassAssignerTest extends DomainTestSupport {
     void membersAreFoundByDomainEmailMemberIdOrDatabaseId() {
         assertThat(run(FUNCTION, member.getDomainEmail().toUpperCase(), false).render()).contains("would create");
         assertThat(run(FUNCTION, "9001", false).render()).contains("would create");
-        assertThat(run(FUNCTION, String.valueOf(member.getId()), false).render()).contains("would create");
+        assertThat(run(FUNCTION, "id:" + member.getId(), false).render()).contains("would create");
     }
 
     @Test
-    void ambiguousNumericIdentifierIsRejected() {
-        TMember other = newMember("Olga", "Inna", "slaskie");
-        jdbc.update("UPDATE members SET member_id = ? WHERE id = ?", String.valueOf(other.getId()), member.getId());
+    void aDatabaseIdIsNeverUsedWithoutTheExplicitPrefix() {
+        // F0-1: a number no member carries must not silently become a database id (a typo could
+        // hand the global function to someone else); the operator has to write id:<n> on purpose.
+        BreakGlassReport bare = run(FUNCTION, String.valueOf(member.getId()), false);
 
-        BreakGlassReport report = run(FUNCTION, String.valueOf(other.getId()), true);
+        assertThat(bare.exitCode()).isEqualTo(1);
+        assertThat(bare.render()).contains("Unknown member").doesNotContain("resolved by database id");
+
+        BreakGlassReport prefixed = run(FUNCTION, "id:" + member.getId(), false);
+
+        assertThat(prefixed.render()).contains("resolved by database id", "would create");
+        assertThat(prefixed.render()).doesNotContain(member.getDomainEmail());
+    }
+
+    @Test
+    void aZeroPaddedNumberIsAlwaysAMemberNumberNeverADatabaseId() {
+        // Stage after the register import: the owner's record is 000205, another member has database id 205.
+        TMember other = newMember("Olga", "Inna", "slaskie");
+        String padded = String.format("%06d", other.getId());
+        jdbc.update("UPDATE members SET member_id = ? WHERE id = ?", padded, member.getId());
+
+        BreakGlassReport report = run(FUNCTION, padded, true);
+
+        assertThat(report.exitCode()).as(report.render()).isZero();
+        assertThat(events.events).singleElement()
+                                 .satisfies(event -> assertThat(event.memberId()).isEqualTo(member.getId()));
+    }
+
+    @Test
+    void anUnpaddedNumberMatchesThePaddedRegisterNumber() {
+        jdbc.update("UPDATE members SET member_id = '009001' WHERE id = ?", member.getId());
+
+        assertThat(run(FUNCTION, "9001", false).render()).contains("would create");
+        assertThat(run(FUNCTION, "0009001", false).render()).contains("would create");
+    }
+
+    @Test
+    void anUnpaddedNumberNeverSilentlyPicksAnotherMembersDatabaseId() {
+        TMember other = newMember("Olga", "Inna", "slaskie");
+        jdbc.update("UPDATE members SET member_id = ? WHERE id = ?",
+            String.format("%06d", other.getId()), member.getId());
+
+        // Unpadded digits are a member number only: the member carrying it is the one resolved.
+        BreakGlassReport report = run(FUNCTION, String.valueOf(other.getId()), false);
+
+        assertThat(report.render()).contains("resolved by member number").doesNotContain("resolved by database id");
+        assertThat(membershipCount()).isZero();
+    }
+
+    @Test
+    void aNumberSharedByTwoRecordsIsRejected() {
+        TMember other = newMember("Olga", "Inna", "slaskie");
+        jdbc.update("UPDATE members SET member_id = '000777' WHERE id = ?", member.getId());
+        jdbc.update("UPDATE members SET member_id = '777' WHERE id = ?", other.getId());
+
+        BreakGlassReport report = run(FUNCTION, "000777", true);
 
         assertThat(report.exitCode()).isEqualTo(1);
         assertThat(report.render()).contains("Ambiguous");
