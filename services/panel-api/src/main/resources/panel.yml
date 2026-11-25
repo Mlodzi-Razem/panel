@@ -21,3 +21,7 @@ panel:
     enabled: ${PANEL_MAIL_ENABLED:false}
     sender: ${PANEL_MAIL_SENDER:}
     daily-external-limit: ${PANEL_MAIL_DAILY_EXTERNAL_LIMIT:}
+  dev:
+    # Test-only shift of the single application clock (decision D8): the recruitment harness
+    # advances "today" past statutory windows. Refuses to start without the 'dev' profile.
+    clock-offset-days: ${PANEL_DEV_CLOCK_OFFSET_DAYS:0}
