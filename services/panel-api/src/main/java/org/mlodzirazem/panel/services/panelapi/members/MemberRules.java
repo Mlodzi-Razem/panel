@@ -53,14 +53,31 @@ public final class MemberRules {
         return birthDate.getYear() + MEMBERSHIP_END_AGE == year;
     }
 
+    /** NFKC-folded text: full-width and other compatibility digits become ASCII (BAN-1). */
+    public static String fold(String raw) {
+        return java.text.Normalizer.normalize(raw, java.text.Normalizer.Form.NFKC);
+    }
+
+    /**
+     * Canonical PESEL/member-number digits: NFKC-folded, spaces and hyphens removed. Only ASCII
+     * '0'..'9' pass {@link #isAsciiDigits}: Character.isDigit and parseInt accept other scripts (BAN-1).
+     */
+    public static String canonicalDigits(String raw) {
+        return fold(raw).replaceAll("[\\s-]", "");
+    }
+
+    public static boolean isAsciiDigits(String value) {
+        return value.chars().allMatch(ch -> ch >= '0' && ch <= '9');
+    }
+
     public static boolean isReservedTestMemberNumber(@Nullable String memberId) {
         if (memberId == null || memberId.isBlank()) {
             return false;
         }
 
-        String digits = memberId.strip();
+        String digits = fold(memberId.strip());
 
-        if (digits.chars().anyMatch(ch -> !Character.isDigit(ch))) {
+        if (!isAsciiDigits(digits)) {
             return false;
         }
 

@@ -418,8 +418,8 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
         String banPesel = SyntheticPesel.of(LocalDate.of(2007, 4, 1), 41);
         TRecruitmentCase bannedCase = awaitingCase("zbanowana@example.org");
         jdbc.update("INSERT INTO admission_bans (formal_identifier, decision_signature,"
-            + " effective_from, effective_until, note) VALUES (?, 'ZO/MZ/BAN/26',"
-            + " CURRENT_DATE - 30, CURRENT_DATE + 300, 'arta 9 ust. 5')", banPesel);
+            + " effective_from, effective_until, reason, note) VALUES (?, 'ZO/MZ/BAN/26',"
+            + " CURRENT_DATE - 30, CURRENT_DATE + 300, 'arta 9 ust. 5 — uchwała ZK', 'arta 9 ust. 5')", banPesel);
 
         RecruitmentEformService.DeclarationLink bannedLink =
             eform.createDeclarationLink(bannedCase.getId(), actor);
@@ -433,6 +433,15 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
         assertThatThrownBy(bannedSubmit)
             .isInstanceOf(RuleViolationException.class)
             .extracting("message").isEqualTo("Deklaracja nie może być przyjęta");
+
+        // BAN-1: the full-width spelling of the banned PESEL hits the same ban
+        String fullWidthBanPesel = banPesel.chars()
+            .mapToObj(c -> String.valueOf((char) ('０' + (c - '0'))))
+            .collect(java.util.stream.Collectors.joining());
+        assertThatThrownBy(() -> eform.submitForm(bannedLink.token(),
+            submission(fullWidthBanPesel, "Felicja")))
+            .isInstanceOf(RuleViolationException.class)
+            .extracting("code").isEqualTo("DECLARATION_BLOCKED");
 
         String memberPesel = SyntheticPesel.of(LocalDate.of(2007, 4, 1), 42);
         TMember existingMember = newMember("Marcin", "Juzmember", "mazowieckie");

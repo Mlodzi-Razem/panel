@@ -68,6 +68,9 @@ class MemberRulesTest {
         assertThat(MemberRules.isReservedTestMemberNumber("999999")).isTrue();
         assertThat(MemberRules.isReservedTestMemberNumber("975001")).isTrue();
         assertThat(MemberRules.isReservedTestMemberNumber("0950000")).isTrue();
+        // full-width digits fold to the same reserved number; the Arabic-Indic zero never matches
+        assertThat(MemberRules.isReservedTestMemberNumber("９５００００")).isTrue();
+        assertThat(MemberRules.isReservedTestMemberNumber("٩٥٠٠٠٠")).isFalse();
 
         assertThat(MemberRules.isReservedTestMemberNumber("949999")).isFalse();
         assertThat(MemberRules.isReservedTestMemberNumber("1000000")).isFalse();
