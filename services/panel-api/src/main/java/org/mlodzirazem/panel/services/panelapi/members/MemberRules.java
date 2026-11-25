@@ -97,6 +97,15 @@ public final class MemberRules {
                         "Ordinary membership requires age %d-%d at admission".formatted(ORDINARY_MIN_AGE,
                             ORDINARY_MAX_AGE));
                 }
+
+                // Statute jednolity 2026, art. 7 ust. 1 pkt 2: candidacy is admissible only until the end of
+                // the calendar year of the 26th birthday (the same bound membership ends on, art. 11 ust. 1
+                // pkt 5). Completed age alone is not enough: someone born late in December is still 26 on
+                // the next 1 January, when the admissible year has already ended.
+                if (admissionDate.isAfter(membershipEndDate(birthDate))) {
+                    throw new RuleViolationException("ADMISSION_AGE",
+                        "Ordinary candidacy ends with the calendar year of the 26th birthday");
+                }
             }
             case SUPPORTING -> {
                 if (age < SUPPORTING_MIN_AGE) {

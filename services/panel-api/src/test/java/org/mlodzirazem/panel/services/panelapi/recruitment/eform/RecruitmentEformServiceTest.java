@@ -412,6 +412,26 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
     }
 
     @Test
+    void submitRejectsTheCandidateStillTwentySixAfterTheBirthdayYearEnded() {
+        // Statute art. 7 ust. 1 pkt 2: candidacy ends with the calendar year of the 26th birthday.
+        // A candidate born on 31 December is still 26 in completed years the whole next year — the
+        // completed-age band alone used to let them through (G1 §7 item 15); the calendar-year bound
+        // does not. The service clock is UTC, so the fixture is computed in UTC to match it.
+        LocalDate turnedTwentySixLastYear =
+            LocalDate.of(LocalDate.now(java.time.ZoneOffset.UTC).getYear() - 27, 12, 31);
+
+        long actor = districtActor();
+        TRecruitmentCase candidateCase = awaitingCase("po-roku@example.org", turnedTwentySixLastYear);
+        RecruitmentEformService.DeclarationLink link =
+            eform.createDeclarationLink(candidateCase.getId(), actor);
+
+        assertThatThrownBy(() -> eform.submitForm(link.token(),
+            submission(SyntheticPesel.of(turnedTwentySixLastYear, 7), "Felicja")))
+            .isInstanceOf(RuleViolationException.class)
+            .extracting("code").isEqualTo("ADMISSION_AGE");
+    }
+
+    @Test
     void submitBlocksBansMembersAndDuplicateOpenCasesGenerically() {
         long actor = districtActor();
 
