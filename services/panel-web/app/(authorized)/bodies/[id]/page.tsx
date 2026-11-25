@@ -21,7 +21,9 @@ import { UsersThreeIcon } from "@phosphor-icons/react/ssr";
 import { updateBodyAction } from "@/app/actions/bodies";
 import AssignFunctionForm from "@/components/bodies/AssignFunctionForm";
 import { KindBadge } from "@/components/bodies/BodyViews";
+import DeleteBodyButton from "@/components/bodies/DeleteBodyButton";
 import EndMembershipForm from "@/components/bodies/EndMembershipForm";
+import VoidMembershipForm from "@/components/bodies/VoidMembershipForm";
 import EditCard from "@/components/form/EditCard";
 import { TextField } from "@/components/form/Fields";
 import ApiErrorNotice from "@/components/members/ApiErrorNotice";
@@ -94,7 +96,7 @@ export default async function BodyPage({params}: { params: Promise<{ id: string 
                             <th scope="col">{t('role')}</th>
                             <th scope="col">{t('validFrom')}</th>
                             <th scope="col">{t('validTo')}</th>
-                            {canManage && <th scope="col">{t('endMembership')}</th>}
+                            {canManage && <th scope="col">{t('membershipActions')}</th>}
                         </tr>
                     </thead>
                     <tbody>
@@ -110,6 +112,9 @@ export default async function BodyPage({params}: { params: Promise<{ id: string 
                                 <EndMembershipForm bodyId={id}
                                                    membershipId={entry.membershipId}
                                                    memberName={entry.memberName}/>
+                                <VoidMembershipForm bodyId={id}
+                                                    membershipId={entry.membershipId}
+                                                    memberName={entry.memberName}/>
                             </td>}
                         </tr>)}
                     </tbody>
@@ -120,6 +125,13 @@ export default async function BodyPage({params}: { params: Promise<{ id: string 
             {memberTypes.length === 0
                 ? <p>{t('noRoles')}</p>
                 : <AssignFunctionForm bodyId={id} memberTypes={memberTypes}/>}
+        </Card>}
+
+        {/* A seeded organ never shows the action — the panel's catalogue is not editable here. */}
+        {canManage && !body.seeded && <Card id="hazard"
+                                            title={t('hazardTitle')}
+                                            hint={t('hazardHint')}>
+            <DeleteBodyButton id={id} name={body.name}/>
         </Card>}
     </Page>;
 }

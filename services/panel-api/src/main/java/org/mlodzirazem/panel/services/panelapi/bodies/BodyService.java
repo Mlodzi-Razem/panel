@@ -38,6 +38,13 @@ public interface BodyService {
 
     TBody update(long bodyId, UpdateBody update);
 
+    /**
+     * Deletes a body that was created by mistake, with three guards: a body seeded by the
+     * migrations cannot be deleted at all; a body with subordinate bodies stays; a body with any
+     * mandate in its history, voided ones included, stays (history is never deleted, A3-1).
+     */
+    void delete(long bodyId);
+
     List<TBodyTemplate> templates();
 
     List<TBodyTemplateMemberType> memberTypes(long templateId);

@@ -33,6 +33,20 @@ public interface TBodyRepository extends JpaRepository<TBody, Long> {
     List<TBody> findAllByKind(@Param("kind") BodyKind kind);
 
     /**
+     * Statute 2026 keeps one organ of a kind in the whole country and one per district
+     * (PLAN-WORKFLOW.md, A3), so the existence checks below answer the kinds with limits;
+     * local circles, teams and districts themselves are unlimited.
+     */
+    @Query("select case when count(b) > 0 then true else false end from TBody b where b.bodyTemplate.kind = :kind")
+    boolean existsByKind(@Param("kind") BodyKind kind);
+
+    @Query("select case when count(b) > 0 then true else false end"
+        + " from TBody b where b.bodyTemplate.kind = :kind and b.parentBody.id = :parentId")
+    boolean existsByKindAndParent(@Param("kind") BodyKind kind, @Param("parentId") long parentId);
+
+    long countByParentBodyId(Long parentId);
+
+    /**
      * The body of the given kind installed under the parent body, e.g. the Zarząd Okręgu of a
      * district. Districts seed exactly one board each; first match is enough for the caller.
      */

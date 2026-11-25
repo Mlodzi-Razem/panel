@@ -59,6 +59,13 @@ public class TBody extends TBaseEntity {
     @Column(name = "email")
     private @Nullable String email;
 
+    /**
+     * True when the migrations seeded this body — the statutory catalogue the panel itself
+     * installed (A3). Such a body can never be deleted through the API.
+     */
+    @Column(name = "seeded", nullable = false)
+    private boolean seeded;
+
     public @Nullable BodyKind kind() {
         return bodyTemplate == null ? null : bodyTemplate.getKind();
     }

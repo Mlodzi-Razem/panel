@@ -32,6 +32,8 @@ public record BodyMembershipChanged(
 ) {
     public enum Change {
         CREATED,
-        ENDED
+        ENDED,
+        /** The mandate was voided as a mistaken entry: it stops granting the function and permissions. */
+        VOIDED
     }
 }
