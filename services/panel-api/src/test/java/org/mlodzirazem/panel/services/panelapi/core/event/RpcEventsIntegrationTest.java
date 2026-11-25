@@ -18,6 +18,8 @@
 package org.mlodzirazem.panel.services.panelapi.core.event;
 
 import lombok.SneakyThrows;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -25,7 +27,7 @@ import org.mlodzirazem.panel.services.panelapi.core.event.impl.ApplicationEvents
 import org.mlodzirazem.panel.services.panelapi.core.event.impl.RpcEventsAspect;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.context.event.EventListener;
@@ -44,26 +46,36 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest(
-    classes = {
-        RpcResponder.class,
-        RpcEventPublisher.class,
-        ApplicationEventsRpcRegistry.class,
-        RpcEventsAspect.class,
-        RpcEventsIntegrationTest.TestRpcListener.class,
-        RpcEventsIntegrationTest.RpcTestConfiguration.class
-    }
-)
-@EnableAsync
-@EnableAspectJAutoProxy
 @Execution(ExecutionMode.CONCURRENT)
 class RpcEventsIntegrationTest {
     static final Duration TIMEOUT = Duration.ofMillis(50);
     public static final int TEST_REPETITIONS = 512;
     static final Map<UUID, AtomicInteger> VOID_RESPONSES = new ConcurrentHashMap<>(TEST_REPETITIONS);
 
-    @Autowired
-    RpcEventPublisher publisher;
+    static AnnotationConfigApplicationContext context;
+    static RpcEventPublisher publisher;
+
+    // The context is owned by this class rather than by @SpringBootTest on purpose. This class runs in parallel with
+    // other test classes, and the contexts they load can push this one out of the shared LRU context cache, which
+    // closes it while its tests are still running. The closed task executor then rejects the pending timeout signal
+    // ("Scheduler unavailable" instead of "Timeout").
+    @BeforeAll
+    static void startContext() {
+        context = new AnnotationConfigApplicationContext(
+            RpcResponder.class,
+            RpcEventPublisher.class,
+            ApplicationEventsRpcRegistry.class,
+            RpcEventsAspect.class,
+            TestRpcListener.class,
+            RpcTestConfiguration.class
+        );
+        publisher = context.getBean(RpcEventPublisher.class);
+    }
+
+    @AfterAll
+    static void closeContext() {
+        context.close();
+    }
 
     @RepeatedTest(value = TEST_REPETITIONS, failureThreshold = 1)
     void rpcEventPublishing() {
@@ -158,6 +170,8 @@ class RpcEventsIntegrationTest {
                       .incrementAndGet();
     }
 
+    @EnableAsync
+    @EnableAspectJAutoProxy
     static class RpcTestConfiguration {
         @Bean
         public Clock clock() {
