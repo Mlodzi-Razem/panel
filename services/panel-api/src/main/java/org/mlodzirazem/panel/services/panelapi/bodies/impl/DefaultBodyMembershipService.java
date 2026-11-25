@@ -36,6 +36,7 @@ import org.mlodzirazem.panel.services.panelapi.core.error.NotFoundException;
 import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
 import org.mlodzirazem.panel.services.panelapi.members.BodiesManagerGuard;
 import org.mlodzirazem.panel.services.panelapi.members.CurrentMemberResolver;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.BodyMembershipStatus;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBody;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBodyMembership;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBodyMembershipRepository;
@@ -147,6 +148,11 @@ class DefaultBodyMembershipService implements BodyMembershipService {
                                                 .orElseThrow(() -> new NotFoundException("Body membership",
                                                     membershipId));
 
+        if (membership.isVoided()) {
+            throw new ConflictException("MEMBERSHIP_ALREADY_VOIDED",
+                "The mandate is already voided: it never existed and is never touched again", List.of("status"));
+        }
+
         LocalDate today = LocalDate.now(clock);
         LocalDate date = endDate != null ? endDate : today;
 
@@ -183,6 +189,63 @@ class DefaultBodyMembershipService implements BodyMembershipService {
             membership,
             "bodies :: membership-end",
             membership.getDecisionReference() == null ? List.of("validTo") : List.of("validTo", "decisionReference")
+        );
+
+        return membership;
+    }
+
+    @Override
+    @Transactional
+    public TBodyMembership voidMembership(long membershipId, String reason, @Nullable String decisionReference) {
+        bodiesManagerGuard.lock();
+
+        TBodyMembership membership = memberships.findById(membershipId)
+                                                .orElseThrow(() -> new NotFoundException("Body membership",
+                                                    membershipId));
+
+        if (membership.isVoided()) {
+            throw new ConflictException("MEMBERSHIP_ALREADY_VOIDED",
+                "The mandate is already voided; a voided mandate is never touched again",
+                List.of("status"));
+        }
+
+        String trimmedReason = reason == null ? "" : reason.strip();
+
+        if (trimmedReason.isEmpty()) {
+            throw new RuleViolationException("VOID_REASON_REQUIRED",
+                "Voiding a mandate requires a reason (the mandate was recorded by mistake)");
+        }
+
+        if (trimmedReason.length() > 500) {
+            throw new RuleViolationException("VOID_REASON_TOO_LONG",
+                "The void reason exceeds 500 characters");
+        }
+
+        if (membership.getValidTo() == null
+            && bodiesManagerGuard.wouldLeaveNone(List.of(membership.getId()), null, 0)) {
+            throw new RuleViolationException(BodiesManagerGuard.VIOLATION_CODE,
+                "Voiding this mandate would leave nobody able to manage bodies");
+        }
+
+        String reference = decisionReference == null ? null : decisionReference.strip();
+
+        // The voiding resolution goes to its own column: decisionReference (the appointing
+        // resolution) is history and is never overwritten by a void (A3-2).
+        boolean hasVoidReference = reference != null && !reference.isBlank();
+
+        membership.setStatus(BodyMembershipStatus.VOIDED);
+        membership.setVoidReason(trimmedReason);
+        membership.setVoidDecisionReference(hasVoidReference ? reference : null);
+        membership.setUpdatedBy(currentMemberResolver.current().orElse(null));
+        memberships.saveAndFlush(membership);
+
+        publishAndAudit(
+            BodyMembershipChanged.Change.VOIDED,
+            membership,
+            "bodies :: membership-void",
+            hasVoidReference
+                ? List.of("status", "voidReason", "voidDecisionReference")
+                : List.of("status", "voidReason")
         );
 
         return membership;

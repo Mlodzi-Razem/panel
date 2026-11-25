@@ -18,6 +18,7 @@
 package org.mlodzirazem.panel.services.panelapi.members;
 
 import org.junit.jupiter.api.Test;
+import org.mlodzirazem.panel.services.panelapi.bodies.BodyMembershipService;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.BodyKind;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBody;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.MemberStatus;
@@ -48,6 +49,9 @@ class PermissionServiceTest extends DomainTestSupport {
 
     @Autowired
     AffiliationService affiliationService;
+
+    @Autowired
+    BodyMembershipService bodyMembershipService;
 
     @Test
     void districtBoardMemberHasLocalPermissionsOverMembersOfThatDistrictOnly() {
@@ -123,6 +127,26 @@ class PermissionServiceTest extends DomainTestSupport {
         assertThat(permissions.canGlobally(PermissionType.RECRUITMENT_APPROVE)).isFalse();
         assertThat(permissionService.can(proxy.getId(), FORMAL_PERSONAL_DATA_MANAGE, target.getId())).isTrue();
         assertThat(permissions.perDistrict()).hasSize(17);
+    }
+
+    @Test
+    void voidedMandatesGiveNoPermissionsButStayInTheTable() {
+        TMember coordinator = newMember("Vic", "Void", "mazowieckie");
+        TMember target = newMember("Ida", "Target", "mazowieckie");
+        grant(coordinator, board("mazowieckie"), "COORDINATOR");
+
+        assertThat(permissionService.can(coordinator.getId(), FORMAL_PERSONAL_DATA_MANAGE, target.getId())).isTrue();
+
+        long membershipId = jdbc.queryForObject(
+            "SELECT id FROM body_memberships WHERE member_id = ?", Long.class, coordinator.getId());
+        bodyMembershipService.voidMembership(membershipId, "wpis omylkowy", null);
+
+        assertThat(permissionService.can(coordinator.getId(), FORMAL_PERSONAL_DATA_MANAGE, target.getId())).isFalse();
+        assertThat(permissionService.of(coordinator.getId()).canGlobally(BODIES_MANAGE)).isFalse();
+        // The row is the voided history — permissions lost it, the auditor must still find it.
+        assertThat(jdbc.queryForObject(
+            "SELECT status::text FROM body_memberships WHERE id = ?", String.class, membershipId))
+            .isEqualTo("VOIDED");
     }
 
     @Test

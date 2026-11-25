@@ -33,8 +33,10 @@ import {
     assignMembership,
     checkAssignment,
     createBody,
+    deleteBody,
     endMembership,
     updateBody,
+    voidMembership,
 } from "@/panel-api/members/bodies";
 import { ActionResult, AssignmentCheck, AssignmentResponse } from "@/panel-api/members/types";
 
@@ -150,4 +152,54 @@ export async function endMembershipAction(
     }
     refresh();
     return {ok: true};
+}
+
+export async function voidMembershipAction(
+    bodyId: number,
+    membershipId: number,
+    reason: string,
+    decisionReference: string,
+): Promise<ActionResult> {
+    const denied = await denyUnlessSignedIn();
+    if (denied) {
+        return denied;
+    }
+    const trimmedReason = reason.trim();
+    const trimmedReference = decisionReference.trim();
+    if (!idSchema.safeParse(bodyId).success || !idSchema.safeParse(membershipId).success) {
+        return invalid('membershipId');
+    }
+    if (trimmedReason.length === 0) {
+        return invalid('reason');
+    }
+    if (trimmedReason.length > 500) {
+        return fail({status: 422, code: 'VOID_REASON_TOO_LONG', message: 'The void reason exceeds 500 characters'});
+    }
+    const result = await voidMembership(
+        bodyId,
+        membershipId,
+        trimmedReason,
+        trimmedReference.length > 0 ? trimmedReference : undefined,
+    );
+    if (!result.ok) {
+        return fail(result.error);
+    }
+    refresh();
+    return {ok: true};
+}
+
+export async function deleteBodyAction(id: number): Promise<ActionResult> {
+    const denied = await denyUnlessSignedIn();
+    if (denied) {
+        return denied;
+    }
+    if (!idSchema.safeParse(id).success) {
+        return invalid('id');
+    }
+    const result = await deleteBody(id);
+    if (!result.ok) {
+        return fail(result.error);
+    }
+    refresh();
+    return {ok: true, redirectTo: '/bodies'};
 }

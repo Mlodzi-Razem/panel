@@ -40,7 +40,9 @@ public final class BodyResponses {
         @Nullable BodyScope scope,
         @Nullable Long templateId,
         @Nullable String templateName,
-        @Nullable Long parentBodyId
+        @Nullable Long parentBodyId,
+        /** True when the body was seeded by the migrations: such a body cannot be deleted (A3). */
+        boolean seeded
     ) {
     }
 

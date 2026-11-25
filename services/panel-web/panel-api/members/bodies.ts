@@ -95,3 +95,20 @@ export function endMembership(bodyId: number, membershipId: number, endDate?: st
         query: {endDate},
     }, membershipSchema);
 }
+
+export function voidMembership(
+    bodyId: number,
+    membershipId: number,
+    reason: string,
+    decisionReference?: string,
+): Promise<ApiResult<Membership>> {
+    return apiCall({
+        method: 'POST',
+        path: `/bodies/${bodyId}/memberships/${membershipId}/void`,
+        body: {reason, ...(decisionReference ? {decisionReference} : {})},
+    }, membershipSchema);
+}
+
+export function deleteBody(id: number): Promise<ApiResult<unknown>> {
+    return apiCall({method: 'DELETE', path: `/bodies/${id}`}, z.unknown());
+}

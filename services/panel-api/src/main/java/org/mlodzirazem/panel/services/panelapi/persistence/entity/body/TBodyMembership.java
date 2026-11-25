@@ -19,6 +19,8 @@ package org.mlodzirazem.panel.services.panelapi.persistence.entity.body;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -29,6 +31,8 @@ import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.TBaseEntity;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember;
@@ -70,7 +74,36 @@ public class TBodyMembership extends TBaseEntity {
     @Column(name = "decision_reference")
     private @Nullable String decisionReference;
 
+    /**
+     * Mandate status. VOIDED marks a mandate recorded by mistake ("wpis omyłkowy"): it stops
+     * counting as a function everywhere, but the row is never deleted — the history of the
+     * correction itself stays in the table and in the audit log.
+     */
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "status", nullable = false)
+    private BodyMembershipStatus status = BodyMembershipStatus.ACTIVE;
+
+    /**
+     * Why the mandate was voided; present only on VOIDED rows (enforced by the checks in the
+     * A3 migration). Free text written by a bodies manager — kept in this table, not in the audit
+     * log, whose payloads carry field names only.
+     */
+    @Column(name = "void_reason")
+    private @Nullable String voidReason;
+
+    /**
+     * Resolution that voids this mandate; present only on VOIDED rows. Kept apart from
+     * {@link #decisionReference}, which holds the appointing resolution and is never overwritten.
+     */
+    @Column(name = "void_decision_reference")
+    private @Nullable String voidDecisionReference;
+
+    public boolean isVoided() {
+        return status == BodyMembershipStatus.VOIDED;
+    }
+
     public boolean isActiveOn(LocalDate date) {
-        return !validFrom.isAfter(date) && (validTo == null || validTo.isAfter(date));
+        return !isVoided() && !validFrom.isAfter(date) && (validTo == null || validTo.isAfter(date));
     }
 }
