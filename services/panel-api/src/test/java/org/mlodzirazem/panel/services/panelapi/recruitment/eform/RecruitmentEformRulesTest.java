@@ -71,6 +71,23 @@ class RecruitmentEformRulesTest {
     }
 
     @Test
+    void fullWidthDigitsFoldToTheSamePeselAndNonAsciiDigitsAreRejected() {
+        String valid = SyntheticPesel.of(LocalDate.of(2007, 4, 1), 1);
+        // U+FF10..FF19 (full-width) fold to ASCII under NFKC, so the banned/member lookups see the
+        // canonical PESEL, not a variant that slips past them (BAN-1).
+        String fullWidth = valid.chars()
+            .mapToObj(c -> String.valueOf((char) ('０' + (c - '0'))))
+            .collect(java.util.stream.Collectors.joining());
+
+        assertThat(RecruitmentEformRules.normalizePersonalId(fullWidth, null)).isEqualTo(valid);
+        // Arabic-Indic digit one (U+0661) is Character.isDigit but not ASCII: must never pass.
+        String arabicIndic = "١" + valid.substring(1);
+        assertThatThrownBy(() -> RecruitmentEformRules.normalizePersonalId(arabicIndic, null))
+            .isInstanceOf(RuleViolationException.class)
+            .extracting("code").isEqualTo("PERSONAL_ID_INVALID");
+    }
+
+    @Test
     void knownBirthDateMustMatchThePesel() {
         String pesel = SyntheticPesel.of(LocalDate.of(2007, 4, 1), 1);
 

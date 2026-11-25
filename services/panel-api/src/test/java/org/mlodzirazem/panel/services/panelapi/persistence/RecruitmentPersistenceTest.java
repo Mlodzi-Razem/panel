@@ -225,6 +225,7 @@ class RecruitmentPersistenceTest extends DomainTestSupport {
         TAdmissionBan ban = new TAdmissionBan();
         ban.setFormalIdentifier("29999912345");
         ban.setDecisionSignature("ZK/BAN/77/26");
+        ban.setReason("uchwała ZK o zakazie przyjmowania (art. 9 ust. 5)");
         ban.setEffectiveFrom(LocalDate.of(2026, 1, 1));
         ban.setEffectiveUntil(LocalDate.of(2026, 6, 1));
         admissionBanRepository.saveAndFlush(ban);
@@ -232,10 +233,45 @@ class RecruitmentPersistenceTest extends DomainTestSupport {
         assertThatThrownBy(() -> {
             TAdmissionBan broken = new TAdmissionBan();
             broken.setDecisionSignature("ZK/BAN/78/26");
+            broken.setReason("uchwała ZK o zakazie przyjmowania (art. 9 ust. 5)");
             broken.setEffectiveFrom(LocalDate.of(2026, 7, 1));
             broken.setEffectiveUntil(LocalDate.of(2026, 6, 1));
             admissionBanRepository.saveAndFlush(broken);
         }).isInstanceOf(DataAccessException.class);
+    }
+
+    @Test
+    void admissionBanPeriodIsBoundedTo365DaysAndReasonIsMandatory() {
+        LocalDate from = LocalDate.of(2026, 1, 1);
+
+        // art. 9 ust. 5: "na okres maksymalnie 365 dni" — the 365th day still fits, the 366th does not
+        TAdmissionBan maximal = new TAdmissionBan();
+        maximal.setFormalIdentifier("29999954321");
+        maximal.setDecisionSignature("ZK/BAN/81/26");
+        maximal.setReason("uchwała ZK o zakazie przyjmowania (art. 9 ust. 5)");
+        maximal.setEffectiveFrom(from);
+        maximal.setEffectiveUntil(from.plusDays(365));
+        admissionBanRepository.saveAndFlush(maximal);
+
+        assertSqlState(CHECK_VIOLATION, () -> {
+            TAdmissionBan tooLong = new TAdmissionBan();
+            tooLong.setFormalIdentifier("29999954322");
+            tooLong.setDecisionSignature("ZK/BAN/82/26");
+            tooLong.setReason("uchwała ZK o zakazie przyjmowania (art. 9 ust. 5)");
+            tooLong.setEffectiveFrom(from);
+            tooLong.setEffectiveUntil(from.plusDays(366));
+            admissionBanRepository.saveAndFlush(tooLong);
+        });
+
+        assertSqlState(CHECK_VIOLATION, () -> {
+            TAdmissionBan withoutReason = new TAdmissionBan();
+            withoutReason.setFormalIdentifier("29999954323");
+            withoutReason.setDecisionSignature("ZK/BAN/83/26");
+            withoutReason.setReason("   ");
+            withoutReason.setEffectiveFrom(from);
+            withoutReason.setEffectiveUntil(from.plusDays(30));
+            admissionBanRepository.saveAndFlush(withoutReason);
+        });
     }
 
     @Test
