@@ -21,12 +21,12 @@ import { UserPlusIcon } from "@phosphor-icons/react/ssr";
 import ApiErrorNotice from "@/components/members/ApiErrorNotice";
 import RecruitmentCasesTable from "@/components/recruitment/RecruitmentCasesTable";
 import { LinkButton, Page } from "@/components/page/Page";
-import { Pagination, ResultCount, Toolbar } from "@/components/ui/Blocks";
+import { Pagination, ResultCount, Tabs, Toolbar } from "@/components/ui/Blocks";
 import { UrlFilterSelect } from "@/components/ui/UrlControls";
 import { listDistricts } from "@/panel-api/members/members";
 import { requireMe } from "@/panel-api/members/requireMe";
 import { hasPermission } from "@/panel-api/members/me";
-import { CASE_STATUSES, CaseStatus, listRecruitmentCases } from "@/panel-api/members/recruitment";
+import { CASE_STATUSES, CASE_VIEWS, CaseStatus, getRecruitmentViewCounts, listRecruitmentCases } from "@/panel-api/members/recruitment";
 
 /**
  * The semantic phases of STATES 1 drive the status filter groups (E3): the exact status
@@ -76,7 +76,10 @@ export default async function RecruitmentPage({searchParams}: { searchParams: Se
     const openParam = single(params["open"]);
     const open = openParam === "true" ? true : openParam === "false" ? false : undefined;
 
-    const [districtsResult, casesResult] = await Promise.all([
+    const view = oneOf(single(params["view"]), CASE_VIEWS);
+    const district = Number.isFinite(districtParam) ? districtParam : undefined;
+
+    const [districtsResult, casesResult, viewCountsResult] = await Promise.all([
         listDistricts(),
         listRecruitmentCases({
             page: pageNumber,
@@ -84,8 +87,11 @@ export default async function RecruitmentPage({searchParams}: { searchParams: Se
             district: Number.isFinite(districtParam) ? districtParam : undefined,
             status,
             open,
+            view,
         }),
+        getRecruitmentViewCounts(district),
     ]);
+    const viewCounts = viewCountsResult.ok ? viewCountsResult.data : {};
 
     const districts = districtsResult.ok ? districtsResult.data : [];
     const canCreate = districts.some(d => d.permissions.includes(PERMISSIONS.recruitmentManage));
@@ -94,6 +100,7 @@ export default async function RecruitmentPage({searchParams}: { searchParams: Se
         const next = new URLSearchParams();
         const current: Record<string, string | undefined> = {
             district: Number.isFinite(districtParam) ? String(districtParam) : undefined,
+            view,
             status,
             open: open === undefined ? undefined : String(open),
             size: size !== DEFAULT_SIZE ? String(size) : undefined,
@@ -113,6 +120,20 @@ export default async function RecruitmentPage({searchParams}: { searchParams: Se
                  actions={canCreate && <LinkButton href="/rekrutacja/nowa" primary>
                      <UserPlusIcon aria-hidden/>{t("newCase")}
                  </LinkButton>}>
+        <Tabs label={t("viewsLabel")}
+              items={[
+                  {
+                      href: hrefWith({view: undefined, status: undefined, open: undefined, page: undefined}),
+                      label: t("views.ALL"),
+                      active: !view,
+                  },
+                  ...CASE_VIEWS.map(v => ({
+                      href: hrefWith({view: v, status: undefined, open: undefined, page: undefined}),
+                      label: t(`views.${v}`),
+                      active: view === v,
+                      count: viewCounts[v],
+                  })),
+              ]}/>
         <Toolbar end={casesResult.ok && <ResultCount>
             {t("resultCount", {count: casesResult.data.totalItems})}
         </ResultCount>}>

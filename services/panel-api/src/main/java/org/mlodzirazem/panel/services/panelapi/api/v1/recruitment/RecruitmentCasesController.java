@@ -148,7 +148,8 @@ public class RecruitmentCasesController {
         @RequestParam(name = "size", defaultValue = "25") int size,
         @RequestParam(name = "district", required = false) @Nullable Long district,
         @RequestParam(name = "status", required = false) @Nullable RecruitmentCaseStatus status,
-        @RequestParam(name = "open", required = false) @Nullable Boolean open
+        @RequestParam(name = "open", required = false) @Nullable Boolean open,
+        @RequestParam(name = "view", required = false) @Nullable RecruitmentCaseView view
     ) {
         Caller caller = callers.require();
         RecruitmentCaseSearch.Scope scope = new RecruitmentCaseSearch.Scope(
@@ -163,9 +164,26 @@ public class RecruitmentCasesController {
         int safeSize = Math.min(MAX_PAGE_SIZE, Math.max(1, size));
 
         RecruitmentCaseSearch.Result result = search.search(scope,
-            new RecruitmentCaseSearch.Filter(district, status, open), safePage, safeSize);
+            new RecruitmentCaseSearch.Filter(district, status, open, view), safePage, safeSize);
 
         return PageResponse.of(summaries(result.ids()), safePage, safeSize, result.total());
+    }
+
+    /** Badge counters of the predefined list views, within the caller's read scope. */
+    @GetMapping("/views")
+    public Map<RecruitmentCaseView, Long> viewCounts(
+        @RequestParam(name = "district", required = false) @Nullable Long district
+    ) {
+        Caller caller = callers.require();
+        RecruitmentCaseSearch.Scope scope = new RecruitmentCaseSearch.Scope(
+            caller.permissions().canGlobally(PermissionType.RECRUITMENT_READ),
+            caller.permissions().districtsWith(PermissionType.RECRUITMENT_READ));
+
+        if (scope.empty()) {
+            throw new ForbiddenException("No permission to read recruitment cases");
+        }
+
+        return search.viewCounts(scope, district);
     }
 
     @GetMapping("/{id}")

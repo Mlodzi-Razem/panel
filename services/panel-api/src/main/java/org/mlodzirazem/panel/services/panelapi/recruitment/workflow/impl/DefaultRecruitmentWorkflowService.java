@@ -69,6 +69,7 @@ class DefaultRecruitmentWorkflowService implements RecruitmentWorkflowService {
     private final AuditLog auditLog;
     private final JsonMapper jsonMapper;
     private final Clock clock;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     @Override
     @Transactional
@@ -217,6 +218,8 @@ class DefaultRecruitmentWorkflowService implements RecruitmentWorkflowService {
             "zo_recommended_on", "admission_resolution_not_later_on"));
         emit(recruitmentCase, actorMemberId, RecruitmentCaseEventType.RECOMMENDATION_SENT, List.of(
             "zo_recommended_on"));
+        events.publishEvent(new org.mlodzirazem.panel.services.panelapi.recruitment.workflow.ZoRecommendationRecorded(
+            recruitmentCase.getId()));
 
         audit(actorMemberId, recruitmentCase, "recruitment :: record-zo-recommendation", List.of(
             "zo_recommended_on", "admission_resolution_not_later_on"));
