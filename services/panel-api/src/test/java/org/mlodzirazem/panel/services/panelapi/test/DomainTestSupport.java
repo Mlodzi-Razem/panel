@@ -18,6 +18,7 @@
 package org.mlodzirazem.panel.services.panelapi.test;
 
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.mlodzirazem.panel.services.panelapi.members.MemberField;
 import org.mlodzirazem.panel.services.panelapi.members.MemberService;
@@ -66,6 +67,7 @@ public abstract class DomainTestSupport {
 
     @BeforeEach
     protected void cleanDomainData() {
+        cleanFees();
         jdbc.execute("DELETE FROM recruitment_consents");
         jdbc.execute("DELETE FROM declaration_artifacts");
         jdbc.execute("DELETE FROM declaration_form_sessions");
@@ -81,6 +83,14 @@ public abstract class DomainTestSupport {
         jdbc.execute("DELETE FROM bodies WHERE code IS NULL OR code LIKE 'test-%'");
         jdbc.execute("DELETE FROM member_identities");
         jdbc.execute("DELETE FROM members");
+    }
+
+    @AfterEach
+    protected void cleanFees() {
+        for (String table : new String[]{"fee_payment_allocations", "fee_payments", "bank_transactions", "bank_statement_imports", "fee_dues", "fee_adjustments",
+            "member_fee_tiers", "fee_sender_ibans", "fee_tier_rates", "fee_tiers"}) {
+            jdbc.execute("DELETE FROM " + table);
+        }
     }
 
     protected TMember newMember(String first, String last, String districtSlug) {

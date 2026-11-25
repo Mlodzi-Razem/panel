@@ -1,0 +1,71 @@
+@startuml
+!include <C4/C4_Container>
+
+title MR Panel on Microsoft 365 -- target system architecture
+
+Person(member, "Member", "Business Basic or F1,\npasskey-only sign-in")
+Person(coordinator, "District coordinator", "Business Basic")
+Person(board, "National board and audit", "Business Basic: CEO, CFO, CTO,\nCOO, CPAO, audit commission")
+Person(electoral, "Electoral commission\nand trustees", "Belenios administrators,\ncredential authority, trustees")
+
+System_Ext(cloudflare, "Cloudflare", "DNS, TLS proxy,\norigin certificates")
+
+System_Boundary(m365, "Microsoft 365 tenant (EU data boundary)") {
+    Container(entra, "Microsoft Entra ID", "Identity provider", "Members, groups,\nSecurity Defaults, passkeys, TAP")
+    Container(teams, "Microsoft Teams", "Collaboration", "MR app pinned as the Home tab,\nchannels, meetings")
+    Container(exchange, "Exchange Online", "Mail", "Business Basic and shared mailboxes\n(F1: no mailbox rights)")
+    Container(sharepoint, "SharePoint / OneDrive", "Documents", "Bylaws, finance documents,\nViva Connections home site")
+    Container(engage, "Viva Engage", "Community", "Announcements and\nmember discussion")
+    Container(automate, "Power Automate", "Process harness", "Secretariat and finance flows,\nClaude connector")
+}
+
+System_Boundary(vps, "MR server -- single-node microk8s (trusted)") {
+    Container(web, "panel-web", "Next.js, Auth.js", "UI, Teams tab host,\nEntra and Google sign-in")
+    Container(api, "panel-api", "Spring Boot", "Member register, bodies, districts,\nfinance and UEPiK, enrollment,\ndirectory synchronisation")
+    ContainerDb(db, "PostgreSQL", "CloudNativePG", "Register, ledger,\nevent log, audit trail")
+}
+
+System_Boundary(voting, "Voting host (separate)") {
+    Container(broker, "Identity broker", "Keycloak or authentik", "Entra sign-in,\nissues sub = member number")
+    Container(belenios, "Belenios", "OCaml", "End-to-end verifiable\nelections and referenda")
+}
+
+System_Boundary(azure, "Azure subscription (nonprofit grant)") {
+    Container(logic, "Logic Apps / Automation", "Serverless", "Scheduled jobs,\nmail-driven workflows")
+    ContainerDb(blob, "Blob Storage", "Azure Storage", "Database backups\n(write-once)")
+    Container(keyvault, "Key Vault", "Secrets", "Graph credentials,\nAPI keys")
+}
+
+System_Ext(claude, "Anthropic Claude API", "LLM used by the harness")
+System_Ext(google, "Google Workspace", "Legacy directory and mail,\nuntil the cutover")
+
+Rel(member, teams, "Uses", "Teams client")
+Rel(coordinator, cloudflare, "Opens Panel", "HTTPS")
+Rel(board, cloudflare, "Opens Panel,\nuploads bank statements", "HTTPS")
+Rel(electoral, belenios, "Sets up elections,\ndecrypts the tally", "HTTPS")
+Rel(member, belenios, "Votes", "HTTPS")
+
+Rel(teams, cloudflare, "Embeds the MR app tab", "HTTPS, Teams SSO")
+Rel(cloudflare, web, "Proxies", "HTTPS")
+Rel(web, entra, "Signs users in", "OIDC")
+Rel(web, google, "Signs users in\n(migration only)", "OIDC")
+Rel(web, api, "Calls", "HTTP, HS256 service token")
+Rel(api, db, "Reads and writes", "JDBC")
+Rel(api, entra, "Users, groups,\nlicences, TAP", "Microsoft Graph")
+Rel(api, google, "Directory provider\n(migration only)", "Admin SDK")
+Rel(api, teams, "Sends notifications", "Graph activity feed")
+Rel(api, engage, "Publishes announcements", "Engage API / Workflows")
+Rel(api, keyvault, "Reads secrets", "HTTPS")
+Rel(db, blob, "Ships WAL and base backups", "HTTPS")
+
+Rel(automate, api, "Calls process endpoints", "Custom connector")
+Rel(logic, api, "Calls process endpoints", "HTTPS")
+Rel(automate, claude, "Classifies and drafts", "HTTPS")
+Rel(logic, claude, "Classifies and drafts", "HTTPS")
+Rel(automate, sharepoint, "Files documents", "M365 connector")
+
+Rel(belenios, broker, "Authenticates voters", "OIDC")
+Rel(broker, entra, "Signs voters in,\nreads member number", "OIDC, Graph")
+
+SHOW_LEGEND()
+@enduml

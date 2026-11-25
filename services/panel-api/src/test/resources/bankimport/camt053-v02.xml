@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ Copyright (C) 2025 Stowarzyszenie Młodzi Razem
+
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU Affero General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU Affero General Public License for more details.
+
+ You should have received a copy of the GNU Affero General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+-->
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02">
+  <BkToCstmrStmt>
+    <GrpHdr><MsgId>MSG-0001</MsgId><CreDtTm>2025-04-01T06:00:00</CreDtTm></GrpHdr>
+    <Stmt>
+      <Id>STMT-2025-03</Id>
+      <CreDtTm>2025-04-01T06:00:00</CreDtTm>
+      <FrToDt><FrDtTm>2025-03-01T00:00:00</FrDtTm><ToDtTm>2025-03-31T23:59:59</ToDtTm></FrToDt>
+      <Acct><Id><IBAN>PL61109010140000071219812874</IBAN></Id><Ccy>PLN</Ccy></Acct>
+      <Bal><Tp><CdOrPrtry><Cd>OPBD</Cd></CdOrPrtry></Tp><Amt Ccy="PLN">1000.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Dt><Dt>2025-03-01</Dt></Dt></Bal>
+      <Bal><Tp><CdOrPrtry><Cd>CLBD</Cd></CdOrPrtry></Tp><Amt Ccy="PLN">1444.50</Amt><CdtDbtInd>CRDT</CdtDbtInd><Dt><Dt>2025-03-31</Dt></Dt></Bal>
+      <Ntry>
+        <Amt Ccy="PLN">150.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2025-03-03</Dt></BookgDt><ValDt><Dt>2025-03-03</Dt></ValDt>
+        <AcctSvcrRef>REF-0001</AcctSvcrRef>
+        <NtryDtls><TxDtls>
+          <RltdPties><Dbtr><Nm>Jan Testowy</Nm></Dbtr><DbtrAcct><Id><IBAN>PL86102010550000820123456789</IBAN></Id></DbtrAcct></RltdPties>
+          <RmtInf><Ustrd>Skladka MR-12-3</Ustrd><Ustrd>za marzec</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="PLN">45.50</Amt><CdtDbtInd>DBIT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2025-03-05</Dt></BookgDt><ValDt><Dt>2025-03-06</Dt></ValDt>
+        <AcctSvcrRef>REF-0002</AcctSvcrRef>
+        <NtryDtls><TxDtls>
+          <RltdPties><Cdtr><Nm>Fake Hosting Sp. z o.o.</Nm></Cdtr><CdtrAcct><Id><IBAN>DE89370400440532013000</IBAN></Id></CdtrAcct></RltdPties>
+          <RmtInf><Strd><CdtrRefInf><Tp><CdOrPrtry><Cd>SCOR</Cd></CdOrPrtry></Tp><Ref>RF18539007547034</Ref></CdtrRefInf></Strd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="PLN">300.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2025-03-10</Dt></BookgDt><ValDt><Dt>2025-03-10</Dt></ValDt>
+        <AcctSvcrRef>REF-0003</AcctSvcrRef>
+        <NtryDtls>
+          <TxDtls>
+            <AmtDtls><TxAmt><Amt Ccy="PLN">100.00</Amt></TxAmt></AmtDtls>
+            <RltdPties><Dbtr><Nm>Anna Przykladowa</Nm></Dbtr><DbtrAcct><Id><IBAN>PL45124060690000100011112222</IBAN></Id></DbtrAcct></RltdPties>
+            <RmtInf><Ustrd>MR-20-5 skladka</Ustrd></RmtInf>
+          </TxDtls>
+          <TxDtls>
+            <AmtDtls><TxAmt><Amt Ccy="PLN">120.00</Amt></TxAmt></AmtDtls>
+            <RltdPties><Dbtr><Nm>Piotr Fikcyjny</Nm></Dbtr><DbtrAcct><Id><IBAN>PL27114020040000300201355387</IBAN></Id></DbtrAcct></RltdPties>
+            <RmtInf><Ustrd>MR-31-7</Ustrd></RmtInf>
+          </TxDtls>
+          <TxDtls>
+            <AmtDtls><TxAmt><Amt Ccy="PLN">80.00</Amt></TxAmt></AmtDtls>
+            <RltdPties><Dbtr><Nm>Ewa Wymyslona</Nm></Dbtr></RltdPties>
+            <RmtInf><Ustrd>darowizna</Ustrd></RmtInf>
+          </TxDtls>
+        </NtryDtls>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="PLN">20.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2025-03-12</Dt></BookgDt><ValDt><Dt>2025-03-12</Dt></ValDt>
+        <NtryDtls><TxDtls>
+          <RltdPties><Dbtr><Nm>Ewa Wymyslona</Nm></Dbtr></RltdPties>
+          <RmtInf><Ustrd>wpłata na cele statutowe</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="PLN">20.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2025-03-12</Dt></BookgDt><ValDt><Dt>2025-03-12</Dt></ValDt>
+        <NtryDtls><TxDtls>
+          <RltdPties><Dbtr><Nm>Ewa Wymyslona</Nm></Dbtr></RltdPties>
+          <RmtInf><Ustrd>wpłata na cele statutowe</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+    </Stmt>
+  </BkToCstmrStmt>
+</Document>

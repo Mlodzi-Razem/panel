@@ -1,0 +1,125 @@
+@startuml
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultTextAlignment center
+
+skinparam component {
+    BackgroundColor<<planned>> #fff4e0
+    BorderColor<<planned>> #b36b00
+    BackgroundColor<<legacy>> #eeeeee
+    BorderColor<<legacy>> #888888
+}
+
+title MR Panel -- components (existing and planned)
+
+actor "Browser" as browser
+actor "Teams client" as teamsClient
+
+package "panel-web (Next.js)" {
+    component "Auth.js session\n(12 h JWT)" as session
+    component "Entra ID provider" <<planned>> as entraProvider
+    component "Google provider" <<legacy>> as googleProvider
+    component "Teams tab host\n(Teams JS SSO, token exchange)" <<planned>> as teamsHost
+    component "Pages:\nmember self-service,\ndistrict management, admin" as pages
+    component "Finance pages" <<planned>> as financePages
+    component "Enrollment portal" <<planned>> as enrollmentPortal
+    component "panel-api client\n(service-token signer)" as apiClient
+}
+
+package "panel-api (Spring Boot)" {
+    component "REST API v1\nme, members, districts,\nbodies, change requests" as rest
+    component "REST API v1\nfinance, enrollment" <<planned>> as restPlanned
+    component "Service-token filter\nand permissions" as security
+
+    package "Domain" {
+        component "Members" as members
+        component "Bodies and districts" as bodies
+        component "Change requests" as changeRequests
+        component "Spreadsheet importer" as importer
+        component "Audit" as audit
+        component "Finance: bank import,\nledger, approvals" <<planned>> as finance
+        component "UEPiK reports" <<planned>> as uepik
+        component "Enrollment: identity match,\nTAP, passkey registration" <<planned>> as enrollment
+        component "Announcements publisher" <<planned>> as announcements
+    }
+
+    package "Core" {
+        component "Event bus and RPC" as eventBus
+        component "Event log" as eventLog
+        component "Cache" as cache
+    }
+
+    package "Directory" {
+        component "DirectoryFactory\n(reloadable proxies)" as directoryFactory
+        component "Mock provider" as mockProvider
+        component "Google provider" <<legacy>> as googleDirectory
+        component "Entra provider\n(Graph client)" <<planned>> as entraDirectory
+    }
+
+    component "Persistence (JPA)" as persistence
+}
+
+database "PostgreSQL" as postgres
+cloud "Microsoft Graph" as graph
+cloud "Google Admin SDK" as adminSdk
+cloud "Microsoft Entra ID" as entra
+cloud "Google identity" as googleIdentity
+cloud "Teams / Viva Engage" as collab
+
+browser --> session
+teamsClient --> teamsHost
+teamsHost --> session
+session --> entraProvider
+session --> googleProvider
+entraProvider --> entra
+googleProvider --> googleIdentity
+enrollmentPortal --> googleProvider : proves identity\nduring migration
+pages --> apiClient
+financePages --> apiClient
+enrollmentPortal --> apiClient
+
+apiClient --> security
+security --> rest
+security --> restPlanned
+
+rest --> members
+rest --> bodies
+rest --> changeRequests
+restPlanned --> finance
+restPlanned --> enrollment
+finance --> uepik
+
+members --> eventBus
+bodies --> eventBus
+changeRequests --> eventBus
+finance --> eventBus
+enrollment --> eventBus
+eventBus --> eventLog
+eventBus --> audit
+eventBus --> announcements
+members --> cache
+
+members --> directoryFactory
+bodies --> directoryFactory
+enrollment --> directoryFactory
+directoryFactory --> mockProvider
+directoryFactory --> googleDirectory
+directoryFactory --> entraDirectory
+
+entraDirectory --> graph
+googleDirectory --> adminSdk
+announcements --> collab
+importer --> persistence
+members --> persistence
+finance --> persistence
+eventLog --> persistence
+audit --> persistence
+persistence --> postgres
+
+legend right
+    | Colour | Meaning |
+    | <#ffffff> | Implemented |
+    | <#fff4e0> | Planned for the Microsoft 365 migration |
+    | <#eeeeee> | Legacy, removed after the cutover |
+endlegend
+@enduml

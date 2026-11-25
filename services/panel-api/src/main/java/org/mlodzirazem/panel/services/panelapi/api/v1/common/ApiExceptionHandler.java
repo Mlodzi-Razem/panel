@@ -19,6 +19,7 @@ package org.mlodzirazem.panel.services.panelapi.api.v1.common;
 
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.mlodzirazem.panel.services.panelapi.bankimport.BankStatementParseException;
 import org.mlodzirazem.panel.services.panelapi.bodies.AssignmentBlockedException;
 import org.mlodzirazem.panel.services.panelapi.bodies.ConfirmationRequiredException;
 import org.mlodzirazem.panel.services.panelapi.core.error.ConflictException;
@@ -78,6 +79,11 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return respond(HttpStatus.UNPROCESSABLE_ENTITY, ErrorResponse.of(e.getCode(), e.getMessage()));
     }
 
+    @ExceptionHandler(BankStatementParseException.class)
+    ResponseEntity<ErrorResponse> statement(BankStatementParseException e) {
+        return respond(HttpStatus.UNPROCESSABLE_ENTITY, ErrorResponse.of(e.getCode().name(), "The statement file cannot be read"));
+    }
+
     @ExceptionHandler(DeclarationFormAccessException.class)
     ResponseEntity<ErrorResponse> declarationForm(DeclarationFormAccessException e) {
         HttpStatus status = switch (e.getCode()) {
@@ -120,6 +126,11 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
         if (statusCode.value() == 400) {
             code = "BAD_REQUEST";
+        }
+
+        if (statusCode.value() == 413) {
+            code = "FILE_TOO_LARGE";
+            reason = "The file exceeds the upload limit";
         }
 
         return ResponseEntity.status(statusCode).headers(headers).body(ErrorResponse.of(code, reason));
