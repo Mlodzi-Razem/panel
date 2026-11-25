@@ -186,7 +186,7 @@ FROM (VALUES ('950001', 'Zarząd Okręgu Mazowieckiego', 'COORDINATOR'),
          JOIN members m ON m.member_id = seeded.member_id
          JOIN bodies b ON b.name = seeded.body_name
          JOIN body_template_member_types mt ON mt.body_template_id = b.body_template_id AND mt.code = seeded.type_code
-ON CONFLICT (member_id, body_id, member_type_id) WHERE valid_to IS NULL DO NOTHING;
+ON CONFLICT (member_id, body_id, member_type_id) WHERE valid_to IS NULL AND status = 'ACTIVE' DO NOTHING;
 
 -- ---------------------------------------------------------------- suspension ---
 -- Suspended member with a documented suspension issued by her district board.
