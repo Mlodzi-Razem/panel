@@ -20,6 +20,7 @@ package org.mlodzirazem.panel.services.panelapi;
 import org.springframework.boot.SpringApplication;
 import org.mlodzirazem.panel.services.panelapi.admin.AdminMode;
 import org.mlodzirazem.panel.services.panelapi.admin.BanImportMode;
+import org.mlodzirazem.panel.services.panelapi.admin.MandateImportMode;
 import org.mlodzirazem.panel.services.panelapi.core.cli.CliMode;
 import org.mlodzirazem.panel.services.panelapi.importer.ImportMode;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -42,7 +43,8 @@ public class PanelApiApplication {
 
         SpringApplication application = new SpringApplication(PanelApiApplication.class);
 
-        CliMode.Trigger[] triggers = {ImportMode.TRIGGER, AdminMode.TRIGGER, BanImportMode.TRIGGER};
+        CliMode.Trigger[] triggers = {ImportMode.TRIGGER, AdminMode.TRIGGER, BanImportMode.TRIGGER,
+            MandateImportMode.TRIGGER};
 
         if (!CliMode.requested(args, triggers)) {
             application.run(args);
