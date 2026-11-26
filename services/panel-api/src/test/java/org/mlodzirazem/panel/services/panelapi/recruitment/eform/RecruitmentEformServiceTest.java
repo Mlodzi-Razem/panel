@@ -89,6 +89,7 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
     static void declarationStorage(DynamicPropertyRegistry registry) throws IOException {
         Path storage = Files.createTempDirectory("declarations-test");
         registry.add("panel.api.recruitment.declaration.storage-dir", () -> storage.toString());
+        registry.add("panel.api.recruitment.declaration.web-url", () -> "https://panel.example.org/");
     }
 
     private long districtActor() {
@@ -147,7 +148,8 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
             eform.createDeclarationLink(candidateCase.getId(), actor);
 
         assertThat(first.token()).isNotBlank().isNotEqualTo(second.token());
-        assertThat(second.formUrl()).contains(second.token());
+        assertThat(second.formUrl())
+            .isEqualTo("https://panel.example.org/rekrutacja/deklaracja/" + second.token());
         assertThat(second.expiresAt()).isNotNull();
 
         List<String> tokenStatuses = jdbc.queryForList(
@@ -329,7 +331,8 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
             submission(pesel, "Felicja"));
 
         assertThat(filled.status()).isEqualTo("FILLED");
-        assertThat(filled.pdfUrl()).contains(link.token()).endsWith("/pdf");
+        // the API path, independent of the web address the candidate link is built on
+        assertThat(filled.pdfUrl()).isEqualTo("/public/declaration-form/" + link.token() + "/pdf");
 
         TRecruitmentCase stored = caseRepository.findById(candidateCase.getId()).orElseThrow();
         assertThat(stored.getCandidateFormalFirstName()).isEqualTo("Felicja");

@@ -798,6 +798,10 @@ curl -fsS https://dev.panel.mlodzirazem.org/api/health     # {"status":"ok"}
 
 ### 11.8. Backup (tor K) — cron z pg_dump przez CNPG
 
+> **Uwaga:** na stage od 2026-11-26 działa `panel-backup.sh` zamiast linii
+> poniżej, a od wdrożenia e-deklaracji obejmuje on też pliki deklaracji:
+> **§12.4**. Sam `pg_dump` plików NIE zabezpiecza.
+
 Linia do `crontab -e` (user `nepose`; retencja jak w §5):
 
 ```cron
@@ -870,3 +874,100 @@ deploy starych obrazów.
    `storageClassName` (dynamiczny provisioning nie rusza dla
    volumeName-prebound). Overlay stage ma `volumeName: null` — klucz znika
    z renderu; nie przywracaj go na klastrach z dynamiczną klasą.
+
+---
+
+## §12. E-deklaracja: pliki deklaracji i link dla kandydata (tor K)
+
+### 12.1. Co się zmienia
+
+| obszar | ustawienie | uwagi |
+|---|---|---|
+| link dla kandydata | `PANEL_WEB_URL` (chart: z `panel.web.url`; compose: z `NEXTAUTH_URL`) | `<adres web>/rekrutacja/deklaracja/<token>`; adres względny lub błędny **zatrzymuje start** panel-api. `pdfUrl` w API zostaje ścieżką API (`/public/declaration-form/<token>/pdf`), web pobiera PDF przez własne proxy |
+| katalog plików | `PANEL_DECLARATIONS_DIR=/var/lib/panel/declarations` | katalog niezapisywalny **zatrzymuje start** panel-api (`Declaration storage directory '…' is not writable`) |
+| wolumen | PVC `panel-api-declarations` (`panel.api.declarations.*`; stage: `microk8s-hostpath`, 2 Gi) | adnotacja `helm.sh/resource-policy: keep` |
+| prawa | initContainer `declarations-permissions` (root, tylko `CHOWN`/`FOWNER`): katalog `10001:10001`, `0700`; pliki `0600` | kubelet nie stosuje `fsGroup` do wolumenów hostPath |
+
+Pliki zawierają dane osobowe (art. 9 RODO). Istnieją **tylko** na tym wolumenie
+i w kopiach z §12.4; w bazie są wyłącznie odwołania (`declaration_artifacts.storage_ref`
+= sha256 treści + `.pdf`). Anulowana transakcja może zostawić plik bez odwołania.
+
+### 12.2. Trwałość: co kasuje dane, a co nie
+
+| operacja | pliki |
+|---|---|
+| `helm upgrade`, `helm rollback`, restart/usunięcie poda | zostają |
+| `helm uninstall panel-stage -n stage` | **zostają** (PVC nie jest kasowany); ponowna instalacja pod tą samą nazwą release i w tym samym ns przejmuje PVC |
+| `kubectl delete namespace stage` lub `kubectl delete pvc panel-api-declarations` | **przepadają** (reclaim policy `Delete`) |
+| `docker compose down -v` (tor compose) | **przepadają** |
+
+Helm **rollback do rewizji sprzed e-deklaracji** nie kasuje PVC, ale stary chart
+go nie montuje (stare API i tak nie zapisuje plików). Przed usunięciem
+namespace (rollback z §11, demontaż): kopia z §12.4, albo ochrona wolumenu:
+
+```bash
+PV=$(microk8s kubectl -n stage get pvc panel-api-declarations -o jsonpath='{.spec.volumeName}')
+microk8s kubectl patch pv "$PV" -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
+```
+
+`storageClassName` istniejącego PVC jest niezmienne. PVC jest `ReadWriteOnce`:
+na klastrze wielowęzłowym rolling update wymaga obu podów na jednym węźle.
+
+### 12.3. Sprawdzenie po wdrożeniu
+
+```bash
+microk8s kubectl -n stage get pvc panel-api-declarations          # Bound
+microk8s kubectl -n stage get pods                                # panel-api Running, 1/1
+microk8s kubectl -n stage exec deploy/panel-api -c panel-api -- sh -c 'id -u; stat -c "%u:%g %a" /var/lib/panel/declarations'
+# 10001 oraz 10001:10001 700
+microk8s kubectl -n stage exec deploy/panel-api -c panel-api -- printenv PANEL_WEB_URL PANEL_DECLARATIONS_DIR
+```
+
+Potem, w interfejsie: sprawa w stanie „oczekuje na deklarację” → wygeneruj link.
+Musi zaczynać się od `https://dev.panel.mlodzirazem.org/rekrutacja/deklaracja/`.
+Do próby używaj wyłącznie fikcyjnych danych. Linku (to token dostępu) nie wklejaj
+do zgłoszeń ani logów. Tworzenie spraw i linków wymaga `RECRUITMENT_MANAGE`
+(mandat w ZO okręgu).
+
+Wysłane wcześniej linki w starym formacie nie zadziałają: wystaw nowe (nowy link
+unieważnia poprzedni).
+
+### 12.4. Kopie: baza i pliki (`panel-backup.sh`)
+
+Źródło skryptu: `panel/stage-backup/panel-backup.sh` na komputerze właściciela
+(jeszcze poza repo); na VPS: `/opt/panel-stage/scripts/panel-backup.sh`.
+
+**Nową wersję instaluj dopiero PO wdrożeniu chartu z wolumenem** (bez niego
+krok plików kończy się błędem). Przed pierwszym użyciem formularza na stage:
+bez nowej wersji skryptu pliki nie mają kopii.
+
+```bash
+scp panel-backup.sh panel-vps:/tmp/panel-backup.sh
+ssh panel-vps 'install -m 700 /tmp/panel-backup.sh /opt/panel-stage/scripts/panel-backup.sh && rm /tmp/panel-backup.sh'
+ssh panel-vps '/opt/panel-stage/scripts/panel-backup.sh backup && /opt/panel-stage/scripts/panel-backup.sh restore-check && /opt/panel-stage/scripts/panel-backup.sh status'
+```
+
+Linie crontaba pozostają bez zmian.
+W torze compose `scripts/backup.sh` i `scripts/restore.sh` nadal obejmują **tylko bazę** (wolumen
+`declarations-data` trzeba kopiować osobno).
+
+| polecenie | pliki deklaracji |
+|---|---|
+| `backup` | po zrzucie bazy: `panel-stage-auto-<znacznik>.files.tar.gz` + `.sha256` (prawa 600), tylko `*.pdf`; kontrola odczytu całego archiwum i obecności wszystkich plików, do których odwołuje się baza |
+| `restore-check` | sumy kontrolne, rozpakowanie do katalogu tymczasowego (usuwanego także po błędzie), zgodność treści każdego pliku z nazwą, komplet odwołań z odtworzonej bazy |
+| retencja | jak dla bazy: 7 dni, min. 3 najnowsze; liczona osobno dla zrzutów i archiwów, tylko po udanej nowej kopii danego rodzaju |
+| `status` | „ostatnia udana kopia” oznacza komplet (baza **i** pliki) |
+
+Gdy krok plików zawiedzie (np. panel-api nie działa), zrzut bazy zostaje,
+polecenie kończy się błędem, a `status` po 26 h pokazuje ostrzeżenie. Nadal bez
+kopii zewnętrznej i bez alarmu.
+
+**Przywracanie plików** (najpierw baza, potem pliki z TEGO SAMEGO znacznika albo
+nowsze; pliki są adresowane treścią, więc nadpisanie jest bezpieczne). Pod
+`panel-api` musi działać; rozpakowanie jako uid 10001 zachowuje właściciela:
+
+```bash
+cd /opt/panel-stage/backups/auto
+sha256sum -c panel-stage-auto-<znacznik>.files.tar.gz.sha256
+gunzip -c panel-stage-auto-<znacznik>.files.tar.gz | microk8s kubectl -n stage exec -i deploy/panel-api -c panel-api -- sh -c 'umask 077 && tar -C /var/lib/panel/declarations --no-same-permissions -xf -'
+```

@@ -97,6 +97,9 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
 
     private static final int MAX_CORRECTION_REASON = 500;
 
+    /** pdfUrl points at the API itself (panel-web serves the file through its own proxy), unlike the form link. */
+    private static final String PDF_PATH_PREFIX = "/public/declaration-form/";
+
     private static final String CODE_TOKEN_INVALID = "TOKEN_INVALID";
     private static final String CODE_TOKEN_EXPIRED = "TOKEN_EXPIRED";
     private static final String CODE_CASE_CLOSED = "CASE_CLOSED";
@@ -158,7 +161,7 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
         emit(candidateCase, actorMemberId, RecruitmentCaseEventType.DECLARATION_LINK_CREATED,
             List.of("token_hash", "expires_at"));
 
-        String formUrl = properties.getPublicBaseUrl() + token;
+        String formUrl = properties.formUrl(token);
         String emailDispatch = mailLink(candidateCase, formUrl, expiresAt);
 
         auditLog.record("recruitment :: declaration-link",
@@ -692,7 +695,7 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
 
     private DeclarationForm formView(TDeclarationFormSession session, String token) {
         String pdfUrl = switch (session.getStatus()) {
-            case FILLED, SIGNED -> properties.getPublicBaseUrl() + token + "/pdf";
+            case FILLED, SIGNED -> PDF_PATH_PREFIX + token + "/pdf";
             default -> null;
         };
 

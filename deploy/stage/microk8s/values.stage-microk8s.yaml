@@ -52,6 +52,11 @@ panel:
     image: ghcr.io/Mlodzi-Razem/panel-api:stage
     #dockerconfigjson z sekretem GHCR tworzy właściciel (RUNBOOK §11.4).
     imagePullSecret: ghcr-pull
+    # Pliki deklaracji (dane osobowe): PVC panel-api-declarations, zostaje po
+    # helm uninstall (RUNBOOK §12).
+    declarations:
+      storageClassName: microk8s-hostpath
+      sizeGigabytes: 2
     replicaResources:
       # Stage na 8 vCPU: minimum z chart-schema (api: 1 CPU, web: 0.5 CPU).
       maximumMemoryMb: 1024
