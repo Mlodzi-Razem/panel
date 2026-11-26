@@ -46,6 +46,7 @@ class DefaultSenderIbans implements SenderIbans {
     @Override
     @Transactional
     public ConfirmedIban confirm(long actorMemberId, String iban, long memberId) {
+        OwnFeesGuard.reject(actorMemberId, memberId);
         String normalised = normalise(iban);
         TMember member = members.findById(memberId).orElseThrow(() -> new NotFoundException("Member", memberId));
 

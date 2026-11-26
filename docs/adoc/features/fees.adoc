@@ -5,6 +5,12 @@ The national board sets the amounts, discounts and exemptions (Art. 29.1.12).
 This feature replaces the spreadsheet and the manual bank checks; the association's ledger and
 UEPiK reports (AD-8 in the target architecture) are a later feature built on top of it.
 
+WARNING: The article numbers and the arrears rules on this page follow the 2024 statute. The binding 2026 statute
+suspends a member for unjustified arrears of at least 3 months only by a resolution of the district board
+(Art. 10(1)(1), Art. 42(2)(8)) and does not list arrears among the grounds for losing membership (Art. 11).
+The automatic loss of electoral rights described below is still what the code does; changing it is an open
+decision of the owner.
+
 === Who pays
 
 * Only *ordinary* members pay fees (Art. 13.4). Supporting and honorary members are exempt
@@ -24,8 +30,11 @@ UEPiK reports (AD-8 in the target architecture) are a later feature built on top
   exist yet (normally the next month, or a later one when a resolution is entered in advance).
   Dues already generated keep the amount they were generated with, so a change never rewrites
   past months and a member's history always shows what was owed at the time.
+* A rate and a tier assignment start in the current month at the earliest: entering a past month would create or
+  reprice dues backwards. Arrears from before Panel come from a data import, not from past rates.
 * Every paying member is assigned to one tier (default: the tier marked as default).
-  Assignments have `valid_from`, so changing a tier never rewrites past dues.
+  Assignments have `valid_from`, so changing a tier never rewrites past dues. Which tier is the default cannot
+  change once any dues exist.
 * No dues are generated until at least one rate exists.
 
 === Adjustments
@@ -57,17 +66,26 @@ Reason categories: `FINANCIAL_HARDSHIP` (_trudna sytuacja materialna_), `HEALTH`
 
 Adjustments never change dues that are already paid; changing an unpaid due recalculates it.
 
+Nobody decides on their own fees: another holder of `FEES_MANAGE` grants the adjustment, records a payment made
+outside the bank statements, assigns the tier, confirms a sender IBAN or matches a transfer by hand. Transfers an
+import identifies by itself are booked as usual.
+
 === Payments and allocation
 
 * Sources: imported bank transactions (camt.053 or MT940 statement files) and payments recorded
   by the ZK Treasurer (cash, other). Only the ZK Treasurer records or matches payments.
-* Every member has a personal *payment reference* `MR-<member number>-<check digit>`
-  (the check digit is the ISO 7064 mod 11-10 digit of the member number), shown on their fees page
-  together with the bank account and recipient name.
-* Matching an incoming transfer: a valid reference in the title (case, spaces and dashes ignored)
-  identifies the member; otherwise a sender IBAN previously confirmed for exactly one member does;
-  otherwise the transfer waits in the *unmatched queue* for the Treasurer, who assigns it to one or more
-  members (split) or marks it as not a fee. A manual match can remember the sender IBAN.
+* The association's transfer title is `<member number> SKŁADKA CZŁONKOWSKA STOWARZYSZENIE MŁODZI RAZEM`. The
+  member number is also the *payment reference*; members without a six-digit number get
+  `MR-<number>-<check digit>` (the ISO 7064 mod 11-10 check digit). The reference, the title, the bank account and
+  the recipient name are shown on the member's fees page.
+* Matching an incoming transfer by its title: either the title follows the template -- it starts with an existing
+  six-digit member number (also accepted as `<number>@mlodzirazem.org`), followed by "składka członkowska",
+  optionally the name of the association (the bank may cut it off) and nothing else -- or it holds a valid
+  `MR-` reference. Case, Polish diacritics, spaces and punctuation are ignored. Otherwise a sender IBAN previously
+  confirmed for exactly one member identifies the member, unless the title names somebody else. Anything else
+  waits in the *unmatched queue* for the Treasurer, who assigns it to one or more members (split) or marks it as
+  not a fee. A manual match can remember the sender IBAN. The template has no check digit: a mistyped number that
+  belongs to another member is booked for that member until the Treasurer reopens the transfer.
 * A payment is allocated to the member's oldest open dues first; any surplus is a credit used by
   future dues. Reversing a payment (e.g. a wrong match) re-allocates the member's remaining payments.
 * Importing the same statement twice changes nothing (transactions are identified by the bank's
@@ -108,6 +126,8 @@ with ids and field names only; amounts are stored in the fee tables, not in the 
 * *Finanse / Finance* for `FEES_READ`: overview (expected vs collected per month), arrears list with
   the Art. 14 and Art. 17 thresholds, and each member's fee card (dues, payments, adjustments, balance).
   District roles see their district only.
+* Statement transfers, the unmatched queue and import history hold data of third parties and need `FEES_MANAGE`
+  to read as well as to change. Payment notes and bank bookkeeping are shown to `FEES_MANAGE` only.
 * For the ZK Treasurer additionally: statement import (with a preview before saving),
   the unmatched queue, recording a payment, tiers and rates, and adjustments.
 

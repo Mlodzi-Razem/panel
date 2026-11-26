@@ -63,6 +63,11 @@ class DefaultPaymentService implements PaymentService {
     public Payment record(long actorMemberId, RecordPayment request) {
         lock.acquire();
 
+        // a bank transfer comes from the statement import or the matching queue, which guards manual matching itself
+        if (request.bankTransactionId() == null) {
+            OwnFeesGuard.reject(actorMemberId, request.memberId());
+        }
+
         TMember member = members.findById(request.memberId())
                                 .orElseThrow(() -> new NotFoundException("Member", request.memberId()));
         BigDecimal amount = Money.positive(request.amount(), "PAYMENT_AMOUNT_INVALID");

@@ -22,7 +22,7 @@ import java.util.Optional;
 
 /**
  * Sender IBANs confirmed for exactly one member (a confirmed IBAN identifies the member of an incoming transfer).
- * Errors: IBAN_INVALID, IBAN_ALREADY_CONFIRMED (conflict, other member), NOT_FOUND.
+ * Errors: SELF_FEES_NOT_ALLOWED, IBAN_INVALID, IBAN_ALREADY_CONFIRMED (conflict, other member), NOT_FOUND.
  */
 public interface SenderIbans {
     /**

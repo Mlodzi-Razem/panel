@@ -264,6 +264,8 @@ class DefaultBankImportService implements BankImportService {
             throw new RuleViolationException("SPLIT_SUM_MISMATCH", "The splits must add up to the transaction amount");
         }
 
+        OwnFeesGuard.reject(actorMemberId, seen);
+
         LocalDate today = LocalDate.now(clock);
         LocalDate paidOn = tx.getBookingDate().isAfter(today) ? today : tx.getBookingDate();
 
@@ -381,7 +383,11 @@ class DefaultBankImportService implements BankImportService {
         if (t.counterpartyIban() != null) {
             Optional<Long> byIban = senderIbans.memberOf(t.counterpartyIban());
 
-            if (byIban.isPresent()) {
+            // a title naming somebody else (paying for another member, several numbers) is the treasurer's call
+            if (byIban.isPresent()
+                && references.membersNamed(t.title() == null ? "" : t.title())
+                             .stream()
+                             .allMatch(byIban.get()::equals)) {
                 return new Row(t, ImportOutcome.NEW_MATCHED_IBAN, byIban.get());
             }
         }

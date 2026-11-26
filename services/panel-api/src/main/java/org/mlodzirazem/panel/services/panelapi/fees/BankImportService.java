@@ -26,7 +26,7 @@ import java.util.List;
  * Bank statement import and the unmatched queue (ZK Treasurer, FEES_MANAGE enforced by the caller). Errors:
  * STATEMENT_ALREADY_IMPORTED (conflict), FILE_TOO_LARGE, FILE_EMPTY, NOT_FOUND, TRANSACTION_NOT_UNMATCHED (conflict),
  * TRANSACTION_NOT_REOPENABLE (conflict), TRANSACTION_CURRENCY_UNSUPPORTED, SPLITS_REQUIRED, SPLIT_AMOUNT_INVALID,
- * SPLIT_DUPLICATE_MEMBER, SPLIT_SUM_MISMATCH, IBAN_ALREADY_CONFIRMED (conflict), plus the parser errors
+ * SPLIT_DUPLICATE_MEMBER, SPLIT_SUM_MISMATCH, SELF_FEES_NOT_ALLOWED (matching a transfer to oneself by hand), IBAN_ALREADY_CONFIRMED (conflict), plus the parser errors
  * ({@link org.mlodzirazem.panel.services.panelapi.bankimport.BankStatementParseException}).
  */
 public interface BankImportService {

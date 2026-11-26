@@ -25,10 +25,16 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 @ConfigurationProperties("panel.fees")
 public record FeesProperties(
     @Nullable String bankAccount,
-    @DefaultValue("Stowarzyszenie Młodzi Razem") String recipientName,
-    @DefaultValue("Składka członkowska {reference}") String titleTemplate
+    @DefaultValue("") String recipientName,
+    @DefaultValue("") String titleTemplate
 ) {
+    private static final String DEFAULT_RECIPIENT = "Stowarzyszenie Młodzi Razem";
+    private static final String DEFAULT_TITLE = "{reference} SKŁADKA CZŁONKOWSKA STOWARZYSZENIE MŁODZI RAZEM";
+
     public FeesProperties {
+        recipientName = recipientName.isBlank() ? DEFAULT_RECIPIENT : recipientName;
+        titleTemplate = titleTemplate.isBlank() ? DEFAULT_TITLE : titleTemplate;
+
         if (bankAccount != null && bankAccount.isBlank()) {
             bankAccount = null;
         }

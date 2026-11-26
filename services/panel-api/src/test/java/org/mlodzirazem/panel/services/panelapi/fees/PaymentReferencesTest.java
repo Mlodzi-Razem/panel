@@ -64,6 +64,46 @@ class PaymentReferencesTest extends FeesTestSupport {
     }
 
     @Test
+    void sixDigitMemberNumbersAreTheReferenceAndFollowTheTitleTemplate() {
+        TMember member = numbered("Six", "000205");
+
+        assertThat(references.referenceOf(member.getId())).isEqualTo("000205");
+
+        for (String title : new String[]{
+            "000205 SKŁADKA CZŁONKOWSKA STOWARZYSZENIE MŁODZI RAZEM",
+            "000205 skladka czlonkowska stowarzyszenie mlodzi razem",
+            "000205@mlodzirazem.org - Składka członkowska Stowarzyszenie Młodzi Razem.",
+            "000205 SKŁADKA CZŁON KOWSKA STOWARZYSZ",
+            "000205 Składka członkowska"
+        }) {
+            assertThat(references.parse(title)).as(title).contains(member.getId());
+        }
+    }
+
+    @Test
+    void titlesOutsideTheTemplateAreLeftToTheTreasurer() {
+        TMember member = numbered("Six", "000205");
+        TMember other = numbered("Other", "000206");
+
+        for (String title : new String[]{
+            "SKŁADKA CZŁONKOWSKA 000205",
+            "000205 darowizna",
+            "000205, 000206 SKŁADKA CZŁONKOWSKA STOWARZYSZENIE MŁODZI RAZEM",
+            "000205 SKŁADKA CZŁONKOWSKA STOWARZYSZENIE MŁODZI RAZEM 000206",
+            "000205 SKŁADKA CZŁONKOWSKA za brata",
+            "000299 SKŁADKA CZŁONKOWSKA STOWARZYSZENIE MŁODZI RAZEM",
+            "1000205 SKŁADKA CZŁONKOWSKA",
+            "205 SKŁADKA CZŁONKOWSKA",
+            "000205@example.org SKŁADKA CZŁONKOWSKA"
+        }) {
+            assertThat(references.parse(title)).as(title).isEmpty();
+        }
+
+        assertThat(references.membersNamed("Składka za 000205 i 000206, faktura 123456"))
+            .containsExactlyInAnyOrder(member.getId(), other.getId());
+    }
+
+    @Test
     void wrongCheckDigitUnknownMembersAndAmbiguousTitlesAreRejected() {
         TMember a = numbered("A", "7001");
         TMember b = numbered("B", "7002");

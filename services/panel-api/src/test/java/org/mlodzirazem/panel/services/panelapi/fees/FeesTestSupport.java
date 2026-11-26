@@ -57,7 +57,23 @@ abstract class FeesTestSupport extends DomainTestSupport {
     protected void setUpTierWithRate() {
         actor = newMember("Tre", "Asurer", "mazowieckie");
         tierId = schedule.createTier(actor.getId(), new NewFeeTier("standard", "Standardowa", true)).id();
-        schedule.addRate(actor.getId(), tierId, NOW.minusMonths(12), money("30"), "U/1");
+        pastRate(tierId, NOW.minusMonths(12), "30");
+    }
+
+    /**
+     * A rate that has been in force since a past month. The service refuses to create one (rates start in the current
+     * month at the earliest), so the history is written directly, the way it looks after months of running.
+     */
+    protected void pastRate(long tier, YearMonth validFrom, String amount) {
+        jdbc.update("INSERT INTO fee_tier_rates (tier_id, monthly_amount, valid_from, resolution_reference, "
+            + "created_by_user_id) VALUES (?, ?, ?, 'U/1', ?)", tier, money(amount), validFrom.atDay(1), actor.getId());
+        dues.generateDues(NOW);
+    }
+
+    protected void pastAssignment(TMember member, long tier, YearMonth validFrom) {
+        jdbc.update("INSERT INTO member_fee_tiers (member_id, tier_id, valid_from, created_by_user_id) "
+            + "VALUES (?, ?, ?, ?)", member.getId(), tier, validFrom.atDay(1), actor.getId());
+        dues.refresh(member.getId());
     }
 
     protected TMember ordinaryMember(String first, String last, YearMonth since) {

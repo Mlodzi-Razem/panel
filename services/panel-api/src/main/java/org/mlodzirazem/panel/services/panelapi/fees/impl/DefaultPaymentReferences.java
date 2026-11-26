@@ -32,6 +32,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 class DefaultPaymentReferences implements PaymentReferences {
     private static final String NUMERIC = "[0-9]{1,9}";
+    private static final String MEMBER_NUMBER = "[0-9]{6}";
 
     private final JdbcClient jdbc;
 
@@ -45,6 +46,10 @@ class DefaultPaymentReferences implements PaymentReferences {
 
         String number = row.orElseThrow(() -> new NotFoundException("Member", memberId)).orElse(null);
 
+        if (number != null && number.matches(MEMBER_NUMBER)) {
+            return number;
+        }
+
         return ReferenceCode.format(number != null && number.matches(NUMERIC) ? number : Long.toString(memberId));
     }
 
@@ -57,14 +62,31 @@ class DefaultPaymentReferences implements PaymentReferences {
             resolve(number).ifPresent(found::add);
         }
 
+        TransferTitle.templateNumber(transferTitle).flatMap(this::byMemberNumber).ifPresent(found::add);
+
         return found.size() == 1 ? Optional.of(found.iterator().next()) : Optional.empty();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Set<Long> membersNamed(String transferTitle) {
+        Set<Long> found = new HashSet<>();
+
+        ReferenceCode.validNumbers(transferTitle).forEach(number -> resolve(number).ifPresent(found::add));
+        TransferTitle.numbersNamed(transferTitle).forEach(number -> byMemberNumber(number).ifPresent(found::add));
+
+        return found;
+    }
+
+    private Optional<Long> byMemberNumber(String number) {
+        return jdbc.sql("SELECT id FROM members WHERE member_id = :number")
+                   .param("number", number)
+                   .query(Long.class)
+                   .optional();
+    }
+
     private Optional<Long> resolve(String number) {
-        Optional<Long> byNumber = jdbc.sql("SELECT id FROM members WHERE member_id = :number")
-                                      .param("number", number)
-                                      .query(Long.class)
-                                      .optional();
+        Optional<Long> byNumber = byMemberNumber(number);
 
         if (byNumber.isPresent()) {
             return byNumber;

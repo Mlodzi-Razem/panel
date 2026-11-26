@@ -285,4 +285,6 @@ export const PERMISSIONS = {
     recruitmentRead: 'RECRUITMENT_READ',
     recruitmentManage: 'RECRUITMENT_MANAGE',
     recruitmentApprove: 'RECRUITMENT_APPROVE',
+    feesRead: 'FEES_READ',
+    feesManage: 'FEES_MANAGE',
 } as const;

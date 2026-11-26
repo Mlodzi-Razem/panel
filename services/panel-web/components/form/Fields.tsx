@@ -38,7 +38,7 @@ function Label({id, label, required}: { id: string; label: string; required?: bo
 }
 
 export type TextFieldProps = CommonProps & {
-    type?: 'text' | 'email' | 'url' | 'date' | 'tel' | 'search' | 'password';
+    type?: 'text' | 'email' | 'url' | 'date' | 'month' | 'tel' | 'search' | 'password';
     defaultValue?: string;
     placeholder?: string;
     autoComplete?: string;

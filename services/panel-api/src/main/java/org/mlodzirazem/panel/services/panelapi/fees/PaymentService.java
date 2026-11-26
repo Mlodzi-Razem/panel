@@ -23,7 +23,7 @@ import java.util.List;
  * Payments and allocation (ZK Treasurer, FEES_MANAGE enforced by the caller). A payment is allocated to the oldest
  * open dues first; the rest is credit applied to dues generated later. Errors: NOT_FOUND,
  * PAYMENT_AMOUNT_INVALID, PAYMENT_DATE_INVALID, PAYMENT_SOURCE_INVALID, PAYMENT_REASON_REQUIRED,
- * PAYMENT_ALREADY_REVERSED (conflict).
+ * PAYMENT_ALREADY_REVERSED (conflict), SELF_FEES_NOT_ALLOWED (a payment for oneself without a bank transaction).
  */
 public interface PaymentService {
     Payment record(long actorMemberId, RecordPayment payment);

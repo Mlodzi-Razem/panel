@@ -136,6 +136,20 @@ spec:
               value: {{ .dailyExternalLimit | toString | quote }}
             {{- end }}
             {{- end }}
+            {{- with .Values.panel.fees }}
+            {{- if .bankAccount }}
+            - name: PANEL_FEES_BANK_ACCOUNT
+              value: {{ .bankAccount | quote }}
+            {{- end }}
+            {{- if .recipientName }}
+            - name: PANEL_FEES_RECIPIENT_NAME
+              value: {{ .recipientName | quote }}
+            {{- end }}
+            {{- if .titleTemplate }}
+            - name: PANEL_FEES_TITLE_TEMPLATE
+              value: {{ .titleTemplate | quote }}
+            {{- end }}
+            {{- end }}
             - name: management.observations.key-values.environment
               value: {{ .Release.Namespace }}
             - name: management.observations.key-values.version

@@ -58,6 +58,7 @@ class DefaultAdjustmentService implements AdjustmentService {
     @Override
     @Transactional
     public AdjustmentDetails grant(long actorMemberId, NewAdjustment request) {
+        OwnFeesGuard.reject(actorMemberId, request.memberId());
         lock.acquire();
 
         TMember member = members.findById(request.memberId())

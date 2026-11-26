@@ -17,6 +17,9 @@
 
 package org.mlodzirazem.panel.services.panelapi.fees;
 
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.fee.PaymentSource;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.fee.AdjustmentReason;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.fee.AdjustmentKind;
 import org.mlodzirazem.panel.services.panelapi.fees.*;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.fee.*;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember;
@@ -109,7 +112,7 @@ class FeeDuesTest extends FeesTestSupport {
     }
 
     @Test
-    void noDuesUntilARateExistsAndTheFirstRateBackfills() {
+    void noDuesUntilARateExistsAndARateInForceSinceEarlierBackfills() {
         actor = newMember("Tre", "Asurer", "mazowieckie");
         TMember member = payingMember();
 
@@ -119,7 +122,7 @@ class FeeDuesTest extends FeesTestSupport {
         tierId = schedule.createTier(actor.getId(), new NewFeeTier("standard", "Standardowa", false)).id();
         assertThat(allDues(member)).isEmpty();
 
-        schedule.addRate(actor.getId(), tierId, NOW.minusMonths(3), money("25"), "U/1");
+        pastRate(tierId, NOW.minusMonths(3), "25");
 
         assertThat(allDues(member)).hasSize(4);
         assertThat(allDues(member).getFirst().month()).isEqualTo(NOW.minusMonths(3));
@@ -211,10 +214,10 @@ class FeeDuesTest extends FeesTestSupport {
     void changingTheTierRecalculatesOpenDuesFromItsMonth() {
         setUpTierWithRate();
         long cheap = schedule.createTier(actor.getId(), new NewFeeTier("reduced", "Ulgowa", false)).id();
-        schedule.addRate(actor.getId(), cheap, NOW.minusMonths(12), money("10"), "U/1");
+        pastRate(cheap, NOW.minusMonths(12), "10");
         TMember member = payingMember();
 
-        schedule.assignTier(actor.getId(), member.getId(), cheap, NOW.minusMonths(2));
+        pastAssignment(member, cheap, NOW.minusMonths(2));
 
         assertThat(dueOf(member, NOW.minusMonths(3)).amount()).isEqualByComparingTo("30");
         assertThat(dueOf(member, NOW.minusMonths(2)).amount()).isEqualByComparingTo("10");
@@ -227,16 +230,80 @@ class FeeDuesTest extends FeesTestSupport {
     void paidDuesAreNotRewrittenByTierChanges() {
         setUpTierWithRate();
         long cheap = schedule.createTier(actor.getId(), new NewFeeTier("reduced", "Ulgowa", false)).id();
-        schedule.addRate(actor.getId(), cheap, NOW.minusMonths(12), money("10"), "U/1");
+        pastRate(cheap, NOW.minusMonths(12), "10");
         TMember member = payingMember();
         payments.record(actor.getId(), new RecordPayment(member.getId(), money("60"), today(), PaymentSource.CASH, null, null));
 
-        schedule.assignTier(actor.getId(), member.getId(), cheap, NOW.minusMonths(6));
+        pastAssignment(member, cheap, NOW.minusMonths(6));
 
         assertThat(dueOf(member, NOW.minusMonths(6)).status()).isEqualTo(DueStatus.PAID);
         assertThat(dueOf(member, NOW.minusMonths(6)).amount()).isEqualByComparingTo("30");
         assertThat(dueOf(member, NOW.minusMonths(5)).amount()).isEqualByComparingTo("30");
         assertThat(dueOf(member, NOW.minusMonths(4)).amount()).isEqualByComparingTo("10");
+    }
+
+    @Test
+    void ratesAndAssignmentsCannotStartInThePast() {
+        actor = newMember("Tre", "Asurer", "mazowieckie");
+        TMember member = payingMember();
+        tierId = schedule.createTier(actor.getId(), new NewFeeTier("standard", "Standardowa", false)).id();
+
+        assertThat(codeOf(() -> schedule.addRate(actor.getId(), tierId, NOW.minusMonths(1), money("30"), "U/1")))
+            .isEqualTo("RATE_MONTH_IN_PAST");
+        assertThat(allDues(member)).isEmpty();
+
+        schedule.addRate(actor.getId(), tierId, NOW, money("30"), "U/1");
+
+        assertThat(allDues(member)).extracting(Due::month).containsExactly(NOW);
+        assertThat(codeOf(() -> schedule.assignTier(actor.getId(), member.getId(), tierId, NOW.minusMonths(1))))
+            .isEqualTo("ASSIGNMENT_MONTH_IN_PAST");
+        assertThat(schedule.assignments(member.getId())).isEmpty();
+    }
+
+    @Test
+    void theDefaultTierIsLockedOnceDuesExist() {
+        setUpTierWithRate();
+        long other = schedule.createTier(actor.getId(), new NewFeeTier("other", "Inna", false)).id();
+        payingMember();
+
+        assertThat(codeOf(() -> schedule.updateTier(actor.getId(), other, new FeeTierUpdate(null, null, true))))
+            .isEqualTo("FEE_TIER_DEFAULT_LOCKED");
+        assertThat(codeOf(() -> schedule.createTier(actor.getId(), new NewFeeTier("third", "Trzecia", true))))
+            .isEqualTo("FEE_TIER_DEFAULT_LOCKED");
+        assertThat(schedule.tiers(true)).filteredOn(FeeTier::isDefault).extracting(FeeTier::id).containsExactly(tierId);
+    }
+
+    @Test
+    void nobodyChangesTheirOwnFees() {
+        setUpTierWithRate();
+        TMember self = payingMember();
+        long id = self.getId();
+
+        assertThat(codeOf(() -> schedule.assignTier(id, id, tierId, NOW))).isEqualTo("SELF_FEES_NOT_ALLOWED");
+        assertThat(codeOf(() -> payments.record(id,
+            new RecordPayment(id, money("30"), today(), PaymentSource.CASH, null, null))))
+            .isEqualTo("SELF_FEES_NOT_ALLOWED");
+        assertThat(codeOf(() -> adjustments.grant(id, new NewAdjustment(id, AdjustmentKind.EXEMPTION, NOW, null, null,
+            AdjustmentReason.OTHER, "x", null)))).isEqualTo("SELF_FEES_NOT_ALLOWED");
+        assertThat(payments.paymentsOf(id)).isEmpty();
+        assertThat(adjustments.adjustmentsOf(id)).isEmpty();
+    }
+
+    @Test
+    void anImportedDueWithoutARateStaysAndCountsAsArrears() {
+        setUpTierWithRate();
+        jdbc.update("DELETE FROM fee_tier_rates");
+        TMember member = payingMember();
+        YearMonth old = NOW.minusMonths(6);
+        jdbc.update("INSERT INTO fee_dues (member_id, due_month, amount, tier_id) VALUES (?, ?, 17, ?)",
+            member.getId(), old.atDay(1), tierId);
+
+        schedule.addRate(actor.getId(), tierId, NOW, money("30"), "U/2");
+        dues.refresh(member.getId());
+
+        assertThat(dueOf(member, old).amount()).isEqualByComparingTo("17");
+        assertThat(dueOf(member, old).status()).isEqualTo(DueStatus.OPEN);
+        assertThat(arrears.of(member.getId()).suspendsElectoralRights()).isTrue();
     }
 
     @Test
@@ -255,9 +322,10 @@ class FeeDuesTest extends FeesTestSupport {
     @Test
     void tierWritesAreAuditedWithoutAmounts() {
         setUpTierWithRate();
+        schedule.addRate(actor.getId(), tierId, NOW.plusMonths(1), money("41"), "U/2");
 
         assertThat(auditCount("fees :: tier-create")).isEqualTo(1);
         assertThat(auditCount("fees :: rate-add")).isEqualTo(1);
-        assertThat(auditPayloads("fees :: rate-add")).doesNotContain("30.00");
+        assertThat(auditPayloads("fees :: rate-add")).doesNotContain("41.00");
     }
 }
