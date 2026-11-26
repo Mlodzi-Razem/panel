@@ -20,6 +20,7 @@ package org.mlodzirazem.panel.services.panelapi.api.v1.bodies;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import org.jspecify.annotations.Nullable;
 import org.mlodzirazem.panel.services.panelapi.bodies.AssignmentCheck;
+import org.mlodzirazem.panel.services.panelapi.bodies.CompositionAdvisory;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.BodyKind;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.BodyScope;
 
@@ -54,6 +55,7 @@ public final class BodyResponses {
         long memberId,
         String memberName,
         long memberTypeId,
+        @Nullable String memberTypeCode,
         String memberTypeName,
         LocalDate validFrom,
         @Nullable LocalDate validTo
@@ -63,7 +65,8 @@ public final class BodyResponses {
     public record BodyDetailResponse(
         BodyResponse body,
         List<CompositionEntry> composition,
-        List<MemberTypeResponse> memberTypes
+        List<MemberTypeResponse> memberTypes,
+        List<CompositionAdvisory> advisories
     ) {
     }
 
@@ -77,6 +80,8 @@ public final class BodyResponses {
         @Nullable Integer termLengthMonths,
         @Nullable Integer maxTermMonths,
         @Nullable Integer maxExtensions,
+        boolean creatable,
+        List<Long> unavailableParentIds,
         List<MemberTypeResponse> memberTypes
     ) {
     }

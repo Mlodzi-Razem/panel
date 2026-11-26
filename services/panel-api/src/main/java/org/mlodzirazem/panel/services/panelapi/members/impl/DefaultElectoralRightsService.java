@@ -40,6 +40,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Types;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Comparator;
@@ -59,6 +60,16 @@ class DefaultElectoralRightsService implements ElectoralRightsService {
         WHERE suspension_start <= :today
           AND (suspension_end IS NULL OR suspension_end > :today)
           AND (lifted_at IS NULL OR lifted_at > :today)
+        """;
+
+    /** LEAST ignores NULLs, so it is the earlier of the two ends, or NULL while the suspension has none. */
+    private static final String SUSPENSIONS_OVERLAPPING = """
+        SELECT COUNT(*) FROM suspensions
+        WHERE suspended_user_id = :memberId
+          AND (CAST(:to AS DATE) IS NULL OR suspension_start < CAST(:to AS DATE))
+          AND (LEAST(suspension_end, lifted_at) IS NULL
+               OR (LEAST(suspension_end, lifted_at) > CAST(:from AS DATE)
+                   AND LEAST(suspension_end, lifted_at) > suspension_start))
         """;
 
     private final TMemberRepository members;
@@ -88,6 +99,17 @@ class DefaultElectoralRightsService implements ElectoralRightsService {
         }
 
         return rights(member, suspendedIds(today).contains(memberId), primary, voting, today);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean suspendedDuring(long memberId, LocalDate from, @Nullable LocalDate to) {
+        return jdbc.sql(SUSPENSIONS_OVERLAPPING)
+                   .param("memberId", memberId)
+                   .param("from", from)
+                   .param("to", to, Types.DATE)
+                   .query(Long.class)
+                   .single() > 0;
     }
 
     @Override

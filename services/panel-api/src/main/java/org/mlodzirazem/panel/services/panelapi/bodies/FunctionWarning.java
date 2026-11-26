@@ -19,6 +19,10 @@ package org.mlodzirazem.panel.services.panelapi.bodies;
 
 import org.jspecify.annotations.Nullable;
 
+/**
+ * A rule the statute leaves to the people (art. 17 ust. 1, 17 ust. 3, 43): the assignment is
+ * allowed, but only after the caller has explicitly confirmed this warning's {@link Code}.
+ */
 public record FunctionWarning(
     Code code,
     String message,
@@ -27,16 +31,25 @@ public record FunctionWarning(
     @Nullable Long affectedMembershipId,
     @Nullable Long affectedMemberId,
     @Nullable String affectedMemberName,
-    @Nullable String affectedBodyName
+    @Nullable String affectedBodyName,
+    boolean confirmed
 ) {
     public enum Code {
+        /** Art. 17 ust. 1: more than 2 consecutive terms in the same organ (G-7: warn, never block). */
         TERM_LIMIT_EXCEEDED,
-        SINGLE_PERSON_EXEMPTION_LOST
+        SINGLE_PERSON_EXEMPTION_LOST,
+        /**
+         * Art. 17 ust. 3 and art. 29 ust. 3: the function requires full legal capacity. The panel
+         * cannot know about an incapacitation, so the person recording the decision confirms it.
+         */
+        FULL_LEGAL_CAPACITY_REQUIRED,
+        /** Art. 43 ust. 1: the board gets larger than the statute allows for the district's size. */
+        DISTRICT_BOARD_SIZE_EXCEEDS_STATUTE
     }
 
     public static FunctionWarning termLimitExceeded(String message, int consecutiveTerms, int maxConsecutiveTerms) {
         return new FunctionWarning(Code.TERM_LIMIT_EXCEEDED, message, consecutiveTerms, maxConsecutiveTerms,
-            null, null, null, null);
+            null, null, null, null, false);
     }
 
     public static FunctionWarning singlePersonExemptionLost(
@@ -47,6 +60,15 @@ public record FunctionWarning(
         String affectedBodyName
     ) {
         return new FunctionWarning(Code.SINGLE_PERSON_EXEMPTION_LOST, message, null, null,
-            affectedMembershipId, affectedMemberId, affectedMemberName, affectedBodyName);
+            affectedMembershipId, affectedMemberId, affectedMemberName, affectedBodyName, false);
+    }
+
+    public static FunctionWarning of(Code code, String message) {
+        return new FunctionWarning(code, message, null, null, null, null, null, null, false);
+    }
+
+    public FunctionWarning withConfirmed(boolean value) {
+        return new FunctionWarning(code, message, consecutiveTerms, maxConsecutiveTerms, affectedMembershipId,
+            affectedMemberId, affectedMemberName, affectedBodyName, value);
     }
 }

@@ -34,7 +34,10 @@ import org.mlodzirazem.panel.services.panelapi.bodies.AssignmentCheck;
 import org.mlodzirazem.panel.services.panelapi.bodies.AssignmentResult;
 import org.mlodzirazem.panel.services.panelapi.bodies.BodyMembershipService;
 import org.mlodzirazem.panel.services.panelapi.bodies.BodyService;
+import org.mlodzirazem.panel.services.panelapi.bodies.CreationOptions;
+import org.mlodzirazem.panel.services.panelapi.bodies.FunctionWarning;
 import org.mlodzirazem.panel.services.panelapi.bodies.NewBody;
+import org.mlodzirazem.panel.services.panelapi.bodies.SelfRemovalConfirmation;
 import org.mlodzirazem.panel.services.panelapi.bodies.UpdateBody;
 import org.mlodzirazem.panel.services.panelapi.core.error.NotFoundException;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBody;
@@ -57,7 +60,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/bodies")
@@ -87,11 +92,16 @@ public class BodiesController {
         @Nullable Long memberTypeId,
         @Nullable LocalDate validFrom,
         @Nullable LocalDate validTo,
-        @Nullable Boolean confirmed
+        @Nullable String decisionReference,
+        @Nullable List<String> confirmedWarnings
     ) {
     }
 
-    public record VoidMembershipRequest(@Nullable String reason, @Nullable String decisionReference) {
+    public record VoidMembershipRequest(
+        @Nullable String reason,
+        @Nullable String decisionReference,
+        @Nullable List<String> selfRemovalConfirmations
+    ) {
     }
 
     @GetMapping
@@ -116,14 +126,15 @@ public class BodiesController {
         List<CompositionEntry> composition = bodyMemberships.activeIn(id)
             .stream()
             .map(m -> new CompositionEntry(m.getId(), m.getMember().getId(), Names.display(m.getMember()),
-                m.getMemberType().getId(), m.getMemberType().getName(), m.getValidFrom(), m.getValidTo()))
+                m.getMemberType().getId(), m.getMemberType().getCode(), m.getMemberType().getName(), m.getValidFrom(),
+                m.getValidTo()))
             .toList();
 
         List<MemberTypeResponse> memberTypes = body.getBodyTemplate() == null
             ? List.of()
             : bodies.memberTypes(body.getBodyTemplate().getId()).stream().map(BodiesController::memberType).toList();
 
-        return new BodyDetailResponse(body(body), composition, memberTypes);
+        return new BodyDetailResponse(body(body), composition, memberTypes, bodyMemberships.advisories(id));
     }
 
     @PostMapping
@@ -159,7 +170,7 @@ public class BodiesController {
     public AssignmentResponse assign(@PathVariable("id") long id, @RequestBody AssignRequest request) {
         callers.requireBodiesManager();
 
-        AssignmentResult result = bodyMemberships.assign(assignment(id, request), Boolean.TRUE.equals(request.confirmed()));
+        AssignmentResult result = bodyMemberships.assign(assignment(id, request));
 
         return new AssignmentResponse(
             membership(result.membership()),
@@ -180,7 +191,8 @@ public class BodiesController {
         @PathVariable("id") long id,
         @PathVariable("membershipId") long membershipId,
         @RequestParam(name = "endDate", required = false) @Nullable LocalDate endDate,
-        @RequestParam(name = "decisionReference", required = false) @Nullable String decisionReference
+        @RequestParam(name = "decisionReference", required = false) @Nullable String decisionReference,
+        @RequestParam(name = "selfRemovalConfirmations", required = false) @Nullable List<String> selfRemovalConfirmations
     ) {
         callers.requireBodiesManager();
 
@@ -189,7 +201,8 @@ public class BodiesController {
                                                        .orElseThrow(() -> new NotFoundException("Membership",
                                                            membershipId));
 
-        return membership(bodyMemberships.end(existing.getId(), endDate, decisionReference));
+        return membership(bodyMemberships.end(existing.getId(), endDate, decisionReference,
+            codes(SelfRemovalConfirmation.class, selfRemovalConfirmations, "selfRemovalConfirmations")));
     }
 
     @PostMapping("/{id}/memberships/{membershipId}/void")
@@ -208,7 +221,8 @@ public class BodiesController {
         return membership(bodyMemberships.voidMembership(
             existing.getId(),
             request.reason(),
-            request.decisionReference()
+            request.decisionReference(),
+            codes(SelfRemovalConfirmation.class, request.selfRemovalConfirmations(), "selfRemovalConfirmations")
         ));
     }
 
@@ -228,14 +242,35 @@ public class BodiesController {
 
         LocalDate from = request.validFrom() != null ? request.validFrom() : LocalDate.now(clock);
 
-        return new AssignMembership(request.memberId(), bodyId, request.memberTypeId(), from, request.validTo());
+        Set<FunctionWarning.Code> confirmed = codes(FunctionWarning.Code.class, request.confirmedWarnings(),
+            "confirmedWarnings");
+
+        return new AssignMembership(request.memberId(), bodyId, request.memberTypeId(), from, request.validTo(),
+            request.decisionReference(), confirmed);
+    }
+
+    private static <E extends Enum<E>> Set<E> codes(Class<E> type, @Nullable List<String> values, String field) {
+        Set<E> result = EnumSet.noneOf(type);
+
+        for (String value : values == null ? List.<String>of() : values) {
+            try {
+                result.add(Enum.valueOf(type, value));
+            } catch (IllegalArgumentException unknown) {
+                throw ApiException.badRequest("INVALID_VALUE", "Unknown code in " + field, List.of(field));
+            }
+        }
+
+        return result;
     }
 
     private TemplateResponse template(TBodyTemplate t) {
+        CreationOptions options = bodies.creationOptions(t.getId());
+
         return new TemplateResponse(
             t.getId(), t.getName(), t.getKind(), t.getScope(),
             t.getParentTemplate() == null ? null : t.getParentTemplate().getId(),
             t.getMaxConsecutiveTerms(), t.getTermLengthMonths(), t.getMaxTermMonths(), t.getMaxExtensions(),
+            options.creatable(), options.unavailableParentIds(),
             bodies.memberTypes(t.getId()).stream().map(BodiesController::memberType).toList()
         );
     }

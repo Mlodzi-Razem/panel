@@ -44,6 +44,9 @@ public interface TBodyRepository extends JpaRepository<TBody, Long> {
         + " from TBody b where b.bodyTemplate.kind = :kind and b.parentBody.id = :parentId")
     boolean existsByKindAndParent(@Param("kind") BodyKind kind, @Param("parentId") long parentId);
 
+    @Query("select b from TBody b where b.bodyTemplate.kind = :kind and b.parentBody.id = :parentId order by b.id")
+    List<TBody> findByKindAndParent(@Param("kind") BodyKind kind, @Param("parentId") long parentId);
+
     long countByParentBodyId(Long parentId);
 
     /**

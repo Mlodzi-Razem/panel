@@ -61,6 +61,7 @@ public record MemberDetailResponse(
         String bodyName,
         @Nullable BodyKind bodyKind,
         long memberTypeId,
+        @Nullable String memberTypeCode,
         String memberTypeName,
         LocalDate validFrom,
         @Nullable LocalDate validTo

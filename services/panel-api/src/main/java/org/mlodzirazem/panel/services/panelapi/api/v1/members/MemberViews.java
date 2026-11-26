@@ -258,6 +258,7 @@ public class MemberViews {
             bm.getBody().getName(),
             bm.getBody().kind(),
             bm.getMemberType().getId(),
+            bm.getMemberType().getCode(),
             bm.getMemberType().getName(),
             bm.getValidFrom(),
             bm.getValidTo()

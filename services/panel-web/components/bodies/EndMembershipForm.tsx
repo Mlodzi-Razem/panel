@@ -20,6 +20,7 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { endMembershipAction } from "@/app/actions/bodies";
+import { useSelfRemoval } from "@/components/bodies/useSelfRemoval";
 import ActionForm from "@/components/form/ActionForm";
 import { TextField } from "@/components/form/Fields";
 
@@ -29,10 +30,25 @@ export default function EndMembershipForm({bodyId, membershipId, memberName}: {
     memberName: string;
 }) {
     const t = useTranslations('bodies');
-    return <ActionForm ariaLabel={`${t('endMembership')}: ${memberName}`}
-                       submitLabel={t('endMembership')}
-                       submitVariant="outline"
-                       action={fd => endMembershipAction(bodyId, membershipId, String(fd.get('endDate') ?? ''))}>
-        <TextField name="endDate" label={t('endDate')} type="date" hint={t('endDateHint')}/>
-    </ActionForm>;
+    const selfRemoval = useSelfRemoval();
+
+    return <>
+        <ActionForm ariaLabel={`${t('endMembership')}: ${memberName}`}
+                    submitLabel={t('endMembership')}
+                    submitVariant="outline"
+                    action={fd => selfRemoval.run(confirmations => endMembershipAction(
+                        bodyId,
+                        membershipId,
+                        String(fd.get('endDate') ?? ''),
+                        String(fd.get('decisionReference') ?? ''),
+                        confirmations,
+                    ))}>
+            <TextField name="endDate" label={t('endDate')} type="date" hint={t('endDateHint')}/>
+            <TextField name="decisionReference"
+                       label={t('endReference')}
+                       maxLength={200}
+                       hint={t('endReferenceHint')}/>
+        </ActionForm>
+        {selfRemoval.dialog}
+    </>;
 }

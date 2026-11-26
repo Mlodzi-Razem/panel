@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import MemberTypeName from "@/components/bodies/MemberTypeName";
 import React from "react";
 import Link from "next/link";
 import { useFormatter, useTranslations } from "next-intl";
@@ -42,7 +43,7 @@ export function BodyFunctionsCard({functions, linkBodies = true}: { functions: B
                 <tbody>
                     {functions.map(f => <tr key={f.membershipId}>
                         <td>{linkBodies ? <Link href={`/bodies/${f.bodyId}`}>{f.bodyName}</Link> : f.bodyName}</td>
-                        <td><Badge tone="brand">{f.memberTypeName}</Badge></td>
+                        <td><Badge tone="brand"><MemberTypeName code={f.memberTypeCode} name={f.memberTypeName}/></Badge></td>
                         <td><FormattedDate value={f.validFrom}/></td>
                         <td>{f.validTo ? <FormattedDate value={f.validTo}/> : t('ongoing')}</td>
                     </tr>)}

@@ -32,6 +32,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -69,7 +70,7 @@ class LastBodiesManagerTest extends DomainTestSupport {
         assertThat(check.violations()).extracting(FunctionViolation::code)
                                       .containsExactly(FunctionViolation.Code.INCOMPATIBLE_MEMBERSHIP);
 
-        assertThatThrownBy(() -> service.assign(request, true))
+        assertThatThrownBy(() -> service.assign(request))
             .isInstanceOf(AssignmentBlockedException.class)
             .extracting(e -> ((AssignmentBlockedException) e).getCode())
             .isEqualTo("INCOMPATIBLE_MEMBERSHIP");
@@ -83,7 +84,7 @@ class LastBodiesManagerTest extends DomainTestSupport {
         TMember successor = newMember("Sven", "Successor", "slaskie");
 
         service.assign(new AssignMembership(successor.getId(), body("national-board").getId(),
-            memberType(BodyKind.NATIONAL_BOARD, "MEMBER").getId(), today, null), false);
+            memberType(BodyKind.NATIONAL_BOARD, "MEMBER").getId(), today, null));
 
         assertThat(service.check(toKsk(last)).violations())
             .extracting(FunctionViolation::code)
@@ -198,6 +199,7 @@ class LastBodiesManagerTest extends DomainTestSupport {
 
     @Test
     void guardDoesNotBlockWhenNobodyHoldsThePermissionToBeginWith() {
+        jdbc.execute("DELETE FROM body_membership_endings");
         jdbc.execute("DELETE FROM body_memberships");
 
         TMember ksk = newMember("Kasia", "Court", "slaskie");
@@ -208,13 +210,14 @@ class LastBodiesManagerTest extends DomainTestSupport {
         // Nobody holds BODIES_MANAGE, so nothing blocks creating the first manager (bootstrap).
         TMember bootstrap = newMember("Borys", "Bootstrap", "slaskie");
         service.assign(new AssignMembership(bootstrap.getId(), body("national-board").getId(),
-            memberType(BodyKind.NATIONAL_BOARD, "SECRETARY").getId(), today, null), false);
+            memberType(BodyKind.NATIONAL_BOARD, "SECRETARY").getId(), today, null)
+            .withConfirmedWarnings(Set.of(FunctionWarning.Code.FULL_LEGAL_CAPACITY_REQUIRED)));
         assertThat(membershipCount(bootstrap)).isEqualTo(1);
 
         // Kasia holding an open KSK seat makes a cross-body ZK assignment a statutory violation
         // (never auto-closed anymore) — but the guard itself does not add a LAST_BODIES_MANAGER.
         assertThat(service.check(new AssignMembership(ksk.getId(), body("national-board").getId(),
-            memberType(BodyKind.NATIONAL_BOARD, "SECRETARY").getId(), today, null)).violations())
+            memberType(BodyKind.NATIONAL_BOARD, "TREASURER").getId(), today, null)).violations())
             .extracting(FunctionViolation::code)
             .containsExactly(FunctionViolation.Code.INCOMPATIBLE_MEMBERSHIP);
     }

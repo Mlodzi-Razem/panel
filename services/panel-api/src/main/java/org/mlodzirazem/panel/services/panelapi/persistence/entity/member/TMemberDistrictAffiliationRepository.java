@@ -67,4 +67,22 @@ public interface TMemberDistrictAffiliationRepository extends JpaRepository<TMem
         where a.member.id = :memberId and a.validTo is null
         """)
     List<TMemberDistrictAffiliation> findOpenByMemberId(@Param("memberId") Long memberId);
+
+    /**
+     * Members that belong to the district on the given day through an affiliation of the given kind,
+     * leaving out members in the given statuses (e.g. removed ones). Statute art. 43 ust. 1 sizes
+     * a district board by this number.
+     */
+    @Query("""
+        select count(distinct a.member.id) from TMemberDistrictAffiliation a
+        where a.district.id = :districtId and a.kind = :kind
+          and a.validFrom <= :today and (a.validTo is null or a.validTo > :today)
+          and a.member.status not in :excludedStatuses
+        """)
+    long countMembersOfDistrict(
+        @Param("districtId") Long districtId,
+        @Param("today") LocalDate today,
+        @Param("kind") AffiliationKind kind,
+        @Param("excludedStatuses") Collection<MemberStatus> excludedStatuses
+    );
 }

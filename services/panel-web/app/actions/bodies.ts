@@ -45,7 +45,11 @@ const assignmentSchema = z.object({
     memberTypeId: idSchema,
     validFrom: dateSchema.optional(),
     validTo: dateSchema.optional(),
+    decisionReference: z.string().trim().max(200).optional(),
+    confirmedWarnings: z.array(z.string().max(64)).max(16).optional(),
 });
+
+const selfRemovalSchema = z.array(z.enum(['SELF_REMOVAL', 'SELF_REMOVAL_FINAL'])).max(2);
 
 function refresh() {
     revalidatePath('/bodies', 'layout');
@@ -114,7 +118,6 @@ export async function checkAssignmentAction(bodyId: number, input: unknown): Pro
 export async function assignMembershipAction(
     bodyId: number,
     input: unknown,
-    confirmed: boolean,
 ): Promise<ActionResult<AssignmentResponse>> {
     const denied = await denyUnlessSignedIn();
     if (denied) {
@@ -124,7 +127,7 @@ export async function assignMembershipAction(
     if (!idSchema.safeParse(bodyId).success || !parsed.success) {
         return invalid('memberId', 'memberTypeId');
     }
-    const result = await assignMembership(bodyId, parsed.data, confirmed === true);
+    const result = await assignMembership(bodyId, parsed.data);
     if (!result.ok) {
         return fail(result.error);
     }
@@ -136,17 +139,33 @@ export async function endMembershipAction(
     bodyId: number,
     membershipId: number,
     endDate: string,
+    decisionReference: string,
+    selfRemovalConfirmations: string[],
 ): Promise<ActionResult> {
     const denied = await denyUnlessSignedIn();
     if (denied) {
         return denied;
     }
     const date = endDate.trim();
+    const reference = decisionReference.trim();
+    const confirmations = selfRemovalSchema.safeParse(selfRemovalConfirmations);
+    if (!confirmations.success) {
+        return invalid('selfRemovalConfirmations');
+    }
+    if (reference.length > 200) {
+        return invalid('decisionReference');
+    }
     if (!idSchema.safeParse(bodyId).success || !idSchema.safeParse(membershipId).success
         || (date.length > 0 && !dateSchema.safeParse(date).success)) {
         return invalid('endDate');
     }
-    const result = await endMembership(bodyId, membershipId, date.length > 0 ? date : undefined);
+    const result = await endMembership(
+        bodyId,
+        membershipId,
+        date.length > 0 ? date : undefined,
+        reference.length > 0 ? reference : undefined,
+        confirmations.data,
+    );
     if (!result.ok) {
         return fail(result.error);
     }
@@ -159,10 +178,15 @@ export async function voidMembershipAction(
     membershipId: number,
     reason: string,
     decisionReference: string,
+    selfRemovalConfirmations: string[],
 ): Promise<ActionResult> {
     const denied = await denyUnlessSignedIn();
     if (denied) {
         return denied;
+    }
+    const confirmations = selfRemovalSchema.safeParse(selfRemovalConfirmations);
+    if (!confirmations.success) {
+        return invalid('selfRemovalConfirmations');
     }
     const trimmedReason = reason.trim();
     const trimmedReference = decisionReference.trim();
@@ -180,6 +204,7 @@ export async function voidMembershipAction(
         membershipId,
         trimmedReason,
         trimmedReference.length > 0 ? trimmedReference : undefined,
+        confirmations.data,
     );
     if (!result.ok) {
         return fail(result.error);

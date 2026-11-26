@@ -27,9 +27,11 @@ import org.mlodzirazem.panel.services.panelapi.bodies.AssignmentCheck;
 import org.mlodzirazem.panel.services.panelapi.bodies.AssignmentResult;
 import org.mlodzirazem.panel.services.panelapi.bodies.BodyMembershipChanged;
 import org.mlodzirazem.panel.services.panelapi.bodies.BodyMembershipService;
+import org.mlodzirazem.panel.services.panelapi.bodies.CompositionAdvisory;
 import org.mlodzirazem.panel.services.panelapi.bodies.ConfirmationRequiredException;
 import org.mlodzirazem.panel.services.panelapi.bodies.FunctionViolation;
 import org.mlodzirazem.panel.services.panelapi.bodies.FunctionWarning;
+import org.mlodzirazem.panel.services.panelapi.bodies.SelfRemovalConfirmation;
 import org.mlodzirazem.panel.services.panelapi.core.error.ConflictException;
 import org.mlodzirazem.panel.services.panelapi.core.error.ConstraintConflicts;
 import org.mlodzirazem.panel.services.panelapi.core.error.NotFoundException;
@@ -39,6 +41,8 @@ import org.mlodzirazem.panel.services.panelapi.members.CurrentMemberResolver;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.BodyMembershipStatus;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBody;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBodyMembership;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBodyMembershipEnding;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBodyMembershipEndingRepository;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBodyMembershipRepository;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBodyRepository;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBodyTemplate;
@@ -57,10 +61,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 @Service
@@ -79,12 +85,15 @@ class DefaultBodyMembershipService implements BodyMembershipService {
     );
 
     private final TBodyMembershipRepository memberships;
+    private final TBodyMembershipEndingRepository endings;
     private final TBodyRepository bodies;
     private final TBodyTemplateMemberTypeRepository memberTypes;
     private final TBodyTemplateIncompatibilityRepository incompatibilities;
     private final TMemberRepository members;
     private final CurrentMemberResolver currentMemberResolver;
     private final BodiesManagerGuard bodiesManagerGuard;
+    private final BodyCompositionRules compositionRules;
+    private final FunctionEligibilityRules eligibilityRules;
     private final ApplicationEventPublisher events;
     private final AuditLog auditLog;
     private final Clock clock;
@@ -97,7 +106,7 @@ class DefaultBodyMembershipService implements BodyMembershipService {
 
     @Override
     @Transactional
-    public AssignmentResult assign(AssignMembership request, boolean confirmed) {
+    public AssignmentResult assign(AssignMembership request) {
         bodiesManagerGuard.lock();
 
         TMember actor = currentMemberResolver.current().orElse(null);
@@ -115,7 +124,7 @@ class DefaultBodyMembershipService implements BodyMembershipService {
             throw new AssignmentBlockedException(check);
         }
 
-        if (check.needsConfirmation() && !confirmed) {
+        if (check.needsConfirmation()) {
             throw new ConfirmationRequiredException(check);
         }
 
@@ -125,6 +134,7 @@ class DefaultBodyMembershipService implements BodyMembershipService {
         membership.setMemberType(evaluation.memberType());
         membership.setValidFrom(request.validFrom());
         membership.setValidTo(request.validTo());
+        membership.setDecisionReference(request.decisionReference());
         membership.setCreatedBy(actor);
 
         try {
@@ -134,7 +144,7 @@ class DefaultBodyMembershipService implements BodyMembershipService {
         }
 
         publishAndAudit(BodyMembershipChanged.Change.CREATED, membership, "bodies :: membership-assign",
-            request.validTo() == null ? List.of("validFrom") : List.of("validFrom", "validTo"));
+            assignedFields(request, check));
 
         return new AssignmentResult(membership, List.of(), check);
     }
@@ -142,6 +152,13 @@ class DefaultBodyMembershipService implements BodyMembershipService {
     @Override
     @Transactional
     public TBodyMembership end(long membershipId, @Nullable LocalDate endDate, @Nullable String decisionReference) {
+        return end(membershipId, endDate, decisionReference, Set.of());
+    }
+
+    @Override
+    @Transactional
+    public TBodyMembership end(long membershipId, @Nullable LocalDate endDate, @Nullable String decisionReference,
+                               Set<SelfRemovalConfirmation> selfRemovalConfirmations) {
         bodiesManagerGuard.lock();
 
         TBodyMembership membership = memberships.findById(membershipId)
@@ -167,11 +184,17 @@ class DefaultBodyMembershipService implements BodyMembershipService {
         }
 
         boolean retroactive = date.isBefore(today);
-        String reference = decisionReference == null ? null : decisionReference.trim();
+        String reference = decisionReference == null || decisionReference.isBlank() ? null : decisionReference.strip();
 
-        if (retroactive && (reference == null || reference.isBlank())) {
+        if (retroactive && reference == null) {
             throw new RuleViolationException("RETROACTIVE_CORRECTION_REQUIRES_REASON",
                 "Changing a membership's history requires a decision reference (e.g. the resolution signature)");
+        }
+
+        if (reference != null && reference.length() > AssignMembership.MAX_DECISION_REFERENCE_LENGTH) {
+            throw new RuleViolationException(FunctionViolation.Code.DECISION_REFERENCE_TOO_LONG.name(),
+                "The decision reference is limited to " + AssignMembership.MAX_DECISION_REFERENCE_LENGTH
+                    + " characters");
         }
 
         if (membership.getValidTo() == null && bodiesManagerGuard.wouldLeaveNone(List.of(membership.getId()), null, 0)) {
@@ -179,17 +202,32 @@ class DefaultBodyMembershipService implements BodyMembershipService {
                 "Ending this membership would leave nobody able to manage bodies");
         }
 
+        TMember actor = currentMemberResolver.current().orElse(null);
+        requireSelfRemovalConfirmations(actor, membership, selfRemovalConfirmations);
+
+        // the appointing resolution (decision_reference) is history: the ending and its resolution are a new row
+        TBodyMembershipEnding ending = new TBodyMembershipEnding();
+        ending.setMembership(membership);
+        ending.setPreviousValidTo(membership.getValidTo());
+        ending.setValidTo(date);
+        ending.setDecisionReference(reference);
+        ending.setCreatedBy(actor);
+        endings.save(ending);
+
         membership.setValidTo(date);
-        membership.setDecisionReference(reference != null && reference.isBlank() ? null : reference);
-        membership.setUpdatedBy(currentMemberResolver.current().orElse(null));
+        membership.setUpdatedBy(actor);
         memberships.saveAndFlush(membership);
 
-        publishAndAudit(
-            BodyMembershipChanged.Change.ENDED,
-            membership,
-            "bodies :: membership-end",
-            membership.getDecisionReference() == null ? List.of("validTo") : List.of("validTo", "decisionReference")
-        );
+        List<String> fields = new ArrayList<>();
+        fields.add("validTo");
+
+        if (reference != null) {
+            fields.add("endDecisionReference");
+        }
+
+        fields.addAll(selfRemovalFields(actor, membership));
+
+        publishAndAudit(BodyMembershipChanged.Change.ENDED, membership, "bodies :: membership-end", fields);
 
         return membership;
     }
@@ -197,6 +235,13 @@ class DefaultBodyMembershipService implements BodyMembershipService {
     @Override
     @Transactional
     public TBodyMembership voidMembership(long membershipId, String reason, @Nullable String decisionReference) {
+        return voidMembership(membershipId, reason, decisionReference, Set.of());
+    }
+
+    @Override
+    @Transactional
+    public TBodyMembership voidMembership(long membershipId, String reason, @Nullable String decisionReference,
+                                          Set<SelfRemovalConfirmation> selfRemovalConfirmations) {
         bodiesManagerGuard.lock();
 
         TBodyMembership membership = memberships.findById(membershipId)
@@ -227,6 +272,9 @@ class DefaultBodyMembershipService implements BodyMembershipService {
                 "Voiding this mandate would leave nobody able to manage bodies");
         }
 
+        TMember actor = currentMemberResolver.current().orElse(null);
+        requireSelfRemovalConfirmations(actor, membership, selfRemovalConfirmations);
+
         String reference = decisionReference == null ? null : decisionReference.strip();
 
         // The voiding resolution goes to its own column: decisionReference (the appointing
@@ -236,19 +284,42 @@ class DefaultBodyMembershipService implements BodyMembershipService {
         membership.setStatus(BodyMembershipStatus.VOIDED);
         membership.setVoidReason(trimmedReason);
         membership.setVoidDecisionReference(hasVoidReference ? reference : null);
-        membership.setUpdatedBy(currentMemberResolver.current().orElse(null));
+        membership.setUpdatedBy(actor);
         memberships.saveAndFlush(membership);
 
-        publishAndAudit(
-            BodyMembershipChanged.Change.VOIDED,
-            membership,
-            "bodies :: membership-void",
-            hasVoidReference
-                ? List.of("status", "voidReason", "voidDecisionReference")
-                : List.of("status", "voidReason")
-        );
+        List<String> fields = new ArrayList<>(List.of("status", "voidReason"));
+
+        if (hasVoidReference) {
+            fields.add("voidDecisionReference");
+        }
+
+        fields.addAll(selfRemovalFields(actor, membership));
+
+        publishAndAudit(BodyMembershipChanged.Change.VOIDED, membership, "bodies :: membership-void", fields);
 
         return membership;
+    }
+
+    private static boolean isOwn(@Nullable TMember actor, TBodyMembership membership) {
+        return actor != null && actor.getId().equals(membership.getMember().getId());
+    }
+
+    private static void requireSelfRemovalConfirmations(
+        @Nullable TMember actor,
+        TBodyMembership membership,
+        Set<SelfRemovalConfirmation> confirmations
+    ) {
+        if (isOwn(actor, membership) && !confirmations.containsAll(Set.of(SelfRemovalConfirmation.values()))) {
+            throw new ConflictException("SELF_REMOVAL_CONFIRMATION_REQUIRED",
+                "Removing one's own function needs two separate confirmations",
+                List.of("selfRemovalConfirmations"));
+        }
+    }
+
+    private static List<String> selfRemovalFields(@Nullable TMember actor, TBodyMembership membership) {
+        return isOwn(actor, membership)
+            ? Arrays.stream(SelfRemovalConfirmation.values()).map(c -> "confirmed." + c.name()).toList()
+            : List.of();
     }
 
     @Override
@@ -267,6 +338,35 @@ class DefaultBodyMembershipService implements BodyMembershipService {
     @Transactional(readOnly = true)
     public List<TBodyMembership> historyOf(long memberId) {
         return memberships.findAllByMemberId(memberId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CompositionAdvisory> advisories(long bodyId) {
+        TBody body = bodies.findById(bodyId).orElseThrow(() -> new NotFoundException("Body", bodyId));
+
+        return body.getBodyTemplate() == null
+            ? List.of()
+            : compositionRules.advisories(body, body.getBodyTemplate().getKind());
+    }
+
+    /** Field names and the codes of the warnings the caller confirmed — never values. */
+    private static List<String> assignedFields(AssignMembership request, AssignmentCheck check) {
+        Set<String> fields = new TreeSet<>();
+        fields.add("validFrom");
+
+        if (request.validTo() != null) {
+            fields.add("validTo");
+        }
+
+        if (request.decisionReference() != null) {
+            fields.add("decisionReference");
+        }
+
+        check.warnings().stream().filter(FunctionWarning::confirmed)
+             .forEach(w -> fields.add("confirmed." + w.code().name()));
+
+        return List.copyOf(fields);
     }
 
     private void publishAndAudit(
@@ -324,15 +424,28 @@ class DefaultBodyMembershipService implements BodyMembershipService {
         boolean validPeriod = violations.stream().noneMatch(v -> v.code() == FunctionViolation.Code.INVALID_PERIOD);
 
         if (template != null && validPeriod) {
+            eligibilityRules.evaluate(member, template.getKind(), span, violations);
             checkDuplicates(request, existing, span, violations);
             checkIncompatibilities(request, body, template, existing, span, violations);
             checkTermLimit(body, template, existing, span, warnings);
             checkSinglePersonExemptionLoss(request, body, template, span, warnings);
-            checkCommissionerTerm(body, template, existing, span, violations);
+            compositionRules.evaluate(request, body, template.getKind(), memberType, existing, span, violations,
+                warnings);
         }
 
+        if (request.decisionReference() != null
+            && request.decisionReference().length() > AssignMembership.MAX_DECISION_REFERENCE_LENGTH) {
+            violations.add(violation(FunctionViolation.Code.DECISION_REFERENCE_TOO_LONG,
+                "The decision reference is limited to " + AssignMembership.MAX_DECISION_REFERENCE_LENGTH
+                    + " characters"));
+        }
+
+        List<FunctionWarning> reviewed = warnings.stream()
+                                                 .map(w -> w.withConfirmed(request.confirmedWarnings().contains(w.code())))
+                                                 .toList();
+
         return new Evaluation(member, body, memberType, existing,
-            new AssignmentCheck(List.of(), warnings, violations));
+            new AssignmentCheck(List.of(), reviewed, violations));
     }
 
     private void checkDuplicates(
@@ -448,7 +561,7 @@ class DefaultBodyMembershipService implements BodyMembershipService {
             if (exemptionLost) {
                 TMember sole = held.getMember();
                 warnings.add(FunctionWarning.singlePersonExemptionLost(
-                    "%s stops being single-person, so the function in %s becomes incompatible (Art. 21.1.3)"
+                    "%s stops being single-person, so the function in %s becomes incompatible (art. 18 ust. 1 pkt 6 of the statute)"
                         .formatted(body.getName(), held.getBody().getName()),
                     held.getId(),
                     sole.getId(),
@@ -479,44 +592,6 @@ class DefaultBodyMembershipService implements BodyMembershipService {
         if (terms > maxTerms) {
             warnings.add(FunctionWarning.termLimitExceeded(
                 "More than %d consecutive terms in %s".formatted(maxTerms, body.getName()), terms, maxTerms));
-        }
-    }
-
-    private void checkCommissionerTerm(
-        TBody body,
-        TBodyTemplate template,
-        List<TBodyMembership> existing,
-        FunctionRules.Span span,
-        List<FunctionViolation> violations
-    ) {
-        Integer maxTermMonths = template.getMaxTermMonths();
-
-        if (maxTermMonths == null) {
-            return;
-        }
-
-        LocalDate validTo = span.to();
-
-        if (validTo == null) {
-            violations.add(violation(FunctionViolation.Code.COMMISSIONER_VALID_TO_REQUIRED,
-                "valid_to is required for this function"));
-            return;
-        }
-
-        if (span.from().plusMonths(maxTermMonths).isBefore(validTo)) {
-            violations.add(violation(FunctionViolation.Code.COMMISSIONER_TERM_TOO_LONG,
-                "A single term is limited to " + maxTermMonths + " months"));
-        }
-
-        int maxExtensions = template.getMaxExtensions() == null ? 0 : template.getMaxExtensions();
-        FunctionRules.Chain chain = FunctionRules.previousChain(sameBodySpans(existing, body), span);
-
-        if (chain.previousCount() > maxExtensions) {
-            violations.add(violation(FunctionViolation.Code.COMMISSIONER_EXTENSIONS_EXCEEDED,
-                "The term can be extended at most " + maxExtensions + " times"));
-        } else if (chain.start().plusMonths((long) maxTermMonths * (1 + maxExtensions)).isBefore(validTo)) {
-            violations.add(violation(FunctionViolation.Code.COMMISSIONER_TOTAL_TOO_LONG,
-                "The total term is limited to " + maxTermMonths * (1 + maxExtensions) + " months"));
         }
     }
 

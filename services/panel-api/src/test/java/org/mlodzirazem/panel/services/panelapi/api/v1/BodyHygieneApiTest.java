@@ -22,6 +22,8 @@ import org.junit.jupiter.api.Test;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.BodyKind;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember;
 
+import tools.jackson.databind.JsonNode;
+
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -73,7 +75,7 @@ class BodyHygieneApiTest extends ApiTestSupport {
             BodyKind.DISTRICT_COMMISSIONER, "Drugi komisarz mazowiecki", "test-commissioner-maz-2",
             district("mazowieckie").getId()));
         assertThat(secondCommissionerMazovia.status()).isEqualTo(409);
-        assertThat(secondCommissionerMazovia.code()).isEqualTo("BODY_ALREADY_EXISTS");
+        assertThat(secondCommissionerMazovia.code()).isEqualTo("COMMISSIONER_BOARD_STILL_OPEN");
 
         Res commissionerSilesia = post(secretary, "/bodies", createRequest(BodyKind.DISTRICT_COMMISSIONER,
             "Komisarz śląski", "test-commissioner-sla", district("slaskie").getId()));
@@ -167,6 +169,36 @@ class BodyHygieneApiTest extends ApiTestSupport {
         Res ended = delete(secretary, "/bodies/" + teamId + "/memberships/" + membershipId);
         assertThat(ended.status()).isEqualTo(409);
         assertThat(ended.code()).isEqualTo("MEMBERSHIP_ALREADY_VOIDED");
+    }
+
+    @Test
+    void theTemplatesSayWhatTheServerWouldRefuseToCreate() {
+        Res before = get(secretary, "/bodies/templates");
+
+        assertThat(templateOption(before, BodyKind.NATIONAL_BOARD).path("creatable").asBoolean(true)).isFalse();
+        assertThat(templateOption(before, BodyKind.NATIONAL_COUNCIL).path("creatable").asBoolean(true)).isFalse();
+        assertThat(templateOption(before, BodyKind.TEAM).path("creatable").asBoolean(false)).isTrue();
+        // every district is seeded with its board
+        assertThat(templateOption(before, BodyKind.DISTRICT_BOARD).path("creatable").asBoolean(true)).isFalse();
+        assertThat(templateOption(before, BodyKind.DISTRICT_COMMISSIONER).path("unavailableParentIds")).isEmpty();
+
+        assertThat(post(secretary, "/bodies", createRequest(BodyKind.DISTRICT_COMMISSIONER, "Komisarz lista",
+            "test-commissioner-options", district("mazowieckie").getId())).status()).isEqualTo(201);
+
+        JsonNode commissioner = templateOption(get(secretary, "/bodies/templates"), BodyKind.DISTRICT_COMMISSIONER);
+        assertThat(commissioner.path("creatable").asBoolean(false)).isTrue();
+        assertThat(commissioner.path("unavailableParentIds")).extracting(JsonNode::asLong)
+            .containsExactly(district("mazowieckie").getId());
+    }
+
+    private JsonNode templateOption(Res templates, BodyKind kind) {
+        for (JsonNode node : templates.body()) {
+            if (node.path("kind").asString().equals(kind.name())) {
+                return node;
+            }
+        }
+
+        throw new AssertionError("No template " + kind);
     }
 
     @Test

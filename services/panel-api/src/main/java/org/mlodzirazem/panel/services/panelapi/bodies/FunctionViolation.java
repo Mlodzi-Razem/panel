@@ -28,19 +28,50 @@ public record FunctionViolation(
 ) {
     public enum Code {
         MEMBER_NOT_ELIGIBLE,
+        /** Art. 7 ust. 2 pkt 1, art. 8 ust. 2: a function in an organ is for ordinary members. */
+        FUNCTION_REQUIRES_ORDINARY_MEMBERSHIP,
+        /** Art. 9 ust. 4, art. 10: not during the initial period or while the member is suspended. */
+        FUNCTION_REQUIRES_ACTIVE_MEMBER,
+        /** Art. 10 ust. 3: a suspension covers part of the mandate's period. */
+        MEMBER_SUSPENDED_IN_PERIOD,
+        /** Art. 11 ust. 1 pkt 5: the ordinary membership ends before the mandate starts. */
+        MEMBERSHIP_ENDED_BEFORE_MANDATE,
         MEMBER_TYPE_MISMATCH,
         INVALID_PERIOD,
         DUPLICATE_MEMBERSHIP,
         INCOMPATIBLE_MEMBERSHIP,
         COMMISSIONER_VALID_TO_REQUIRED,
-        COMMISSIONER_TERM_TOO_LONG,
-        COMMISSIONER_EXTENSIONS_EXCEEDED,
-        COMMISSIONER_TOTAL_TOO_LONG,
+        /** Art. 44 ust. 3: a commissioner board exists for 186 days at most, once — no extensions. */
+        COMMISSIONER_BODY_TERM_EXCEEDED,
+        /** Art. 44 ust. 4: a post in at most one commissioner board. */
+        COMMISSIONER_IN_ANOTHER_BODY,
+        /** Two commissioner boards of one district never exist at the same time. */
+        COMMISSIONER_BOARDS_OVERLAP,
+        /**
+         * Between the starts of two commissioner boards of one district a ZO mandate has to start (and before
+         * the later board does): otherwise the later board only carries the earlier one past 186 days.
+         */
+        COMMISSIONER_ZO_REQUIRED_BETWEEN,
+        /** The statute fixes how many people one function has (e.g. 2 co-chairs, 1 secretary of the ZK). */
+        FUNCTION_SLOTS_FULL,
+        /** The statute fixes the size of the organ (ZK 7, KSK 9, KKR 5, KKW 5, commissioner board 2). */
+        BODY_COMPOSITION_FULL,
+        DECISION_REFERENCE_TOO_LONG,
         LAST_BODIES_MANAGER
     }
 
     public FunctionViolation(Code code, String message) {
         this(code, message, null, null, null);
+    }
+
+    public static FunctionViolation of(
+        Code code,
+        String message,
+        long conflictingMembershipId,
+        long conflictingBodyId,
+        String conflictingBodyName
+    ) {
+        return new FunctionViolation(code, message, conflictingMembershipId, conflictingBodyId, conflictingBodyName);
     }
 
     /**

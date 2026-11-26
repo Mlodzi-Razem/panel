@@ -79,6 +79,7 @@ public abstract class DomainTestSupport {
         jdbc.execute("DELETE FROM audited_operations");
         jdbc.execute("DELETE FROM member_change_requests");
         jdbc.execute("DELETE FROM member_district_affiliations");
+        jdbc.execute("DELETE FROM body_membership_endings");
         jdbc.execute("DELETE FROM body_memberships");
         removeDistrictReaderFunction();
         jdbc.execute("DELETE FROM suspensions");
@@ -116,6 +117,9 @@ public abstract class DomainTestSupport {
 
     @AfterEach
     protected void removeDistrictReaderFunction() {
+        jdbc.execute("DELETE FROM body_membership_endings WHERE body_membership_id IN "
+            + "(SELECT m.id FROM body_memberships m JOIN body_template_member_types t ON t.id = m.member_type_id "
+            + "WHERE t.code = 'TEST_READER')");
         jdbc.execute("DELETE FROM body_memberships WHERE member_type_id IN "
             + "(SELECT id FROM body_template_member_types WHERE code = 'TEST_READER')");
         jdbc.execute("DELETE FROM body_template_member_types WHERE code = 'TEST_READER'");

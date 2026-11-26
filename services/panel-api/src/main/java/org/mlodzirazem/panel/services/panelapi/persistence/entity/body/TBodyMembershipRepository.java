@@ -100,6 +100,23 @@ public interface TBodyMembershipRepository extends JpaRepository<TBodyMembership
         select bm from TBodyMembership bm
           join fetch bm.member
           join fetch bm.memberType
+        where bm.body.id = :bodyId and bm.status <> :notStatus
+        order by bm.validFrom, bm.id
+        """)
+    List<TBodyMembership> findByBodyIdAndStatusNot(
+        @Param("bodyId") Long bodyId,
+        @Param("notStatus") BodyMembershipStatus notStatus
+    );
+
+    /** Every mandate the body ever had, ended ones included: statutory limits also apply to past periods. */
+    default List<TBodyMembership> findAllByBodyId(Long bodyId) {
+        return findByBodyIdAndStatusNot(bodyId, BodyMembershipStatus.VOIDED);
+    }
+
+    @Query("""
+        select bm from TBodyMembership bm
+          join fetch bm.member
+          join fetch bm.memberType
         where bm.body.id = :bodyId
           and bm.status = :status
           and bm.validFrom <= :today and (bm.validTo is null or bm.validTo > :today)
@@ -171,6 +188,25 @@ public interface TBodyMembershipRepository extends JpaRepository<TBodyMembership
 
     default List<TBodyMembership> findActiveByKindIn(Collection<BodyKind> kinds, LocalDate today) {
         return findActiveByKindInAndStatus(kinds, today, BodyMembershipStatus.ACTIVE);
+    }
+
+    @Query("""
+        select bm from TBodyMembership bm
+          join fetch bm.member
+          join fetch bm.body b
+          join fetch b.bodyTemplate t
+        where b.parentBody.id = :parentId and t.kind = :kind and bm.status <> :notStatus
+        order by bm.validFrom, bm.id
+        """)
+    List<TBodyMembership> findByParentBodyAndKindAndStatusNot(
+        @Param("parentId") Long parentId,
+        @Param("kind") BodyKind kind,
+        @Param("notStatus") BodyMembershipStatus notStatus
+    );
+
+    /** Every live or ended (never voided) mandate in the district's bodies of one kind. */
+    default List<TBodyMembership> findAllByParentBodyAndKind(Long parentId, BodyKind kind) {
+        return findByParentBodyAndKindAndStatusNot(parentId, kind, BodyMembershipStatus.VOIDED);
     }
 
     @Query("""

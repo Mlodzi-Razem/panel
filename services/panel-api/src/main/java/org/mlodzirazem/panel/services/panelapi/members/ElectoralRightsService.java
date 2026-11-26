@@ -17,8 +17,10 @@
 
 package org.mlodzirazem.panel.services.panelapi.members;
 
+import org.jspecify.annotations.Nullable;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -26,6 +28,13 @@ import java.util.List;
  */
 public interface ElectoralRightsService {
     ElectoralRights rightsOf(long memberId);
+
+    /**
+     * Whether a suspension row of the member covers any day of {@code [from, to)} ({@code to == null}: open
+     * ended). A row ends on its end date or on the day it was lifted, whichever comes first (both exclusive).
+     * The register does not record what a suspension covers (art. 10 ust. 3), so every row counts.
+     */
+    boolean suspendedDuring(long memberId, LocalDate from, @Nullable LocalDate to);
 
     List<TMember> nationalElectorate();
 

@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import { useMemberTypeName } from "@/components/bodies/MemberTypeName";
 import React from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -30,13 +31,14 @@ export function MemberLink({entry, linkMembers}: { entry: CompositionEntry; link
 
 export function CompositionSummary({entries, linkMembers}: { entries: CompositionEntry[]; linkMembers: boolean }) {
     const t = useTranslations('bodies');
+    const memberTypeName = useMemberTypeName();
     if (entries.length === 0) {
         return <p className={styles.noMembers}>{t('noComposition')}</p>;
     }
     return <ul className={styles.composition}>
         {entries.map(entry => <li key={entry.membershipId}>
             <NameCell name={entry.memberName}
-                      secondary={entry.memberTypeName}
+                      secondary={memberTypeName(entry.memberTypeCode, entry.memberTypeName)}
                       href={linkMembers ? `/members/${entry.memberId}` : undefined}/>
             {entry.validTo && <Muted>{t('until')} <FormattedDate value={entry.validTo}/></Muted>}
         </li>)}

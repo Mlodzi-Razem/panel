@@ -35,12 +35,20 @@ export function useFormState(): FormState {
     return useContext(FormStateContext);
 }
 
+/** Names the API reports that no input in any form stands for: they are never shown to people. */
+const TECHNICAL_FIELDS = new Set(['selfRemovalConfirmations', 'confirmedWarnings', 'kind', 'children', 'memberships']);
+
+/** The outcome of an action the person backed out of: nothing happened, so nothing is reported. */
+export const CANCELLED = 'CANCELLED';
+
 export function useErrorMessage() {
     const t = useTranslations('errors');
     const tf = useTranslations('fields');
     return (error: ApiError) => {
         const message = t.has(error.code) ? t(error.code) : error.message;
-        const fields = (error.fields ?? []).map(f => (tf.has(f) ? tf(f) : f));
+        const fields = (error.fields ?? [])
+            .filter(f => !TECHNICAL_FIELDS.has(f))
+            .map(f => (tf.has(f) ? tf(f) : f));
         return {message, fields};
     };
 }
@@ -92,7 +100,7 @@ export default function ActionForm<T>({
         const formData = new FormData(form);
         startTransition(async () => {
             const outcome = await action(formData);
-            setResult(outcome);
+            setResult(!outcome.ok && outcome.error.code === CANCELLED ? null : outcome);
             if (outcome.ok) {
                 if (resetOnSuccess) {
                     form.reset();

@@ -29,6 +29,6 @@ public record AssignmentCheck(
     }
 
     public boolean needsConfirmation() {
-        return !conflicts.isEmpty() || !warnings.isEmpty();
+        return !conflicts.isEmpty() || warnings.stream().anyMatch(w -> !w.confirmed());
     }
 }
