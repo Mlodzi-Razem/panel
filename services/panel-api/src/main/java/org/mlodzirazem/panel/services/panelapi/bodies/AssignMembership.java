@@ -20,12 +20,43 @@ package org.mlodzirazem.panel.services.panelapi.bodies;
 import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDate;
+import java.util.Set;
 
+/**
+ * A request to give a member a function (mandate) in a body.
+ *
+ * <p>{@code decisionReference} is the signature of the resolution that justifies the assignment
+ * (stored in {@code body_memberships.decision_reference}; the reference only, never the
+ * document). {@code confirmedWarnings} are the warning codes the caller has explicitly
+ * confirmed: a warning that is not in this set stops the assignment until it is confirmed.
+ */
 public record AssignMembership(
     long memberId,
     long bodyId,
     long memberTypeId,
     LocalDate validFrom,
-    @Nullable LocalDate validTo
+    @Nullable LocalDate validTo,
+    @Nullable String decisionReference,
+    Set<FunctionWarning.Code> confirmedWarnings
 ) {
+    public static final int MAX_DECISION_REFERENCE_LENGTH = 200;
+
+    public AssignMembership {
+        confirmedWarnings = Set.copyOf(confirmedWarnings);
+        decisionReference = decisionReference == null || decisionReference.isBlank()
+            ? null
+            : decisionReference.strip();
+    }
+
+    public AssignMembership(long memberId, long bodyId, long memberTypeId, LocalDate validFrom, @Nullable LocalDate validTo) {
+        this(memberId, bodyId, memberTypeId, validFrom, validTo, null, Set.of());
+    }
+
+    public AssignMembership withDecisionReference(@Nullable String reference) {
+        return new AssignMembership(memberId, bodyId, memberTypeId, validFrom, validTo, reference, confirmedWarnings);
+    }
+
+    public AssignMembership withConfirmedWarnings(Set<FunctionWarning.Code> codes) {
+        return new AssignMembership(memberId, bodyId, memberTypeId, validFrom, validTo, decisionReference, codes);
+    }
 }

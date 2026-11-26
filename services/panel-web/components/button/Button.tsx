@@ -31,6 +31,8 @@ export type ButtonProps = React.PropsWithChildren<{
     disabled?: boolean;
     type?: 'button' | 'submit' | 'reset';
     ariaLabel?: string;
+    'aria-expanded'?: boolean;
+    'aria-controls'?: string;
 }>;
 
 export default function Button({
@@ -44,10 +46,14 @@ export default function Button({
     disabled = false,
     type = 'button',
     ariaLabel,
+    'aria-expanded': ariaExpanded,
+    'aria-controls': ariaControls,
 }: ButtonProps) {
     return <button onClick={onClick}
                    type={type}
                    aria-label={ariaLabel}
+                   aria-expanded={ariaExpanded}
+                   aria-controls={ariaControls}
                    className={css(styles.button, className)}
                    style={style}
                    data-variant={variant}

@@ -20,6 +20,7 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { voidMembershipAction } from "@/app/actions/bodies";
+import { useSelfRemoval } from "@/components/bodies/useSelfRemoval";
 import ActionForm from "@/components/form/ActionForm";
 import { TextField } from "@/components/form/Fields";
 
@@ -34,26 +35,32 @@ export default function VoidMembershipForm({bodyId, membershipId, memberName}: {
 }) {
     const t = useTranslations('bodies');
 
-    const onSubmit = (formData: FormData) => voidMembershipAction(
+    const selfRemoval = useSelfRemoval();
+
+    const onSubmit = (formData: FormData) => selfRemoval.run(confirmations => voidMembershipAction(
         bodyId,
         membershipId,
         String(formData.get('reason') ?? ''),
         String(formData.get('decisionReference') ?? ''),
-    );
+        confirmations,
+    ));
 
-    return <ActionForm ariaLabel={`${t('voidMembership')}: ${memberName}`}
-                       submitLabel={t('voidMembership')}
-                       submitVariant="danger"
-                       successMessage={t('voided')}
-                       action={onSubmit}>
-        <TextField name="reason"
-                   label={t('voidReason')}
-                   required
-                   maxLength={500}
-                   hint={t('voidReasonHint')}/>
-        <TextField name="decisionReference"
-                   label={t('voidReference')}
-                   maxLength={120}
-                   hint={t('voidReferenceHint')}/>
-    </ActionForm>;
+    return <>
+        <ActionForm ariaLabel={`${t('voidMembership')}: ${memberName}`}
+                    submitLabel={t('voidMembership')}
+                    submitVariant="danger"
+                    successMessage={t('voided')}
+                    action={onSubmit}>
+            <TextField name="reason"
+                       label={t('voidReason')}
+                       required
+                       maxLength={500}
+                       hint={t('voidReasonHint')}/>
+            <TextField name="decisionReference"
+                       label={t('voidReference')}
+                       maxLength={120}
+                       hint={t('voidReferenceHint')}/>
+        </ActionForm>
+        {selfRemoval.dialog}
+    </>;
 }

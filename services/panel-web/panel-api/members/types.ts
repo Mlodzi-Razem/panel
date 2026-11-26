@@ -41,6 +41,7 @@ export const bodyFunctionSchema = z.object({
     bodyName: z.string(),
     bodyKind: z.string().nullish(),
     memberTypeId: z.number(),
+    memberTypeCode: z.string().nullish(),
     memberTypeName: z.string(),
     validFrom: z.string(),
     validTo: z.string().nullish(),
@@ -148,6 +149,7 @@ export const compositionEntrySchema = z.object({
     memberId: z.number(),
     memberName: z.string(),
     memberTypeId: z.number(),
+    memberTypeCode: z.string().nullish(),
     memberTypeName: z.string(),
     validFrom: z.string(),
     validTo: z.string().nullish(),
@@ -157,6 +159,12 @@ export const bodyDetailSchema = z.object({
     body: bodySchema,
     composition: z.array(compositionEntrySchema),
     memberTypes: z.array(memberTypeSchema),
+    advisories: z.array(z.object({
+        code: z.string(),
+        message: z.string(),
+        current: z.number(),
+        expected: z.string().nullish(),
+    })).default([]),
 });
 
 export const templateSchema = z.object({
@@ -169,6 +177,8 @@ export const templateSchema = z.object({
     termLengthMonths: z.number().nullish(),
     maxTermMonths: z.number().nullish(),
     maxExtensions: z.number().nullish(),
+    creatable: z.boolean().default(true),
+    unavailableParentIds: z.array(z.number()).default([]),
     memberTypes: z.array(memberTypeSchema).default([]),
 });
 
@@ -204,6 +214,7 @@ export const assignmentCheckSchema = z.object({
         affectedMemberId: z.number().nullish(),
         affectedMemberName: z.string().nullish(),
         affectedBodyName: z.string().nullish(),
+        confirmed: z.boolean().default(false),
     })).default([]),
     violations: z.array(z.object({code: z.string(), message: z.string()})).default([]),
 });

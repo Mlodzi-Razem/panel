@@ -31,7 +31,10 @@ export default function CreateBodyForm({templates, bodies}: { templates: BodyTem
 
     const template = templates.find(x => String(x.id) === templateId);
     const parentTemplateId = template?.parentTemplateId ?? null;
-    const parents = parentTemplateId === null ? [] : bodies.filter(b => b.templateId === parentTemplateId);
+    // what can be created is the server's answer, from the same rule that refuses a creation
+    const parents = parentTemplateId === null
+        ? []
+        : bodies.filter(b => b.templateId === parentTemplateId && !template?.unavailableParentIds.includes(b.id));
 
     return <ActionForm action={createBodyAction} submitLabel={t('createBody')} ariaLabel={t('createTitle')}>
         <SelectField name="templateId"
@@ -39,7 +42,8 @@ export default function CreateBodyForm({templates, bodies}: { templates: BodyTem
                      required
                      emptyLabel={t('chooseTemplate')}
                      onChange={setTemplateId}
-                     options={templates.map(x => ({
+                     hint={t('createUnavailableHint')}
+                     options={templates.filter(x => x.creatable).map(x => ({
                          value: String(x.id),
                          label: `${x.name} (${tEnums.has(`bodyKind.${x.kind}`) ? tEnums(`bodyKind.${x.kind}`) : x.kind})`,
                      }))}/>

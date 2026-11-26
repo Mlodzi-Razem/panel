@@ -23,12 +23,14 @@ import AssignFunctionForm from "@/components/bodies/AssignFunctionForm";
 import { KindBadge } from "@/components/bodies/BodyViews";
 import DeleteBodyButton from "@/components/bodies/DeleteBodyButton";
 import EndMembershipForm from "@/components/bodies/EndMembershipForm";
+import MemberTypeName from "@/components/bodies/MemberTypeName";
+import RowAction from "@/components/bodies/RowAction";
 import VoidMembershipForm from "@/components/bodies/VoidMembershipForm";
 import EditCard from "@/components/form/EditCard";
 import { TextField } from "@/components/form/Fields";
 import ApiErrorNotice from "@/components/members/ApiErrorNotice";
 import { FormattedDate } from "@/components/members/format";
-import { Badge, Card, DescriptionList, Page, TableWrap } from "@/components/page/Page";
+import { Badge, Card, DescriptionList, Notice, Page, TableWrap } from "@/components/page/Page";
 import { EmptyState, NameCell, RecordHeader } from "@/components/ui/Blocks";
 import { getBody } from "@/panel-api/members/bodies";
 import { requireMe } from "@/panel-api/members/requireMe";
@@ -56,7 +58,7 @@ export default async function BodyPage({params}: { params: Promise<{ id: string 
         </Page>;
     }
 
-    const {body, composition, memberTypes} = result.data;
+    const {body, composition, memberTypes, advisories} = result.data;
     const canManage = me.canManageBodies;
 
     const header = <RecordHeader name={body.name}
@@ -87,6 +89,11 @@ export default async function BodyPage({params}: { params: Promise<{ id: string 
             : null}
 
         <Card id="composition" title={t('compositionTitle')}>
+            {advisories.map(advisory => <Notice key={advisory.code} tone="warning">
+                {t.has(`advisories.${advisory.code}`)
+                    ? t(`advisories.${advisory.code}`, {current: advisory.current, expected: advisory.expected ?? ''})
+                    : advisory.message}
+            </Notice>)}
             {composition.length === 0
                 ? <EmptyState icon={<UsersThreeIcon aria-hidden/>} title={t('noComposition')}/>
                 : <TableWrap>
@@ -105,16 +112,22 @@ export default async function BodyPage({params}: { params: Promise<{ id: string 
                                 <NameCell name={entry.memberName}
                                           href={me.canSeeMembers ? `/members/${entry.memberId}` : undefined}/>
                             </td>
-                            <td><Badge tone="brand">{entry.memberTypeName}</Badge></td>
+                            <td><Badge tone="brand">
+                                <MemberTypeName code={entry.memberTypeCode} name={entry.memberTypeName}/>
+                            </Badge></td>
                             <td><FormattedDate value={entry.validFrom}/></td>
                             <td>{entry.validTo ? <FormattedDate value={entry.validTo}/> : t('ongoing')}</td>
                             {canManage && <td>
-                                <EndMembershipForm bodyId={id}
-                                                   membershipId={entry.membershipId}
-                                                   memberName={entry.memberName}/>
-                                <VoidMembershipForm bodyId={id}
-                                                    membershipId={entry.membershipId}
-                                                    memberName={entry.memberName}/>
+                                <RowAction label={t('endMembership')}>
+                                    <EndMembershipForm bodyId={id}
+                                                       membershipId={entry.membershipId}
+                                                       memberName={entry.memberName}/>
+                                </RowAction>
+                                <RowAction label={t('voidMembership')}>
+                                    <VoidMembershipForm bodyId={id}
+                                                        membershipId={entry.membershipId}
+                                                        memberName={entry.memberName}/>
+                                </RowAction>
                             </td>}
                         </tr>)}
                     </tbody>
@@ -124,7 +137,7 @@ export default async function BodyPage({params}: { params: Promise<{ id: string 
         {canManage && <Card id="assign" title={t('assignTitle')} hint={t('assignHint')}>
             {memberTypes.length === 0
                 ? <p>{t('noRoles')}</p>
-                : <AssignFunctionForm bodyId={id} memberTypes={memberTypes}/>}
+                : <AssignFunctionForm bodyId={id} bodyKind={body.kind} memberTypes={memberTypes}/>}
         </Card>}
 
         {/* A seeded organ never shows the action — the panel's catalogue is not editable here. */}

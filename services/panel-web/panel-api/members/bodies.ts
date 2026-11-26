@@ -66,7 +66,11 @@ export type AssignmentInput = {
     memberTypeId: number;
     validFrom?: string;
     validTo?: string;
+    decisionReference?: string;
+    confirmedWarnings?: string[];
 };
+
+export type SelfRemovalConfirmation = 'SELF_REMOVAL' | 'SELF_REMOVAL_FINAL';
 
 export function checkAssignment(bodyId: number, input: AssignmentInput): Promise<ApiResult<AssignmentCheck>> {
     return apiCall({
@@ -76,23 +80,25 @@ export function checkAssignment(bodyId: number, input: AssignmentInput): Promise
     }, assignmentCheckSchema);
 }
 
-export function assignMembership(
-    bodyId: number,
-    input: AssignmentInput,
-    confirmed: boolean,
-): Promise<ApiResult<AssignmentResponse>> {
+export function assignMembership(bodyId: number, input: AssignmentInput): Promise<ApiResult<AssignmentResponse>> {
     return apiCall({
         method: 'POST',
         path: `/bodies/${bodyId}/memberships`,
-        body: {...input, confirmed},
+        body: input,
     }, assignmentResponseSchema);
 }
 
-export function endMembership(bodyId: number, membershipId: number, endDate?: string): Promise<ApiResult<Membership>> {
+export function endMembership(
+    bodyId: number,
+    membershipId: number,
+    endDate?: string,
+    decisionReference?: string,
+    selfRemovalConfirmations: SelfRemovalConfirmation[] = [],
+): Promise<ApiResult<Membership>> {
     return apiCall({
         method: 'DELETE',
         path: `/bodies/${bodyId}/memberships/${membershipId}`,
-        query: {endDate},
+        query: {endDate, decisionReference, selfRemovalConfirmations: selfRemovalConfirmations.join(',')},
     }, membershipSchema);
 }
 
@@ -101,11 +107,12 @@ export function voidMembership(
     membershipId: number,
     reason: string,
     decisionReference?: string,
+    selfRemovalConfirmations: SelfRemovalConfirmation[] = [],
 ): Promise<ApiResult<Membership>> {
     return apiCall({
         method: 'POST',
         path: `/bodies/${bodyId}/memberships/${membershipId}/void`,
-        body: {reason, ...(decisionReference ? {decisionReference} : {})},
+        body: {reason, ...(decisionReference ? {decisionReference} : {}), selfRemovalConfirmations},
     }, membershipSchema);
 }
 

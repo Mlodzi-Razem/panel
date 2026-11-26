@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import MemberTypeName from "@/components/bodies/MemberTypeName";
 import React from "react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
@@ -59,9 +60,9 @@ function MyFunctions({functions}: { functions: BodyFunction[] }) {
                     <Link href={`/bodies/${f.bodyId}`} className={styles.listLink}>
                         <span className={styles.listMain}>
                             <strong>{f.bodyName}</strong>
-                            <small>{f.memberTypeName}</small>
+                            <small><MemberTypeName code={f.memberTypeCode} name={f.memberTypeName}/></small>
                         </span>
-                        <Badge tone="brand">{f.memberTypeName}</Badge>
+                        <Badge tone="brand"><MemberTypeName code={f.memberTypeCode} name={f.memberTypeName}/></Badge>
                     </Link>
                 </li>)}
             </ul>}

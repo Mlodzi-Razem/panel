@@ -22,6 +22,7 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBodyMemb
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 public interface BodyMembershipService {
     /**
@@ -31,19 +32,35 @@ public interface BodyMembershipService {
     AssignmentCheck check(AssignMembership request);
 
     /**
-     * Throws {@link AssignmentBlockedException} on violations, {@link ConfirmationRequiredException} when there
-     * are warnings and {@code confirmed} is false, and {@code SELF_ASSIGNMENT_NOT_ALLOWED} when the caller is
-     * the subject of the assignment. Nothing is ever auto-closed: incompatible mandates have to be ended
-     * explicitly via {@link #end(long, LocalDate, String)}. Publishes {@link BodyMembershipChanged}
-     * for the created membership and audits it.
+     * Throws {@link AssignmentBlockedException} on violations, {@link ConfirmationRequiredException} (and
+     * writes nothing) while a warning's code is not in {@link AssignMembership#confirmedWarnings()}, and
+     * {@code SELF_ASSIGNMENT_NOT_ALLOWED} when the caller is the subject of the assignment. Nothing is ever
+     * auto-closed: incompatible mandates have to be ended explicitly via
+     * {@link #end(long, LocalDate, String)}. Stores the decision reference, publishes
+     * {@link BodyMembershipChanged} for the created membership and audits it (field names and the codes
+     * of the confirmed warnings only).
      */
-    AssignmentResult assign(AssignMembership request, boolean confirmed);
+    AssignmentResult assign(AssignMembership request);
+
+    /**
+     * Non-blocking report about the body's composition today (statutory sizes, vacancies); never
+     * changes anything.
+     */
+    List<CompositionAdvisory> advisories(long bodyId);
 
     /**
      * Ends (closes) the membership on the given date (today by default). A date in the past —
      * a retroactive correction of history — requires a decision reference; a closed membership can
-     * only be shortened, never extended or reopened.
+     * only be shortened, never extended or reopened. The mandate's own {@code decision_reference} is never
+     * changed: each ending is recorded in {@code body_membership_endings} together with its resolution.
+     *
+     * <p>When the mandate is the caller's own, both {@link SelfRemovalConfirmation}s are required; otherwise
+     * {@code SELF_REMOVAL_CONFIRMATION_REQUIRED} is thrown and nothing is written.
      */
+    TBodyMembership end(long membershipId, @Nullable LocalDate endDate, @Nullable String decisionReference,
+                        Set<SelfRemovalConfirmation> selfRemovalConfirmations);
+
+    /** {@link #end(long, LocalDate, String, Set)} without self-removal confirmations. */
     TBodyMembership end(long membershipId, @Nullable LocalDate endDate, @Nullable String decisionReference);
 
     /**
@@ -52,8 +69,13 @@ public interface BodyMembershipService {
      * statutory checks. The row is never deleted: it stays in {@code body_memberships} with status
      * {@code VOIDED} and the reason, and the audit log keeps the record ({@code bodies ::
      * membership-void}). The reason is required; the resolution reference ({@code decisionReference})
-     * is optional and, once given, overwrites nothing silently.
+     * is optional and, once given, overwrites nothing silently. Voiding one's own mandate needs the same two
+     * confirmations as {@link #end}.
      */
+    TBodyMembership voidMembership(long membershipId, String reason, @Nullable String decisionReference,
+                                   Set<SelfRemovalConfirmation> selfRemovalConfirmations);
+
+    /** {@link #voidMembership(long, String, String, Set)} without self-removal confirmations. */
     TBodyMembership voidMembership(long membershipId, String reason, @Nullable String decisionReference);
 
     List<TBodyMembership> activeIn(long bodyId);

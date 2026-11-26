@@ -353,8 +353,11 @@ class MandateImporter {
     }
 
     private static String columnOf(FunctionViolation.Code code) {
-        return code == FunctionViolation.Code.MEMBER_NOT_ELIGIBLE ? MandateColumn.MEMBER.label()
-            : MandateColumn.FUNCTION.label();
+        return switch (code) {
+            case MEMBER_NOT_ELIGIBLE, FUNCTION_REQUIRES_ORDINARY_MEMBERSHIP, FUNCTION_REQUIRES_ACTIVE_MEMBER,
+                 MEMBER_SUSPENDED_IN_PERIOD, MEMBERSHIP_ENDED_BEFORE_MANDATE -> MandateColumn.MEMBER.label();
+            default -> MandateColumn.FUNCTION.label();
+        };
     }
 
     private static MandateImportProblem fileProblem(String header, String code, boolean error) {

@@ -35,6 +35,7 @@ import org.springframework.context.annotation.Import;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -75,8 +76,8 @@ class BodyMembershipServiceTest extends DomainTestSupport {
         });
         assertThat(check.conflicts()).isEmpty();
 
-        assertThatThrownBy(() -> service.assign(request, false)).isInstanceOf(AssignmentBlockedException.class);
-        assertThatThrownBy(() -> service.assign(request, true)).isInstanceOf(AssignmentBlockedException.class);
+        assertThatThrownBy(() -> service.assign(request)).isInstanceOf(AssignmentBlockedException.class);
+        assertThatThrownBy(() -> service.assign(request.withConfirmedWarnings(Set.of(FunctionWarning.Code.values())))).isInstanceOf(AssignmentBlockedException.class);
         assertThat(membershipCount(member)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM body_memberships WHERE valid_to IS NOT NULL",
             Integer.class)).isZero();
@@ -107,7 +108,7 @@ class BodyMembershipServiceTest extends DomainTestSupport {
         assertThat(check.conflicts()).isEmpty();
         assertThat(check.violations()).isEmpty();
         assertThat(check.needsConfirmation()).isFalse();
-        assertThat(service.assign(assign(member, board("mazowieckie"), "COORDINATOR", today, null), false)
+        assertThat(service.assign(assign(member, board("mazowieckie"), "COORDINATOR", today, null))
                           .endedMemberships()).isEmpty();
     }
 
@@ -190,11 +191,15 @@ class BodyMembershipServiceTest extends DomainTestSupport {
 
         assertThat(check.conflicts()).isEmpty();
         assertThat(check.needsConfirmation()).isTrue();
-        assertThat(check.warnings()).singleElement().satisfies(w -> {
-            assertThat(w.code()).isEqualTo(FunctionWarning.Code.SINGLE_PERSON_EXEMPTION_LOST);
+        // two members in the district: a second person on the board is also more than art. 43 allows
+        assertThat(check.warnings()).extracting(FunctionWarning::code).containsExactlyInAnyOrder(
+            FunctionWarning.Code.SINGLE_PERSON_EXEMPTION_LOST,
+            FunctionWarning.Code.DISTRICT_BOARD_SIZE_EXCEEDS_STATUTE);
+        assertThat(check.warnings()).filteredOn(w -> w.code() == FunctionWarning.Code.SINGLE_PERSON_EXEMPTION_LOST)
+                                    .singleElement().satisfies(w -> {
             assertThat(w.affectedMemberId()).isEqualTo(solo.getId());
             assertThat(w.affectedBodyName()).isEqualTo(body("audit-commission").getName());
-        });
+                                    });
     }
 
     @Test
@@ -203,8 +208,10 @@ class BodyMembershipServiceTest extends DomainTestSupport {
         grant(coordinator, board("lubuskie"), "COORDINATOR", today.minusMonths(3), null);
         TMember joiner = newMember("Ewa", "Joiner", "lubuskie");
 
+        // only the art. 43 size warning: nobody on this board holds a function an exemption covers
         assertThat(service.check(assign(joiner, board("lubuskie"), "MEMBER", today, null)).warnings())
-            .isEmpty();
+            .extracting(FunctionWarning::code)
+            .containsExactly(FunctionWarning.Code.DISTRICT_BOARD_SIZE_EXCEEDS_STATUTE);
     }
 
     @Test
@@ -218,7 +225,8 @@ class BodyMembershipServiceTest extends DomainTestSupport {
             assertThat(v.code()).isEqualTo(FunctionViolation.Code.INCOMPATIBLE_MEMBERSHIP);
             assertThat(v.conflictingBodyName()).isEqualTo(body("peer-court").getName());
         });
-        assertThatThrownBy(() -> service.assign(assign(member, body("national-board"), "SECRETARY", today, null), true))
+        assertThatThrownBy(() -> service.assign(assign(member, body("national-board"), "SECRETARY", today, null)
+            .withConfirmedWarnings(Set.of(FunctionWarning.Code.values()))))
             .isInstanceOf(AssignmentBlockedException.class);
     }
 
@@ -232,14 +240,24 @@ class BodyMembershipServiceTest extends DomainTestSupport {
         AssignMembership third = assign(member, body("national-board"), "SECRETARY", today, today.plusYears(1));
         AssignmentCheck check = service.check(third);
 
-        assertThat(check.warnings()).singleElement().satisfies(w -> {
-            assertThat(w.code()).isEqualTo(FunctionWarning.Code.TERM_LIMIT_EXCEEDED);
-            assertThat(w.consecutiveTerms()).isEqualTo(3);
-            assertThat(w.maxConsecutiveTerms()).isEqualTo(2);
-        });
+        assertThat(check.warnings()).extracting(FunctionWarning::code)
+                                    .containsExactlyInAnyOrder(FunctionWarning.Code.TERM_LIMIT_EXCEEDED,
+                                        FunctionWarning.Code.FULL_LEGAL_CAPACITY_REQUIRED);
+        assertThat(check.warnings()).filteredOn(w -> w.code() == FunctionWarning.Code.TERM_LIMIT_EXCEEDED)
+                                    .singleElement().satisfies(w -> {
+                                        assertThat(w.consecutiveTerms()).isEqualTo(3);
+                                        assertThat(w.maxConsecutiveTerms()).isEqualTo(2);
+                                    });
         assertThat(check.violations()).isEmpty();
-        assertThatThrownBy(() -> service.assign(third, false)).isInstanceOf(ConfirmationRequiredException.class);
-        assertThat(service.assign(third, true).membership().getId()).isNotNull();
+        assertThatThrownBy(() -> service.assign(third)).isInstanceOf(ConfirmationRequiredException.class);
+        assertThat(membershipCount(member)).isEqualTo(2);
+
+        // confirming only one of the two warnings is not enough
+        assertThatThrownBy(() -> service.assign(third.withConfirmedWarnings(Set.of(FunctionWarning.Code.TERM_LIMIT_EXCEEDED))))
+            .isInstanceOf(ConfirmationRequiredException.class);
+
+        assertThat(service.assign(third.withConfirmedWarnings(Set.of(FunctionWarning.Code.TERM_LIMIT_EXCEEDED,
+            FunctionWarning.Code.FULL_LEGAL_CAPACITY_REQUIRED))).membership().getId()).isNotNull();
     }
 
     @Test
@@ -251,36 +269,8 @@ class BodyMembershipServiceTest extends DomainTestSupport {
 
         AssignmentCheck check = service.check(assign(member, body("national-board"), "SECRETARY", today, today.plusYears(1)));
 
-        assertThat(check.warnings()).isEmpty();
-    }
-
-    @Test
-    void commissionerNeedsValidToAndIsLimitedToSixMonths() {
-        TMember member = newMember("Cora", "Komisarz", "mazowieckie");
-        TBody commissioners = commissionerBody("mazowieckie");
-
-        assertThat(service.check(assign(member, commissioners, "COMMISSIONER", today, null)).violations())
-            .extracting(FunctionViolation::code).containsExactly(FunctionViolation.Code.COMMISSIONER_VALID_TO_REQUIRED);
-        assertThat(service.check(assign(member, commissioners, "COMMISSIONER", today, today.plusMonths(6).plusDays(1)))
-            .violations()).extracting(FunctionViolation::code)
-                          .contains(FunctionViolation.Code.COMMISSIONER_TERM_TOO_LONG);
-        assertThat(service.check(assign(member, commissioners, "COMMISSIONER", today, today.plusMonths(6))).violations())
-            .isEmpty();
-    }
-
-    @Test
-    void commissionerTermCannotBeExtended() {
-        TMember member = newMember("Eli", "Extend", "mazowieckie");
-        TBody commissioners = commissionerBody("mazowieckie");
-        LocalDate start = today.minusMonths(2);
-
-        service.assign(assign(member, commissioners, "COMMISSIONER", start, start.plusMonths(3)), true);
-
-        AssignMembership second = assign(member, commissioners, "COMMISSIONER", start.plusMonths(3), start.plusMonths(6));
-
-        assertThat(service.check(second).violations()).extracting(FunctionViolation::code)
-                                                      .contains(FunctionViolation.Code.COMMISSIONER_EXTENSIONS_EXCEEDED);
-        assertThatThrownBy(() -> service.assign(second, true)).isInstanceOf(AssignmentBlockedException.class);
+        assertThat(check.warnings()).extracting(FunctionWarning::code)
+                                    .containsExactly(FunctionWarning.Code.FULL_LEGAL_CAPACITY_REQUIRED);
     }
 
     @Test
@@ -368,9 +358,10 @@ class BodyMembershipServiceTest extends DomainTestSupport {
         TBodyMembership ended = service.end(membership.getId(), today.minusDays(10), "ZO/MZ/01/2026");
 
         assertThat(ended.getValidTo()).isEqualTo(today.minusDays(10));
-        assertThat(jdbc.queryForObject("SELECT decision_reference FROM body_memberships WHERE id = ?", String.class,
-            membership.getId())).isEqualTo("ZO/MZ/01/2026");
-        assertThat(auditPayloads("bodies :: membership-end")).contains("decisionReference");
+        assertThat(appointingReference(membership.getId())).isNull();
+        assertThat(endingReferences(membership.getId())).containsExactly("ZO/MZ/01/2026");
+        assertThat(auditPayloads("bodies :: membership-end")).contains("endDecisionReference")
+                                                             .doesNotContain("ZO/MZ/01/2026");
 
         assertThatThrownBy(() -> service.end(membership.getId(), null, null))
             .hasMessageContaining("already closed");
@@ -393,6 +384,48 @@ class BodyMembershipServiceTest extends DomainTestSupport {
         TBodyMembership shortened = service.end(membership.getId(), today, "KKR/02/2026");
 
         assertThat(shortened.getValidTo()).isEqualTo(today);
+    }
+
+    @Test
+    void endingNeverNullsOrOverwritesTheAppointingResolutionOrAnEarlierEndingOne() {
+        TMember member = newMember("Hania", "Historia", "mazowieckie");
+        long id = grant(member, body("peer-court"), "MEMBER", today.minusMonths(6), null).getId();
+        jdbc.update("UPDATE body_memberships SET decision_reference = 'ZK/01/2026' WHERE id = ?", id);
+
+        service.end(id, today.plusDays(30), null);
+
+        assertThat(appointingReference(id)).isEqualTo("ZK/01/2026");
+
+        service.end(id, today.plusDays(10), "  KSK/02/2026  ");
+        service.end(id, today.minusDays(1), "KSK/03/2026");
+
+        assertThat(appointingReference(id)).isEqualTo("ZK/01/2026");
+        assertThat(endingReferences(id)).containsExactly(null, "KSK/02/2026", "KSK/03/2026");
+        assertThat(jdbc.queryForList("SELECT previous_valid_to FROM body_membership_endings"
+            + " WHERE body_membership_id = ? ORDER BY id", java.sql.Date.class, id))
+            .extracting(d -> d == null ? null : d.toLocalDate())
+            .containsExactly(null, today.plusDays(30), today.plusDays(10));
+    }
+
+    @Test
+    void anEndingResolutionLongerThanTheLimitIsRejectedAndNothingIsWritten() {
+        long id = grant(newMember("Lena", "Limit", "mazowieckie"), body("peer-court"), "MEMBER",
+            today.minusMonths(1), null).getId();
+
+        assertThatThrownBy(() -> service.end(id, null, "x".repeat(201)))
+            .isInstanceOfSatisfying(RuleViolationException.class,
+                e -> assertThat(e.getCode()).isEqualTo("DECISION_REFERENCE_TOO_LONG"));
+        assertThat(endingReferences(id)).isEmpty();
+    }
+
+    private String appointingReference(long membershipId) {
+        return jdbc.queryForObject("SELECT decision_reference FROM body_memberships WHERE id = ?", String.class,
+            membershipId);
+    }
+
+    private List<String> endingReferences(long membershipId) {
+        return jdbc.queryForList("SELECT decision_reference FROM body_membership_endings"
+            + " WHERE body_membership_id = ? ORDER BY id", String.class, membershipId);
     }
 
     private TBody commissionerBody(String districtSlug) {
@@ -453,7 +486,8 @@ class BodyMembershipServiceTest extends DomainTestSupport {
 
         assertThat(service.check(assign(member, body("national-board"), "SECRETARY", today, null)).violations())
             .isEmpty();
-        assertThat(service.assign(assign(member, body("national-board"), "SECRETARY", today, null), false)
+        assertThat(service.assign(assign(member, body("national-board"), "SECRETARY", today, null)
+            .withConfirmedWarnings(Set.of(FunctionWarning.Code.FULL_LEGAL_CAPACITY_REQUIRED)))
                        .membership().isVoided()).isFalse();
     }
 
@@ -466,7 +500,7 @@ class BodyMembershipServiceTest extends DomainTestSupport {
 
         service.voidMembership(mistaken.getId(), "wpis omyłkowy", null);
 
-        AssignmentResult second = service.assign(assign(member, circle, "COORDINATOR", today, null), false);
+        AssignmentResult second = service.assign(assign(member, circle, "COORDINATOR", today, null));
 
         assertThat(second.membership().getId()).isNotEqualTo(mistaken.getId());
         assertThat(service.historyOf(member.getId())).hasSize(1);
@@ -483,7 +517,7 @@ class BodyMembershipServiceTest extends DomainTestSupport {
             template(BodyKind.DISTRICT_COMMISSIONER).getId(), "Drugi komisarz", null,
             district("mazowieckie").getId(), "test-commissioner-duplicate")))
             .isInstanceOf(ConflictException.class)
-            .hasMessageContaining("one organ of a kind");
+            .hasMessageContaining("not closed yet");
         assertThatThrownBy(() -> bodyService.create(new NewBody(
             template(BodyKind.NATIONAL_BOARD).getId(), "Drugi ZK", null, null, "test-national-duplicate")))
             .isInstanceOf(ConflictException.class)

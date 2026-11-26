@@ -24,6 +24,7 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember
 
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -87,7 +88,7 @@ class BodiesApiTest extends ApiTestSupport {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM body_memberships WHERE valid_to IS NOT NULL", Integer.class))
             .isZero();
 
-        request.put("confirmed", true);
+        request.put("confirmedWarnings", List.of("FULL_LEGAL_CAPACITY_REQUIRED"));
         assertThat(post(secretary, path, request).status()).isEqualTo(422);
 
         assertThat(get(secretary, "/bodies/" + boardId + "/memberships").body()).isEmpty();
@@ -132,7 +133,52 @@ class BodiesApiTest extends ApiTestSupport {
                 + "&decisionReference=ZK/03/2026");
         assertThat(corrected.status()).isEqualTo(200);
         assertThat(jdbc.queryForObject("SELECT decision_reference FROM body_memberships WHERE id = ?", String.class,
-            membershipId)).isEqualTo("ZK/03/2026");
+            membershipId)).isNull();
+        assertThat(jdbc.queryForObject("SELECT decision_reference FROM body_membership_endings"
+            + " WHERE body_membership_id = ?", String.class, membershipId)).isEqualTo("ZK/03/2026");
+    }
+
+    @Test
+    void removingOnesOwnFunctionNeedsBothConfirmations() {
+        long ownId = grant(secretary, body("press-spokesperson"), "SPOKESPERSON", LocalDate.now().minusDays(10), null)
+            .getId();
+        String path = "/bodies/" + body("press-spokesperson").getId() + "/memberships/" + ownId;
+
+        for (String query : List.of("", "?selfRemovalConfirmations=SELF_REMOVAL",
+            "?selfRemovalConfirmations=SELF_REMOVAL_FINAL",
+            "?selfRemovalConfirmations=SELF_REMOVAL,SELF_REMOVAL")) {
+            Res refused = delete(secretary, path + query);
+
+            assertThat(refused.status()).isEqualTo(409);
+            assertThat(refused.code()).isEqualTo("SELF_REMOVAL_CONFIRMATION_REQUIRED");
+        }
+
+        Map<String, Object> voiding = new LinkedHashMap<>();
+        voiding.put("reason", "wpis omyłkowy");
+        assertThat(post(secretary, path + "/void", voiding).code()).isEqualTo("SELF_REMOVAL_CONFIRMATION_REQUIRED");
+        voiding.put("selfRemovalConfirmations", List.of("SELF_REMOVAL"));
+        assertThat(post(secretary, path + "/void", voiding).code()).isEqualTo("SELF_REMOVAL_CONFIRMATION_REQUIRED");
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM body_memberships WHERE id = ? AND status = 'ACTIVE'"
+            + " AND valid_to IS NULL", Integer.class, ownId)).isEqualTo(1);
+        assertThat(auditCount("bodies :: membership-end")).isZero();
+        assertThat(auditCount("bodies :: membership-void")).isZero();
+
+        assertThat(delete(secretary, path + "?selfRemovalConfirmations=SELF_REMOVAL,SELF_REMOVAL_FINAL").status())
+            .isEqualTo(200);
+        assertThat(auditPayloads("bodies :: membership-end")).contains("confirmed.SELF_REMOVAL_FINAL");
+
+        voiding.put("selfRemovalConfirmations", List.of("SELF_REMOVAL", "SELF_REMOVAL_FINAL"));
+        assertThat(post(secretary, path + "/void", voiding).status()).isEqualTo(200);
+        assertThat(auditPayloads("bodies :: membership-void")).contains("confirmed.SELF_REMOVAL_FINAL");
+    }
+
+    @Test
+    void removingSomeoneElsesFunctionNeedsNoSelfConfirmation() {
+        long id = grant(plain, body("press-spokesperson"), "SPOKESPERSON", LocalDate.now().minusDays(10), null).getId();
+
+        assertThat(delete(secretary, "/bodies/" + body("press-spokesperson").getId() + "/memberships/" + id).status())
+            .isEqualTo(200);
     }
 
     @Test

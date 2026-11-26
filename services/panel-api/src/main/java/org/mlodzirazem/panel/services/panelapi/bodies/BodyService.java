@@ -48,4 +48,7 @@ public interface BodyService {
     List<TBodyTemplate> templates();
 
     List<TBodyTemplateMemberType> memberTypes(long templateId);
+
+    /** Which bodies of the template can be created now; {@link #create} still has the last word. */
+    CreationOptions creationOptions(long templateId);
 }

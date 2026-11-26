@@ -68,8 +68,8 @@ public class TBodyMembership extends TBaseEntity {
     private @Nullable LocalDate validTo;
 
     /**
-     * Reference of the resolution that justifies a correction of this membership's history
-     * (required whenever valid_to is moved to a past date). Name only — never its contents.
+     * The appointing resolution; name only — never its contents. Written once: ending a mandate keeps its
+     * own resolution in {@link TBodyMembershipEnding} (rows ended before that table may hold it here).
      */
     @Column(name = "decision_reference")
     private @Nullable String decisionReference;

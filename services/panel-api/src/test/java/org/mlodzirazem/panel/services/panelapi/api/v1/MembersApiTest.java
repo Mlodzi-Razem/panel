@@ -65,6 +65,7 @@ class MembersApiTest extends ApiTestSupport {
 
     @AfterEach
     void dropCustomGroup() {
+        jdbc.execute("DELETE FROM body_membership_endings");
         jdbc.execute("DELETE FROM body_memberships");
         jdbc.execute("DELETE FROM body_template_member_types WHERE code = 'TEST_EDITOR'");
         jdbc.execute("DELETE FROM permission_group WHERE name = 'test contact editor'");

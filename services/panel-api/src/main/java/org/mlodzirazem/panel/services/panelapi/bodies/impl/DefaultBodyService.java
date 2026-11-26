@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.mlodzirazem.panel.services.panelapi.audit.AuditLog;
 import org.mlodzirazem.panel.services.panelapi.audit.AuditPayload;
 import org.mlodzirazem.panel.services.panelapi.bodies.BodyService;
+import org.mlodzirazem.panel.services.panelapi.bodies.CreationOptions;
 import org.mlodzirazem.panel.services.panelapi.bodies.NewBody;
 import org.mlodzirazem.panel.services.panelapi.bodies.UpdateBody;
 import org.mlodzirazem.panel.services.panelapi.core.error.ConflictException;
@@ -40,6 +41,8 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBodyTemp
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -65,14 +68,13 @@ class DefaultBodyService implements BodyService {
     );
 
     /**
-     * Kinds that exist at most once per district (parent body): WZO, ZO and the district
-     * commissioner. Local circles, teams and the districts themselves are not
-     * limited by the statute — any number of them may exist.
+     * Kinds that exist at most once per district (parent body): WZO and ZO. A commissioner board is
+     * different — each one is a body of its own, see {@code hasOpenCommissionerBoard}. Local
+     * circles, teams and the districts themselves are not limited by the statute.
      */
     private static final Set<BodyKind> ONE_PER_DISTRICT = Set.of(
         BodyKind.DISTRICT_ASSEMBLY,
-        BodyKind.DISTRICT_BOARD,
-        BodyKind.DISTRICT_COMMISSIONER
+        BodyKind.DISTRICT_BOARD
     );
 
     private final TBodyRepository bodies;
@@ -82,6 +84,7 @@ class DefaultBodyService implements BodyService {
     private final CurrentMemberResolver currentMemberResolver;
     private final BodiesManagerGuard bodiesManagerGuard;
     private final AuditLog auditLog;
+    private final Clock clock;
 
     @Override
     @Transactional(readOnly = true)
@@ -172,17 +175,81 @@ class DefaultBodyService implements BodyService {
             return;
         }
 
-        if (ONE_IN_THE_COUNTRY.contains(kind) && bodies.existsByKind(kind)) {
+        if (takenInTheCountry(kind)) {
             throw new ConflictException("BODY_ALREADY_EXISTS",
                 "The association already has a body of this kind (statute 2026: one organ of a kind"
                     + " in the country)", List.of("kind"));
         }
 
-        if (parent != null && ONE_PER_DISTRICT.contains(kind) && bodies.existsByKindAndParent(kind, parent.getId())) {
+        if (parent != null && takenInTheDistrict(kind, parent)) {
             throw new ConflictException("BODY_ALREADY_EXISTS",
                 "This district already has a body of this kind (statute 2026: one organ of a kind"
                     + " in the district)", List.of("kind", "parentBodyId"));
         }
+
+        if (parent != null && kind == BodyKind.DISTRICT_COMMISSIONER && hasOpenCommissionerBoard(parent)) {
+            throw new ConflictException("COMMISSIONER_BOARD_STILL_OPEN",
+                "The district's commissioner board is not closed yet: a new one can be created once the earlier"
+                    + " one has had its mandates and all of them have ended", List.of("kind", "parentBodyId"));
+        }
+    }
+
+    private boolean takenInTheCountry(BodyKind kind) {
+        return ONE_IN_THE_COUNTRY.contains(kind) && bodies.existsByKind(kind);
+    }
+
+    private boolean takenInTheDistrict(BodyKind kind, TBody district) {
+        return ONE_PER_DISTRICT.contains(kind) && bodies.existsByKindAndParent(kind, district.getId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CreationOptions creationOptions(long templateId) {
+        TBodyTemplate template = templates.findById(templateId)
+                                          .orElseThrow(() -> new NotFoundException("Body template", templateId));
+        BodyKind kind = template.getKind();
+        TBodyTemplate parentTemplate = template.getParentTemplate();
+
+        if (kind == null) {
+            return new CreationOptions(true, List.of());
+        }
+
+        if (takenInTheCountry(kind)) {
+            return new CreationOptions(false, List.of());
+        }
+
+        if (parentTemplate == null) {
+            return new CreationOptions(true, List.of());
+        }
+
+        List<TBody> parents = bodies.findAllWithTemplate()
+                                    .stream()
+                                    .filter(b -> b.getBodyTemplate() != null
+                                        && Objects.equals(b.getBodyTemplate().getId(), parentTemplate.getId()))
+                                    .toList();
+        List<Long> unavailable = parents.stream()
+                                        .filter(p -> takenInTheDistrict(kind, p)
+                                            || kind == BodyKind.DISTRICT_COMMISSIONER && hasOpenCommissionerBoard(p))
+                                        .map(TBody::getId)
+                                        .toList();
+
+        return new CreationOptions(unavailable.size() < parents.size(), unavailable);
+    }
+
+    /**
+     * A later commissioner board is a new body, not a second life of the old one (its 186 days are over for
+     * good). It can be created once every earlier board of the district is closed: it had mandates and none is
+     * current or planned. An empty board is still waiting for its mandates. Whether the new board is more than
+     * a disguised extension is checked when its mandates are assigned, because only then its start is known.
+     */
+    private boolean hasOpenCommissionerBoard(TBody district) {
+        LocalDate today = LocalDate.now(clock);
+
+        return bodies.findByKindAndParent(BodyKind.DISTRICT_COMMISSIONER, district.getId())
+                     .stream()
+                     .map(board -> memberships.findAllByBodyId(board.getId()))
+                     .anyMatch(mandates -> mandates.isEmpty() || mandates.stream().anyMatch(
+                         m -> m.getValidTo() == null || m.getValidTo().isAfter(today)));
     }
 
     @Override
