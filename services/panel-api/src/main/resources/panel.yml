@@ -24,6 +24,9 @@ panel:
         web-url: ${PANEL_WEB_URL:http://localhost:3000}
         # signed declarations and scans (personal data): a persistent volume in deployments
         storage-dir: ${PANEL_DECLARATIONS_DIR:./data/declarations}
+      intake:
+        # the public "I want to join" form; keep off until the privacy notice is approved
+        enabled: ${PANEL_RECRUITMENT_INTAKE_ENABLED:false}
   mail:
     enabled: ${PANEL_MAIL_ENABLED:false}
     sender: ${PANEL_MAIL_SENDER:}

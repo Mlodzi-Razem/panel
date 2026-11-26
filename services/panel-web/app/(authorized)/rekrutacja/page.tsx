@@ -17,7 +17,7 @@
 
 import React from "react";
 import { getTranslations } from "next-intl/server";
-import { UserPlusIcon } from "@phosphor-icons/react/ssr";
+import { TrayIcon, UserPlusIcon } from "@phosphor-icons/react/ssr";
 import ApiErrorNotice from "@/components/members/ApiErrorNotice";
 import RecruitmentCasesTable from "@/components/recruitment/RecruitmentCasesTable";
 import { LinkButton, Page } from "@/components/page/Page";
@@ -39,6 +39,7 @@ const STATUS_PHASES: { key: string, statuses: CaseStatus[] }[] = [
     { key: "terminal", statuses: ["ACCEPTED", "REJECTED"] },
 ];
 import { PERMISSIONS } from "@/panel-api/members/types";
+import { listIntakes } from "@/panel-api/members/intakes";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -79,7 +80,7 @@ export default async function RecruitmentPage({searchParams}: { searchParams: Se
     const view = oneOf(single(params["view"]), CASE_VIEWS);
     const district = Number.isFinite(districtParam) ? districtParam : undefined;
 
-    const [districtsResult, casesResult, viewCountsResult] = await Promise.all([
+    const [districtsResult, casesResult, viewCountsResult, intakeResult] = await Promise.all([
         listDistricts(),
         listRecruitmentCases({
             page: pageNumber,
@@ -90,6 +91,8 @@ export default async function RecruitmentPage({searchParams}: { searchParams: Se
             view,
         }),
         getRecruitmentViewCounts(district),
+        // answers 403 to people who do not handle submissions; the link is then not shown
+        listIntakes("PENDING", 0, 1),
     ]);
     const viewCounts = viewCountsResult.ok ? viewCountsResult.data : {};
 
@@ -117,9 +120,14 @@ export default async function RecruitmentPage({searchParams}: { searchParams: Se
 
     return <Page title={t("title")}
                  subtitle={t("subtitle")}
-                 actions={canCreate && <LinkButton href="/rekrutacja/nowa" primary>
-                     <UserPlusIcon aria-hidden/>{t("newCase")}
-                 </LinkButton>}>
+                 actions={<>
+                     {intakeResult.ok && <LinkButton href="/rekrutacja/zgloszenia">
+                         <TrayIcon aria-hidden/>{t("intakeQueue", {count: intakeResult.data.totalItems})}
+                     </LinkButton>}
+                     {canCreate && <LinkButton href="/rekrutacja/nowa" primary>
+                         <UserPlusIcon aria-hidden/>{t("newCase")}
+                     </LinkButton>}
+                 </>}>
         <Tabs label={t("viewsLabel")}
               items={[
                   {

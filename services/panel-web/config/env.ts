@@ -104,6 +104,18 @@ export function entraConfig(): EntraConfig | undefined {
     };
 }
 
+const TRUSTED_PROXY_HOPS_ENV_VAR = 'PANEL_TRUSTED_PROXY_HOPS';
+
+/**
+ * How many trusted proxies in front of panel-web append to X-Forwarded-For. 0 (the default, and whenever the
+ * chain does not preserve the client address, e.g. behind a plain TCP forwarder) disables the per-client limit
+ * of the public join form; the global limits of panel-api still apply.
+ */
+export function trustedProxyHops(): number {
+    const hops = Number(process.env[TRUSTED_PROXY_HOPS_ENV_VAR]?.trim() || '0');
+    return Number.isInteger(hops) && hops > 0 ? hops : 0;
+}
+
 const RECRUITMENT_DECLARATION_MOCK_ENV_VAR = 'PANEL_RECRUITMENT_DECLARATION_MOCK';
 
 /**

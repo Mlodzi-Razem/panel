@@ -28,6 +28,7 @@ import org.mlodzirazem.panel.services.panelapi.core.error.ForbiddenException;
 import org.mlodzirazem.panel.services.panelapi.core.error.NotFoundException;
 import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
 import org.mlodzirazem.panel.services.panelapi.recruitment.eform.DeclarationFormAccessException;
+import org.mlodzirazem.panel.services.panelapi.recruitment.intake.IntakeFormException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -93,6 +94,17 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         };
 
         return respond(status, ErrorResponse.of(e.getCode(), e.getMessage()));
+    }
+
+    @ExceptionHandler(IntakeFormException.class)
+    ResponseEntity<ErrorResponse> intakeForm(IntakeFormException e) {
+        HttpStatus status = switch (e.getKind()) {
+            case DISABLED -> HttpStatus.NOT_FOUND;
+            case BUSY -> HttpStatus.TOO_MANY_REQUESTS;
+            case INVALID -> HttpStatus.UNPROCESSABLE_ENTITY;
+        };
+
+        return respond(status, ErrorResponse.of(e.getCode(), e.getMessage(), e.getFields()));
     }
 
     @ExceptionHandler(DomainException.class)
