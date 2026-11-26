@@ -222,7 +222,7 @@ class BreakGlassAssignerTest extends DomainTestSupport {
         for (String[] input : new String[][] {
             {"no-such-body:SECRETARY", "9001"},
             {"national-board:NO_SUCH_TYPE", "9001"},
-            {"national-board:MEMBER", "9001"},
+            {"national-board:VICE_CHAIR", "9001"},
             {"national-board", "9001"},
             {"national-board:", "9001"},
             {FUNCTION, "424242"},

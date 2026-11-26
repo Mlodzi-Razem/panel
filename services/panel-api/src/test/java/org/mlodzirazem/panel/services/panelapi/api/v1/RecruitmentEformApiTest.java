@@ -143,7 +143,7 @@ class RecruitmentEformApiTest extends ApiTestSupport {
         assertThat(mine.body().path("formUrl").asString()).contains(mine.body().path("token").asString());
         assertThat(mine.body().path("expiresAt").asString()).isNotBlank();
 
-        assertThat(post(treasurerOfMazowieckie(), "/recruitment-cases/" + caseId
+        assertThat(post(readerOfMazowieckie(), "/recruitment-cases/" + caseId
             + "/declaration-link", Map.of()).status()).isEqualTo(403);
         assertThat(post(zoB, "/recruitment-cases/" + caseId + "/declaration-link",
             Map.of()).status()).isEqualTo(403);
@@ -154,10 +154,10 @@ class RecruitmentEformApiTest extends ApiTestSupport {
         assertThat(repeat.body().path("token").asString()).isNotEqualTo(mine.body().path("token").asString());
     }
 
-    private TMember treasurerOfMazowieckie() {
-        TMember treasurer = linked(newMember("Tola", "Skarbnik", "mazowieckie"));
-        grant(treasurer, body("district-mazowieckie-treasurer"), "TREASURER");
-        return treasurer;
+    private TMember readerOfMazowieckie() {
+        TMember reader = linked(newMember("Tola", "Czytelnik", "mazowieckie"));
+        grantDistrictReader(reader, "mazowieckie");
+        return reader;
     }
 
     @Test

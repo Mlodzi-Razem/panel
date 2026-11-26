@@ -38,7 +38,7 @@ class BodiesApiTest extends ApiTestSupport {
         secretary = linked(newMember("Sam", "Secretary", "pomorskie"));
         grant(secretary, body("national-board"), "SECRETARY");
         zkMember = newMember("Zbyszek", "Krajowy", "slaskie");
-        grant(zkMember, body("national-board"), "VICE_CHAIR");
+        grant(zkMember, body("national-board"), "MEMBER");
         plain = linked(newMember("Pat", "Plain", "slaskie"));
     }
 

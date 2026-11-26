@@ -35,10 +35,11 @@ SET client_encoding = 'UTF8';
 \set czlonek_od '2026-01-01'
 -- Mandat (opcjonalny; puste organ = bez mandatu, tylko „Moje członkostwo”).
 -- organ = nazwa istniejącego organu z tabeli bodies; rola = KOD roli, nie nazwa funkcji:
---   'Zarząd Krajowy'                        CO_CHAIR | VICE_CHAIR | SECRETARY -> National board (GLOBAL)
+--   'Zarząd Krajowy'                        CO_CHAIR | SECRETARY | MEMBER     -> National board (GLOBAL)
 --   'Zarząd Krajowy'                        TREASURER                         -> National board treasurer (GLOBAL)
---   'Zarząd Okręgu Mazowieckiego' (itd.)    COORDINATOR | VICE_COORDINATOR    -> District board (LOCAL)
---   'Osoba Skarbnicza Okręgu Mazowieckiego' TREASURER                         -> District treasurer (LOCAL)
+--   'Zarząd Okręgu Mazowieckiego' (itd.)    COORDINATOR | MEMBER              -> District board (LOCAL)
+--   'Zarząd Okręgu Mazowieckiego' (itd.)    TREASURER                         -> District treasurer (LOCAL)
+--   'Rada Krajowa'                          ZO_REPRESENTATIVE | ZK_MEMBER | ... -> No permissions
 --   sądy, komisje krajowe                   CHAIR | MEMBER | ...              -> No permissions
 -- Świeża baza stage ma tylko organy krajowe i okręgowe; komisji i zespołów
 -- (np. IT) nie ma, a model nie zna roli pełnomocnika ZK.

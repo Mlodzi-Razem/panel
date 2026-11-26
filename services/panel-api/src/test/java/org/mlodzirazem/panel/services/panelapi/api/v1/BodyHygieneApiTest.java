@@ -56,10 +56,10 @@ class BodyHygieneApiTest extends ApiTestSupport {
         assertThat(nationalBoard.status()).isEqualTo(409);
         assertThat(nationalBoard.code()).isEqualTo("BODY_ALREADY_EXISTS");
 
-        Res districtTreasurer = post(secretary, "/bodies", createRequest(BodyKind.DISTRICT_TREASURER,
-            "Druga osoba skarbnicza", "test-treasurer-duplicate", district("mazowieckie").getId()));
-        assertThat(districtTreasurer.status()).isEqualTo(409);
-        assertThat(districtTreasurer.code()).isEqualTo("BODY_ALREADY_EXISTS");
+        Res nationalCouncil = post(secretary, "/bodies", createRequest(BodyKind.NATIONAL_COUNCIL,
+            "Druga rada krajowa", "test-council-duplicate", null));
+        assertThat(nationalCouncil.status()).isEqualTo(409);
+        assertThat(nationalCouncil.code()).isEqualTo("BODY_ALREADY_EXISTS");
         assertThat(auditCount("bodies :: create")).isZero();
     }
 
@@ -186,7 +186,7 @@ class BodyHygieneApiTest extends ApiTestSupport {
     @Test
     void voidingTheLastBodiesManagerIsGuarded() {
         TMember zkMember = linked(newMember("Zbyszek", "Krajowy", "slaskie"));
-        grant(zkMember, body("national-board"), "VICE_CHAIR");
+        grant(zkMember, body("national-board"), "MEMBER");
         String path = "/bodies/" + body("national-board").getId() + "/memberships/";
 
         long zkSeat = jdbc.queryForObject("SELECT id FROM body_memberships WHERE member_id = ?", Long.class,

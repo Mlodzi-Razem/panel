@@ -41,7 +41,7 @@ class MembersApiTest extends ApiTestSupport {
     TMember zoA;
     TMember zoB;
     TMember zk;
-    TMember treasurerA;
+    TMember readerA;
     TMember inA;
     TMember inB;
     TMember supportingInA;
@@ -54,8 +54,8 @@ class MembersApiTest extends ApiTestSupport {
         grant(zoB, board("slaskie"), "COORDINATOR");
         zk = linked(newMember("Karol", "Krajowy", "pomorskie"));
         grant(zk, body("national-board"), "SECRETARY");
-        treasurerA = linked(newMember("Tola", "Skarbnik", "mazowieckie"));
-        grant(treasurerA, body("district-mazowieckie-treasurer"), "TREASURER");
+        readerA = linked(newMember("Tola", "Czytelnik", "mazowieckie"));
+        grantDistrictReader(readerA, "mazowieckie");
         inA = newMember("Anna", "Mazowiecka", "mazowieckie");
         memberService.update(inA.getId(), Map.of(MemberField.FORMAL_IDENTIFIER, "90010112345"));
         inB = newMember("Beata", "Slaska", "slaskie");
@@ -80,7 +80,7 @@ class MembersApiTest extends ApiTestSupport {
     void listIsScopedToTheCallersDistricts() {
         Res a = get(zoA, "/members?size=100");
         assertThat(a.status()).isEqualTo(200);
-        assertThat(ids(a)).contains(zoA.getId(), inA.getId(), supportingInA.getId(), treasurerA.getId())
+        assertThat(ids(a)).contains(zoA.getId(), inA.getId(), supportingInA.getId(), readerA.getId())
                           .doesNotContain(inB.getId(), zoB.getId(), zk.getId());
 
         Res b = get(zoB, "/members?size=100");
@@ -179,9 +179,9 @@ class MembersApiTest extends ApiTestSupport {
         assertThat(supporting.body().path("fields").has("status")).isFalse();
         assertThat(supporting.body().has("affiliations")).isFalse();
 
-        Res treasurer = get(treasurerA, "/members/" + inA.getId());
-        assertThat(treasurer.body().path("fields").has("pseudonym")).isTrue();
-        assertThat(treasurer.body().path("fields").has("formalIdentifier")).isFalse();
+        Res reader = get(readerA, "/members/" + inA.getId());
+        assertThat(reader.body().path("fields").has("pseudonym")).isTrue();
+        assertThat(reader.body().path("fields").has("formalIdentifier")).isFalse();
 
         assertThat(get(zoA, "/members/" + inB.getId()).status()).isEqualTo(403);
         assertThat(get(zoA, "/members/999999999").status()).isEqualTo(404);
@@ -199,7 +199,7 @@ class MembersApiTest extends ApiTestSupport {
         assertThat(auditPayloads("members :: reveal-formal-identifier")).contains("formalIdentifier")
                                                                           .doesNotContain("90010112345");
 
-        assertThat(get(treasurerA, "/members/" + inA.getId() + "?reveal=formalIdentifier").status()).isEqualTo(403);
+        assertThat(get(readerA, "/members/" + inA.getId() + "?reveal=formalIdentifier").status()).isEqualTo(403);
         assertThat(get(zoA, "/members/" + inB.getId() + "?reveal=formalIdentifier").status()).isEqualTo(403);
         assertThat(auditCount("members :: reveal-formal-identifier")).isEqualTo(1);
     }
@@ -223,7 +223,7 @@ class MembersApiTest extends ApiTestSupport {
         Res otherDistrict = patch(zoA, "/members/" + inB.getId(), fields("pseudonym", "Q"));
         assertThat(otherDistrict.status()).isEqualTo(403);
         assertThat(otherDistrict.body().path("fields").get(0).asString()).isEqualTo("pseudonym");
-        assertThat(patch(treasurerA, "/members/" + inA.getId(), fields("pseudonym", "Q")).status()).isEqualTo(403);
+        assertThat(patch(readerA, "/members/" + inA.getId(), fields("pseudonym", "Q")).status()).isEqualTo(403);
         assertThat(patch(zoA, "/members/" + inA.getId(), fields("pseudonym", 5)).code()).isEqualTo("INVALID_VALUE");
     }
 
@@ -236,9 +236,9 @@ class MembersApiTest extends ApiTestSupport {
             + "(?, 'CONTACT_PERSONAL_DATA_MANAGE')", groupId, groupId);
         jdbc.update("INSERT INTO body_template_member_types (name, code, is_default, body_template_id, "
             + "permission_group_id) SELECT 'Test editor', 'TEST_EDITOR', FALSE, body_template_id, ? FROM bodies "
-            + "WHERE code = 'district-mazowieckie-treasurer'", groupId);
+            + "WHERE code = 'district-mazowieckie-board'", groupId);
         TMember editor = linked(newMember("Edyta", "Kontaktowa", "mazowieckie"));
-        grant(editor, body("district-mazowieckie-treasurer"), "TEST_EDITOR");
+        grant(editor, board("mazowieckie"), "TEST_EDITOR");
 
         Res mixed = patch(editor, "/members/" + inA.getId(), fields("pseudonym", "P", "addressLine", "x"));
         assertThat(mixed.status()).isEqualTo(403);
@@ -287,7 +287,7 @@ class MembersApiTest extends ApiTestSupport {
         Res moved = post(zoB, path, Map.of("action", "SET_PRIMARY", "districtId", district("slaskie").getId()));
         assertThat(moved.status()).isEqualTo(200);
         assertThat(moved.body().get(0).path("districtId").asLong()).isEqualTo(district("slaskie").getId());
-        assertThat(post(treasurerA, path, add).status()).isEqualTo(403);
+        assertThat(post(readerA, path, add).status()).isEqualTo(403);
     }
 
     @Test
@@ -303,6 +303,6 @@ class MembersApiTest extends ApiTestSupport {
 
         assertThat(get(zoB, "/members/ending-this-year").body()).isEmpty();
         assertThat(get(zoA, "/members/ending-this-year?year=" + (year + 1)).body()).isEmpty();
-        assertThat(get(treasurerA, "/members/ending-this-year").status()).isEqualTo(403);
+        assertThat(get(readerA, "/members/ending-this-year").status()).isEqualTo(403);
     }
 }

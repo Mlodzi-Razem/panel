@@ -63,7 +63,7 @@ class FeePermissionsSeedTest extends FeesTestSupport {
         TMember zo = newMember("Zo", "Coordinator", "slaskie");
         grant(zo, board("mazowieckie"), "COORDINATOR");
         TMember districtTreasurer = newMember("Dis", "Treasurer", "slaskie");
-        grant(districtTreasurer, body("district-mazowieckie-treasurer"), "TREASURER");
+        grant(districtTreasurer, board("mazowieckie"), "TREASURER");
         TMember kkw = newMember("Kkw", "Member", "slaskie");
         grant(kkw, body("electoral-commission"), "MEMBER");
 

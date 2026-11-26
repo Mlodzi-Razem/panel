@@ -83,7 +83,7 @@ class LastBodiesManagerTest extends DomainTestSupport {
         TMember successor = newMember("Sven", "Successor", "slaskie");
 
         service.assign(new AssignMembership(successor.getId(), body("national-board").getId(),
-            memberType(BodyKind.NATIONAL_BOARD, "VICE_CHAIR").getId(), today, null), false);
+            memberType(BodyKind.NATIONAL_BOARD, "MEMBER").getId(), today, null), false);
 
         assertThat(service.check(toKsk(last)).violations())
             .extracting(FunctionViolation::code)
@@ -97,7 +97,7 @@ class LastBodiesManagerTest extends DomainTestSupport {
     @Test
     void successorThatIsRemovedNotOpenEndedOrNotYetActiveDoesNotCount() {
         TMember removed = newMember("Rita", "Removed", "slaskie");
-        grant(removed, body("national-board"), "VICE_CHAIR");
+        grant(removed, body("national-board"), "MEMBER");
         jdbc.update("UPDATE members SET status = 'REMOVED'::member_status WHERE id = ?", removed.getId());
 
         TMember fixedTerm = newMember("Fred", "Fixed", "slaskie");

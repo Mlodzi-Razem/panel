@@ -137,11 +137,11 @@ Persona overview (`test-personas.sql`):
 | member id | synthetic name | purpose | body / role (permission group) |
 |---|---|---|---|
 | 950001 | Adam Testowy | ZO Mazowieckiego operator | `Zarząd Okręgu Mazowieckiego` / COORDINATOR (District board, LOCAL) |
-| 950002 | Beata Przykładowa | ZO Mazowieckiego collegiality (kolegialność) | same body / VICE_COORDINATOR (District board, LOCAL) |
+| 950002 | Beata Przykładowa | ZO Mazowieckiego collegiality (kolegialność) | same body / MEMBER (District board, LOCAL) |
 | 950003 | Cezary Testowy | permission isolation between districts | `Zarząd Okręgu Dolnośląskiego` / COORDINATOR (District board, LOCAL) |
 | 950004 | Dorota Przykładowa | ZK approvals | `Zarząd Krajowy` / CO_CHAIR (National board, GLOBAL) |
 | 950005 | Edmund Testowy | ZK approvals + fees touchpoint | `Zarząd Krajowy` / TREASURER (National board treasurer, GLOBAL) |
-| 950006 | Felicja Skarbnicowa | district fees + contact-data reader | `Osoba Skarbnicza Okręgu Mazowieckiego` / TREASURER (District treasurer, LOCAL) |
+| 950006 | Felicja Skarbnicowa | district treasurer: ZO member rights plus fees | `Zarząd Okręgu Mazowieckiego` / TREASURER (District treasurer, LOCAL) |
 | 950007 | Grażyna Probacyjna | initial-period clock: declaration 65 days ago → assessment window 62–76 open now | — (status `PROBATION`) |
 | 950008 | Henryk Deklaracyjny | pending declaration (10 days ago) | — (status `FORM_REQUEST`) |
 | 950009 | Irena Zawieszona | suspension issued by ZO Mazowieckiego (`suspensions` row, signature `ZO/MZ/01/2026`) | — (status `SUSPENDED`) |

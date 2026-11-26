@@ -20,6 +20,8 @@ package org.mlodzirazem.panel.services.panelapi.persistence.entity.body;
 public enum BodyKind {
     GENERAL_ASSEMBLY,
     NATIONAL_BOARD,
+    /** Rada Krajowa (statute 2026, art. 23-24); its Presidium is a set of function types, not a separate organ. */
+    NATIONAL_COUNCIL,
     PEER_COURT,
     AUDIT_COMMISSION,
     ELECTORAL_COMMISSION,
@@ -30,13 +32,11 @@ public enum BodyKind {
     DISTRICT,
     DISTRICT_ASSEMBLY,
     DISTRICT_BOARD,
-    DISTRICT_TREASURER,
     DISTRICT_COMMISSIONER,
     LOCAL_CIRCLE;
 
     public boolean isDistrictFunction() {
         return this == DISTRICT_BOARD
-            || this == DISTRICT_TREASURER
             || this == DISTRICT_COMMISSIONER
             || this == LOCAL_CIRCLE;
     }
