@@ -68,6 +68,9 @@ public abstract class DomainTestSupport {
     @BeforeEach
     protected void cleanDomainData() {
         cleanFees();
+        jdbc.execute("DELETE FROM recruitment_intake_events");
+        jdbc.execute("DELETE FROM recruitment_intake_slots");
+        jdbc.execute("DELETE FROM recruitment_intakes");
         jdbc.execute("DELETE FROM recruitment_notifications");
         jdbc.execute("DELETE FROM recruitment_consents");
         jdbc.execute("DELETE FROM declaration_artifacts");

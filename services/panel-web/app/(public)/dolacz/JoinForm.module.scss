@@ -1,0 +1,74 @@
+/*
+ * Copyright (C) 2026 Stowarzyszenie Młodzi Razem
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/* The honeypot stays in the document, but out of sight and out of the tab order. */
+.trap {
+    position: absolute;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+.consent {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    line-height: 1.5;
+
+    input {
+        flex: none;
+        width: 1.25rem;
+        height: 1.25rem;
+        margin-top: 0.15rem;
+    }
+}
+
+.notice {
+    line-height: 1.55;
+    font-size: 0.875rem;
+
+    summary {
+        cursor: pointer;
+        font-weight: 550;
+        min-height: 2.75rem;
+        display: flex;
+        align-items: center;
+    }
+
+    p {
+        margin-block: var(--space-2);
+    }
+}
+
+.draft {
+    padding: var(--space-3);
+    border: 1px dashed var(--color-border-strong);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+}
+
+.fieldError {
+    color: var(--color-danger);
+    font-size: 0.8rem;
+}
+
+.fields input, .fields select {
+    @media (max-width: 900px) {
+        font-size: 1rem;
+    }
+}

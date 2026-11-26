@@ -43,4 +43,13 @@ public interface TRecruitmentCaseRepository extends JpaRepository<TRecruitmentCa
         @Param("formalIdentifier") String formalIdentifier,
         @Param("caseId") Long caseId
     );
+
+    @Query("select count(c) > 0 from TRecruitmentCase c"
+        + " where lower(c.candidateEmail) = lower(:email) and c.closedAt is null")
+    boolean existsOpenByEmail(@Param("email") String email);
+
+    @Query("select count(c) > 0 from TRecruitmentCase c"
+        + " where lower(c.candidateEmail) = lower(:email) and c.closedAt is null and c.district.id in :districtIds")
+    boolean existsOpenByEmailInDistricts(@Param("email") String email,
+                                         @Param("districtIds") java.util.Collection<Long> districtIds);
 }
