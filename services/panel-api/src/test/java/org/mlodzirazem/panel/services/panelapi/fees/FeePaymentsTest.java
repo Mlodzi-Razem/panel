@@ -83,7 +83,7 @@ class FeePaymentsTest extends FeesTestSupport {
         assertThat(payments.balance(member.getId()).credit()).isEqualByComparingTo("60");
 
         tierId = schedule.createTier(actor.getId(), new NewFeeTier("standard", "Standardowa", true)).id();
-        schedule.addRate(actor.getId(), tierId, NOW.minusMonths(6), money("30"), "U/1");
+        pastRate(tierId, NOW.minusMonths(6), "30");
 
         assertThat(dueOf(member, NOW.minusMonths(6)).status()).isEqualTo(DueStatus.PAID);
         assertThat(dueOf(member, NOW.minusMonths(5)).status()).isEqualTo(DueStatus.PAID);

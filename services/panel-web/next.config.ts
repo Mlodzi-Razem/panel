@@ -51,6 +51,8 @@ const nextConfig: NextConfig = {
     transpilePackages: ['next-intl'],
     experimental: {
         optimizePackageImports: ["@phosphor-icons/react"],
+        // bank statements are uploaded through a server action; the API accepts files of up to 10 MB
+        serverActions: {bodySizeLimit: '12mb'},
     }
 };
 

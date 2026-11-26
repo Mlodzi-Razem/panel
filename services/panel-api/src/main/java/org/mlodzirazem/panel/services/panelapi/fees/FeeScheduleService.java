@@ -27,7 +27,9 @@ import java.util.Optional;
 /**
  * Tiers, their rate history and member tier assignments. Permission checks (FEES_MANAGE for writes) belong to the
  * caller. Errors: NOT_FOUND, FEE_TIER_CODE_TAKEN (conflict), FEE_TIER_INVALID, FEE_TIER_DEFAULT_REQUIRED,
- * FEE_TIER_INACTIVE, RATE_AMOUNT_INVALID, RATE_REFERENCE_REQUIRED, RATE_EXISTS (conflict), RATE_MONTH_HAS_DUES.
+ * FEE_TIER_INACTIVE, FEE_TIER_DEFAULT_LOCKED (the default cannot change once dues exist), RATE_AMOUNT_INVALID,
+ * RATE_REFERENCE_REQUIRED, RATE_EXISTS (conflict), RATE_MONTH_HAS_DUES, RATE_MONTH_IN_PAST,
+ * ASSIGNMENT_MONTH_IN_PAST, SELF_FEES_NOT_ALLOWED. Rates and assignments start in the current month at the earliest.
  */
 public interface FeeScheduleService {
     List<FeeTier> tiers(boolean includeInactive);

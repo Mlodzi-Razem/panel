@@ -150,6 +150,14 @@ const PanelMail = z.object({
     dailyExternalLimit: z.number().int().min(0),
 })
 
+const PanelFees = z.object({
+    // The association's account shown to members; empty until it is filled in for the installation.
+    bankAccount: z.string(),
+    // Empty keeps the application defaults.
+    recipientName: z.string(),
+    titleTemplate: z.string(),
+})
+
 const PanelWeb = z.object({
     url: z.url(),
     metricsToken: z.string().optional(),
@@ -258,6 +266,7 @@ const PanelValues = z.object({
         postgres: Postgres,
         api: PanelApi,
         mail: PanelMail.optional(),
+        fees: PanelFees.optional(),
         web: PanelWeb,
         gateway: Gateway,
         secrets: Secrets,

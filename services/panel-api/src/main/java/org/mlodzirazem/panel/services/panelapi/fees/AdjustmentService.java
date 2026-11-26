@@ -25,7 +25,8 @@ import java.util.List;
  * recalculates the open dues of the member: exemptions and discounts may be retroactive and cancel or reduce open
  * dues (ending the arrears they caused); paid dues never change. Errors: NOT_FOUND, ADJUSTMENT_RANGE_INVALID,
  * ADJUSTMENT_AMOUNT_REQUIRED, ADJUSTMENT_AMOUNT_INVALID, ADJUSTMENT_AMOUNT_NOT_ALLOWED, ADJUSTMENT_REASON_REQUIRED,
- * ADJUSTMENT_OVERLAP (conflict, same kind overlapping), ADJUSTMENT_ALREADY_REVOKED (conflict).
+ * ADJUSTMENT_OVERLAP (conflict, same kind overlapping), ADJUSTMENT_ALREADY_REVOKED (conflict), SELF_FEES_NOT_ALLOWED
+ * (granting an adjustment to oneself).
  * <p>
  * Confidentiality: {@link AdjustmentView} is safe for every FEES_READ holder; {@link AdjustmentDetails} (reason
  * category and justification) only for FEES_MANAGE holders and the member themself. The audit log never holds reasons.

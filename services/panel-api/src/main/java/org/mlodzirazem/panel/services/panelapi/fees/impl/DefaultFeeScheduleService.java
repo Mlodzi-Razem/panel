@@ -84,7 +84,13 @@ class DefaultFeeScheduleService implements FeeScheduleService {
             throw new ConflictException("FEE_TIER_CODE_TAKEN", "A tier with this code exists", List.of("code"));
         }
 
-        boolean makeDefault = newTier.makeDefault() || tiers.findByDefaultTierTrue().isEmpty();
+        boolean hasDefault = tiers.findByDefaultTierTrue().isPresent();
+
+        if (newTier.makeDefault() && hasDefault) {
+            requireNoDues();
+        }
+
+        boolean makeDefault = newTier.makeDefault() || !hasDefault;
         clearDefault(makeDefault);
 
         TFeeTier tier = new TFeeTier();
@@ -133,6 +139,7 @@ class DefaultFeeScheduleService implements FeeScheduleService {
                 throw new RuleViolationException("FEE_TIER_INACTIVE", "An inactive tier cannot be the default");
             }
 
+            requireNoDues();
             clearDefault(true);
             tier.setDefaultTier(true);
             changed.add("default");
@@ -179,6 +186,11 @@ class DefaultFeeScheduleService implements FeeScheduleService {
                 "Dues already exist for this month or later; a rate may only start in a month without dues");
         }
 
+        if (validFrom.isBefore(YearMonth.now(clock))) {
+            throw new RuleViolationException("RATE_MONTH_IN_PAST",
+                "A rate may not start before the current month; past dues are never generated from a new rate");
+        }
+
         TFeeTierRate rate = new TFeeTierRate();
         rate.setTier(tier);
         rate.setMonthlyAmount(amount);
@@ -207,6 +219,13 @@ class DefaultFeeScheduleService implements FeeScheduleService {
     @Override
     @Transactional
     public TierAssignment assignTier(long actorMemberId, long memberId, long tierId, YearMonth validFrom) {
+        OwnFeesGuard.reject(actorMemberId, memberId);
+
+        if (validFrom.isBefore(YearMonth.now(clock))) {
+            throw new RuleViolationException("ASSIGNMENT_MONTH_IN_PAST",
+                "A tier assignment may not start before the current month");
+        }
+
         lock.acquire();
 
         TMember member = members.findById(memberId).orElseThrow(() -> new NotFoundException("Member", memberId));
@@ -253,6 +272,17 @@ class DefaultFeeScheduleService implements FeeScheduleService {
     public Optional<ResolvedFee> resolve(long memberId, YearMonth month) {
         return FeePricing.price(synchronizer.context(), assignments.findByMemberIdOrderByValidFromAsc(memberId),
             reader.adjustmentEntities(memberId), month);
+    }
+
+    /**
+     * Members without an explicit assignment are priced by the default tier in every month, so switching it would
+     * reprice open dues of past months.
+     */
+    private void requireNoDues() {
+        if (dues.count() > 0) {
+            throw new RuleViolationException("FEE_TIER_DEFAULT_LOCKED",
+                "The default tier cannot change once dues exist");
+        }
     }
 
     private void clearDefault(boolean needed) {

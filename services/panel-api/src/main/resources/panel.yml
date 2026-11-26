@@ -21,6 +21,11 @@ panel:
     enabled: ${PANEL_MAIL_ENABLED:false}
     sender: ${PANEL_MAIL_SENDER:}
     daily-external-limit: ${PANEL_MAIL_DAILY_EXTERNAL_LIMIT:}
+  fees:
+    bank-account: ${PANEL_FEES_BANK_ACCOUNT:}
+    # empty keeps the defaults of FeesProperties
+    recipient-name: ${PANEL_FEES_RECIPIENT_NAME:}
+    title-template: ${PANEL_FEES_TITLE_TEMPLATE:}
   dev:
     # Test-only shift of the single application clock (decision D8): the recruitment harness
     # advances "today" past statutory windows. Refuses to start without the 'dev' profile.

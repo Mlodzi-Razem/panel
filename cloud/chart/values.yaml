@@ -69,6 +69,12 @@ panel:
     enabled: false
     sender: ''
     dailyExternalLimit: 300
+  # Payment instructions on the members' fees page. While bankAccount is empty the page shows no account number.
+  # titleTemplate must contain {reference}; the default is the association's transfer title.
+  fees:
+    bankAccount: ''
+    recipientName: ''
+    titleTemplate: ''
   web:
     url: https://panel.mlodzirazem.org
     auth:
