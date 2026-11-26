@@ -66,6 +66,16 @@ panel:
     networkPolicy:
       enabled: true
       monitoringNamespace: observability
+    # Publiczny formularz „Chcę dołączyć” (/dolacz): włączony na stage decyzją
+    # właściciela; w aplikacji domyślnie wyłączony. Teksty zgody i klauzuli mają
+    # w UI dopisek „PROJEKT” do czasu akceptacji. PANEL_TRUSTED_PROXY_HOPS celowo
+    # nieustawione: przez socat adres klienta nie dociera (RUNBOOK §11.3).
+    config:
+      panel:
+        api:
+          recruitment:
+            intake:
+              enabled: true
 
   web:
     url: https://dev.panel.mlodzirazem.org
