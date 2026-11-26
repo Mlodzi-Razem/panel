@@ -3,13 +3,13 @@
 --
 -- PERSONAS (all fabricated — GDPR-safe, see the README section on test people):
 --   950001 Adam Testowy        ACTIVE  ZO Mazowieckiego coordinator      (District board, LOCAL)
---   950002 Beata Przykładowa   ACTIVE  ZO Mazowieckiego vice-coordinator (District board, LOCAL)
+--   950002 Beata Przykładowa   ACTIVE  ZO Mazowieckiego member (District board, LOCAL)
 --   950003 Cezary Testowy      ACTIVE  ZO Dolnośląski coordinator       (District board, LOCAL) — isolation fixture:
 --                              coordinator of district A must NOT see district B's people
 --   950004 Dorota Przykładowa  ACTIVE  Zarząd Krajowy co-chair          (National board, GLOBAL)
 --   950005 Edmund Testowy      ACTIVE  Zarząd Krajowy treasurer         (National board treasurer: FEES, BODIES_MANAGE)
---   950006 Felicja Skarbnicowa ACTIVE  Osoba Skarbnicza Okręgu Mazowieckiego (District treasurer:
---                              CONTACT_PERSONAL_DATA_READ + FEES_READ in the district)
+--   950006 Felicja Skarbnicowa ACTIVE  ZO Mazowieckiego treasurer (District treasurer:
+--                              at least the district board's permissions, in the district only)
 --   950007 Grażyna Probacyjna PROBATION   initial-period clock fixture, declaration 65 days ago
 --   950008 Henryk Deklaracyjny FORM_REQUEST declaration 10 days ago
 --   950009 Irena Zawieszona    SUSPENDED   + suspensions row issued by ZO Mazowieckiego
@@ -164,25 +164,25 @@ ON CONFLICT (member_id, district_body_id) WHERE valid_to IS NULL DO NOTHING;
 -- Member types resolve through the body's own template (body_templates.name =
 -- 'Zarząd Okręgu' etc. × body_template_member_types.code) — the same tables the
 -- api uses. Resulting permission groups (seeded with V0.0.3.01):
---   COORDINATOR / VICE_COORDINATOR on a district board  -> 'District board'
+--   COORDINATOR / MEMBER on a district board            -> 'District board'
 --     (LOCAL): FORMAL + CONTACT personal-data read/manage inside that district —
 --     these are the recruitment-pipeline operators;
 --   CO_CHAIR on Zarząd Krajowy                          -> 'National board' (GLOBAL);
 --   TREASURER on Zarząd Krajowy                         -> 'National board treasurer'
 --     (GLOBAL): FORMAL/CONTACT read+manage, FEES_READ/FEES_MANAGE, BODIES_MANAGE,
 --     DIRECTORY_*_MANAGE — for ZK approvals and the fees integration;
---   TREASURER on Osoba Skarbnicza Okręgu                -> 'District treasurer'
---     (LOCAL): CONTACT_PERSONAL_DATA_READ + FEES_READ.
+--   TREASURER on a district board (art. 43 ust. 3)      -> 'District treasurer'
+--     (LOCAL): everything 'District board' holds (a treasurer is a ZO member).
 -- Arbiter matches body_memberships_open_unique_idx
 -- (member_id, body_id, member_type_id) WHERE valid_to IS NULL.
 INSERT INTO body_memberships (member_id, body_id, member_type_id, valid_from)
 SELECT m.id, b.id, mt.id, DATE '2026-01-01'
 FROM (VALUES ('950001', 'Zarząd Okręgu Mazowieckiego', 'COORDINATOR'),
-             ('950002', 'Zarząd Okręgu Mazowieckiego', 'VICE_COORDINATOR'),
+             ('950002', 'Zarząd Okręgu Mazowieckiego', 'MEMBER'),
              ('950003', 'Zarząd Okręgu Dolnośląskiego', 'COORDINATOR'),
              ('950004', 'Zarząd Krajowy', 'CO_CHAIR'),
              ('950005', 'Zarząd Krajowy', 'TREASURER'),
-             ('950006', 'Osoba Skarbnicza Okręgu Mazowieckiego', 'TREASURER')) AS seeded (member_id, body_name, type_code)
+             ('950006', 'Zarząd Okręgu Mazowieckiego', 'TREASURER')) AS seeded (member_id, body_name, type_code)
          JOIN members m ON m.member_id = seeded.member_id
          JOIN bodies b ON b.name = seeded.body_name
          JOIN body_template_member_types mt ON mt.body_template_id = b.body_template_id AND mt.code = seeded.type_code

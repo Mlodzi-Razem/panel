@@ -266,6 +266,7 @@ const plMessages: typeof enMessages = {
         bodyKind: {
             GENERAL_ASSEMBLY: "Walne Zebranie Osób Członkowskich",
             NATIONAL_BOARD: "Zarząd Krajowy",
+            NATIONAL_COUNCIL: "Rada Krajowa",
             PEER_COURT: "Krajowy Sąd Koleżeński",
             AUDIT_COMMISSION: "Krajowa Komisja Rewizyjna",
             ELECTORAL_COMMISSION: "Krajowa Komisja Wyborcza",
@@ -275,7 +276,6 @@ const plMessages: typeof enMessages = {
             DISTRICT: "Okręg",
             DISTRICT_ASSEMBLY: "Walne Zebranie Okręgu",
             DISTRICT_BOARD: "Zarząd Okręgu",
-            DISTRICT_TREASURER: "Osoba skarbnicza okręgu",
             DISTRICT_COMMISSIONER: "Osoba Komisarska Okręgu",
             LOCAL_CIRCLE: "Koło terenowe",
         },

@@ -118,7 +118,7 @@ class BodyMembershipServiceTest extends DomainTestSupport {
         grant(other, board("mazowieckie"), "COORDINATOR", today.minusMonths(3), null);
         grant(member, body("electoral-commission"), "CHAIR", today.minusMonths(3), null);
 
-        AssignmentCheck check = service.check(assign(member, board("mazowieckie"), "VICE_COORDINATOR", today, null));
+        AssignmentCheck check = service.check(assign(member, board("mazowieckie"), "MEMBER", today, null));
 
         assertThat(check.violations()).singleElement().satisfies(v -> {
             assertThat(v.code()).isEqualTo(FunctionViolation.Code.INCOMPATIBLE_MEMBERSHIP);
@@ -134,7 +134,7 @@ class BodyMembershipServiceTest extends DomainTestSupport {
         assertThat(service.check(assign(solo, body("peer-court"), "MEMBER", today, null)).violations()).isEmpty();
 
         TMember second = newMember("Sec", "Ond", "slaskie");
-        grant(second, board("slaskie"), "VICE_COORDINATOR", today.minusMonths(1), null);
+        grant(second, board("slaskie"), "MEMBER", today.minusMonths(1), null);
 
         assertThat(service.check(assign(solo, body("audit-commission"), "MEMBER", today, null)).violations())
             .singleElement().satisfies(v -> assertThat(v.conflictingBodyName())
@@ -186,7 +186,7 @@ class BodyMembershipServiceTest extends DomainTestSupport {
         grant(solo, body("audit-commission"), "MEMBER", today.minusMonths(2), null);
         TMember joiner = newMember("Jan", "Joiner", "pomorskie");
 
-        AssignmentCheck check = service.check(assign(joiner, board("pomorskie"), "VICE_COORDINATOR", today, null));
+        AssignmentCheck check = service.check(assign(joiner, board("pomorskie"), "MEMBER", today, null));
 
         assertThat(check.conflicts()).isEmpty();
         assertThat(check.needsConfirmation()).isTrue();
@@ -203,7 +203,7 @@ class BodyMembershipServiceTest extends DomainTestSupport {
         grant(coordinator, board("lubuskie"), "COORDINATOR", today.minusMonths(3), null);
         TMember joiner = newMember("Ewa", "Joiner", "lubuskie");
 
-        assertThat(service.check(assign(joiner, board("lubuskie"), "VICE_COORDINATOR", today, null)).warnings())
+        assertThat(service.check(assign(joiner, board("lubuskie"), "MEMBER", today, null)).warnings())
             .isEmpty();
     }
 
@@ -255,33 +255,32 @@ class BodyMembershipServiceTest extends DomainTestSupport {
     }
 
     @Test
-    void commissionerNeedsValidToAndIsLimitedToThreeMonths() {
+    void commissionerNeedsValidToAndIsLimitedToSixMonths() {
         TMember member = newMember("Cora", "Komisarz", "mazowieckie");
         TBody commissioners = commissionerBody("mazowieckie");
 
         assertThat(service.check(assign(member, commissioners, "COMMISSIONER", today, null)).violations())
             .extracting(FunctionViolation::code).containsExactly(FunctionViolation.Code.COMMISSIONER_VALID_TO_REQUIRED);
-        assertThat(service.check(assign(member, commissioners, "COMMISSIONER", today, today.plusMonths(4))).violations())
-            .extracting(FunctionViolation::code).containsExactly(FunctionViolation.Code.COMMISSIONER_TERM_TOO_LONG);
-        assertThat(service.check(assign(member, commissioners, "COMMISSIONER", today, today.plusMonths(3))).violations())
+        assertThat(service.check(assign(member, commissioners, "COMMISSIONER", today, today.plusMonths(6).plusDays(1)))
+            .violations()).extracting(FunctionViolation::code)
+                          .contains(FunctionViolation.Code.COMMISSIONER_TERM_TOO_LONG);
+        assertThat(service.check(assign(member, commissioners, "COMMISSIONER", today, today.plusMonths(6))).violations())
             .isEmpty();
     }
 
     @Test
-    void commissionerTermCanBeExtendedAtMostTwice() {
+    void commissionerTermCannotBeExtended() {
         TMember member = newMember("Eli", "Extend", "mazowieckie");
         TBody commissioners = commissionerBody("mazowieckie");
-        LocalDate start = today.minusMonths(7);
+        LocalDate start = today.minusMonths(2);
 
         service.assign(assign(member, commissioners, "COMMISSIONER", start, start.plusMonths(3)), true);
-        service.assign(assign(member, commissioners, "COMMISSIONER", start.plusMonths(3), start.plusMonths(6)), true);
-        service.assign(assign(member, commissioners, "COMMISSIONER", start.plusMonths(6), start.plusMonths(9)), true);
 
-        AssignMembership fourth = assign(member, commissioners, "COMMISSIONER", start.plusMonths(9), start.plusMonths(12));
+        AssignMembership second = assign(member, commissioners, "COMMISSIONER", start.plusMonths(3), start.plusMonths(6));
 
-        assertThat(service.check(fourth).violations()).extracting(FunctionViolation::code)
+        assertThat(service.check(second).violations()).extracting(FunctionViolation::code)
                                                       .contains(FunctionViolation.Code.COMMISSIONER_EXTENSIONS_EXCEEDED);
-        assertThatThrownBy(() -> service.assign(fourth, true)).isInstanceOf(AssignmentBlockedException.class);
+        assertThatThrownBy(() -> service.assign(second, true)).isInstanceOf(AssignmentBlockedException.class);
     }
 
     @Test

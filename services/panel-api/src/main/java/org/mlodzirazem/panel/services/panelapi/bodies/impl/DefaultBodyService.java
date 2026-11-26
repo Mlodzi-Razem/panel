@@ -50,12 +50,13 @@ import java.util.Set;
 class DefaultBodyService implements BodyService {
     /**
      * Kinds that exist at most once in the whole country (statute 2026: national organs and
-     * one-person offices; PLAN-WORKFLOW.md, A3): the Walne Zgranie, ZK, KSK, KKR, KKW, the press
-     * spokesperson and the ZK IT proxy. The A4 model package may add the Rada Krajowa here.
+     * one-person offices; PLAN-WORKFLOW.md, A3): the Walne Zgranie, ZK, the Rada Krajowa, KSK, KKR,
+     * KKW, the press spokesperson and the ZK IT proxy.
      */
     private static final Set<BodyKind> ONE_IN_THE_COUNTRY = Set.of(
         BodyKind.GENERAL_ASSEMBLY,
         BodyKind.NATIONAL_BOARD,
+        BodyKind.NATIONAL_COUNCIL,
         BodyKind.PEER_COURT,
         BodyKind.AUDIT_COMMISSION,
         BodyKind.ELECTORAL_COMMISSION,
@@ -64,14 +65,13 @@ class DefaultBodyService implements BodyService {
     );
 
     /**
-     * Kinds that exist at most once per district (parent body): WZO, ZO, the district treasurer
-     * and the district commissioner. Local circles, teams and the districts themselves are not
+     * Kinds that exist at most once per district (parent body): WZO, ZO and the district
+     * commissioner. Local circles, teams and the districts themselves are not
      * limited by the statute — any number of them may exist.
      */
     private static final Set<BodyKind> ONE_PER_DISTRICT = Set.of(
         BodyKind.DISTRICT_ASSEMBLY,
         BodyKind.DISTRICT_BOARD,
-        BodyKind.DISTRICT_TREASURER,
         BodyKind.DISTRICT_COMMISSIONER
     );
 

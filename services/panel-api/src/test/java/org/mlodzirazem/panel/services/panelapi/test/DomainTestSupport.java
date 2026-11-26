@@ -80,6 +80,7 @@ public abstract class DomainTestSupport {
         jdbc.execute("DELETE FROM member_change_requests");
         jdbc.execute("DELETE FROM member_district_affiliations");
         jdbc.execute("DELETE FROM body_memberships");
+        removeDistrictReaderFunction();
         jdbc.execute("DELETE FROM suspensions");
         jdbc.execute("DELETE FROM bodies WHERE code IS NULL OR code LIKE 'test-%'");
         jdbc.execute("DELETE FROM member_identities");
@@ -92,6 +93,35 @@ public abstract class DomainTestSupport {
             "member_fee_tiers", "fee_sender_ibans", "fee_tier_rates", "fee_tiers"}) {
             jdbc.execute("DELETE FROM " + table);
         }
+    }
+
+    /**
+     * Gives the member a district function that can read but not manage. No seeded function is like that any more
+     * (the ZO treasurer has at least the board's rights), while the "read is not manage" checks still need one.
+     * Test-only data: created on demand and removed around every test.
+     */
+    protected TBodyMembership grantDistrictReader(TMember member, String districtSlug) {
+        jdbc.execute("INSERT INTO permission_group (name, scope, is_admin) VALUES ('Test district reader', 'LOCAL', FALSE) "
+            + "ON CONFLICT (scope, name) DO NOTHING");
+        jdbc.execute("INSERT INTO permission_group_permissions (permission_group_id, permission_type) "
+            + "SELECT g.id, v.type::permission_type FROM permission_group g, "
+            + "(VALUES ('CONTACT_PERSONAL_DATA_READ'), ('FEES_READ'), ('RECRUITMENT_READ')) AS v (type) "
+            + "WHERE g.name = 'Test district reader' ON CONFLICT DO NOTHING");
+        jdbc.execute("INSERT INTO body_template_member_types (name, code, is_default, body_template_id, permission_group_id) "
+            + "SELECT 'Test reader', 'TEST_READER', FALSE, t.id, g.id FROM body_templates t, permission_group g "
+            + "WHERE t.kind = 'DISTRICT_BOARD' AND g.name = 'Test district reader' "
+            + "ON CONFLICT (body_template_id, code) DO NOTHING");
+        return grant(member, board(districtSlug), "TEST_READER");
+    }
+
+    @AfterEach
+    protected void removeDistrictReaderFunction() {
+        jdbc.execute("DELETE FROM body_memberships WHERE member_type_id IN "
+            + "(SELECT id FROM body_template_member_types WHERE code = 'TEST_READER')");
+        jdbc.execute("DELETE FROM body_template_member_types WHERE code = 'TEST_READER'");
+        jdbc.execute("DELETE FROM permission_group_permissions WHERE permission_group_id IN "
+            + "(SELECT id FROM permission_group WHERE name = 'Test district reader')");
+        jdbc.execute("DELETE FROM permission_group WHERE name = 'Test district reader'");
     }
 
     protected TMember newMember(String first, String last, String districtSlug) {

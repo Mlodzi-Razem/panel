@@ -45,7 +45,7 @@ class RecruitmentApiTest extends ApiTestSupport {
     TMember zoA;
     TMember zoB;
     TMember zk;
-    TMember treasurerA;
+    TMember readerA;
     TMember plain;
 
     @BeforeEach
@@ -56,8 +56,8 @@ class RecruitmentApiTest extends ApiTestSupport {
         grant(zoB, board("slaskie"), "COORDINATOR");
         zk = linked(newMember("Karol", "Krajowy", "pomorskie"));
         grant(zk, body("national-board"), "SECRETARY");
-        treasurerA = linked(newMember("Tola", "Skarbnik", "mazowieckie"));
-        grant(treasurerA, body("district-mazowieckie-treasurer"), "TREASURER");
+        readerA = linked(newMember("Tola", "Czytelnik", "mazowieckie"));
+        grantDistrictReader(readerA, "mazowieckie");
         plain = linked(newMember("Pat", "Plain", "slaskie"));
     }
 
@@ -96,7 +96,7 @@ class RecruitmentApiTest extends ApiTestSupport {
         assertThat(post(zoA, "/recruitment-cases", caseBody(slaskie(),
             candidate("Obcy", "Cudzy", "cudzy@example.org"))).status()).isEqualTo(403);
 
-        assertThat(post(treasurerA, "/recruitment-cases", body).status()).isEqualTo(403);
+        assertThat(post(readerA, "/recruitment-cases", body).status()).isEqualTo(403);
         assertThat(post(zk, "/recruitment-cases", body).status()).isEqualTo(403);
         assertThat(post(plain, "/recruitment-cases", body).status()).isEqualTo(403);
     }
@@ -160,7 +160,7 @@ class RecruitmentApiTest extends ApiTestSupport {
         Res asZk = get(zk, "/recruitment-cases?size=100");
         assertThat(asZk.body().path("totalItems").asLong()).isEqualTo(3);
 
-        assertThat(get(treasurerA, "/recruitment-cases?size=100").body().path("totalItems").asLong()).isEqualTo(2);
+        assertThat(get(readerA, "/recruitment-cases?size=100").body().path("totalItems").asLong()).isEqualTo(2);
         assertThat(get(plain, "/recruitment-cases").status()).isEqualTo(403);
 
         long slaskieCase = get(zoB, "/recruitment-cases?size=100").body().path("items").get(0).path("id").asLong();
@@ -193,7 +193,7 @@ class RecruitmentApiTest extends ApiTestSupport {
         assertThat(own.body().path("events")).hasSize(1);
 
         assertThat(get(zoA, "/recruitment-cases/" + caseBId).status()).isEqualTo(403);
-        assertThat(get(treasurerA, "/recruitment-cases/" + caseAId).status()).isEqualTo(200);
+        assertThat(get(readerA, "/recruitment-cases/" + caseAId).status()).isEqualTo(200);
         assertThat(get(zk, "/recruitment-cases/" + caseBId).status()).isEqualTo(200);
         assertThat(get(plain, "/recruitment-cases/" + caseAId).status()).isEqualTo(403);
         assertThat(get(zoA, "/recruitment-cases/999999").status()).isEqualTo(404);
@@ -236,7 +236,7 @@ class RecruitmentApiTest extends ApiTestSupport {
         assertThat(closedAgain.status()).isEqualTo(409);
         assertThat(closedAgain.code()).isEqualTo("CASE_NOT_OPEN");
 
-        assertThat(post(treasurerA, "/recruitment-cases/" + caseId + "/transitions",
+        assertThat(post(readerA, "/recruitment-cases/" + caseId + "/transitions",
             Map.of("target", "IN_PROGRESS")).status()).isEqualTo(403);
         assertThat(post(zoB, "/recruitment-cases/" + caseId + "/transitions",
             Map.of("target", "IN_PROGRESS")).status()).isEqualTo(403);
@@ -256,7 +256,7 @@ class RecruitmentApiTest extends ApiTestSupport {
         assertThat(reminder.body().path("events")).hasSize(3);
         assertThat(reminder.body().path("events").get(2).path("eventType").asString()).isEqualTo("REMINDER_SENT");
 
-        assertThat(post(treasurerA, "/recruitment-cases/" + caseId + "/notes", Map.of("note", "x")).status()).isEqualTo(403);
+        assertThat(post(readerA, "/recruitment-cases/" + caseId + "/notes", Map.of("note", "x")).status()).isEqualTo(403);
     }
 
     @Test
@@ -275,7 +275,7 @@ class RecruitmentApiTest extends ApiTestSupport {
         assertThat(cleared.status()).isEqualTo(200);
         assertThat(cleared.body().has("candidatePhone")).isFalse();
 
-        assertThat(patch(treasurerA, "/recruitment-cases/" + caseId,
+        assertThat(patch(readerA, "/recruitment-cases/" + caseId,
             Map.of("candidate", Map.of("candidatePhone", "+48 111"))).status()).isEqualTo(403);
         assertThat(patch(zoB, "/recruitment-cases/" + caseId,
             Map.of("candidate", Map.of("candidatePhone", "+48 111"))).status()).isEqualTo(403);
@@ -326,7 +326,7 @@ class RecruitmentApiTest extends ApiTestSupport {
             .forEach(node -> reasons.add(node.asText()));
         assertThat(reasons).containsExactly("FALSE_ENTRY");
 
-        assertThat(get(treasurerA, "/recruitment-cases/" + caseId + "/transitions").status()).isEqualTo(200);
+        assertThat(get(readerA, "/recruitment-cases/" + caseId + "/transitions").status()).isEqualTo(200);
         assertThat(get(zoB, "/recruitment-cases/" + caseId + "/transitions").status()).isEqualTo(403);
         assertThat(get(plain, "/recruitment-cases/" + caseId + "/transitions").status()).isEqualTo(403);
         assertThat(get(zoA, "/recruitment-cases/999999/transitions").status()).isEqualTo(404);
@@ -394,7 +394,7 @@ class RecruitmentApiTest extends ApiTestSupport {
         assertThat(fieldValues(options, "target"))
             .containsExactly("PROBATION_EXTENDED", "ZO_RECOMMENDED", "REJECTED");
 
-        assertThat(post(treasurerA, "/recruitment-cases/" + caseId + "/transitions",
+        assertThat(post(readerA, "/recruitment-cases/" + caseId + "/transitions",
             Map.of("target", "ZK_VOTING")).status()).isEqualTo(403);
         assertThat(post(zoB, "/recruitment-cases/" + caseId + "/transitions",
             Map.of("target", "ZK_VOTING")).status()).isEqualTo(403);

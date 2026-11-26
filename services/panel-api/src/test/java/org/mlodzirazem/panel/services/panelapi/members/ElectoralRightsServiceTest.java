@@ -114,7 +114,7 @@ class ElectoralRightsServiceTest extends DomainTestSupport {
         grant(kkwOnly, body("electoral-commission"), "CHAIR");
         grant(zoOnly, board("mazowieckie"), "COORDINATOR");
         grant(kkwAndTreasurer, body("electoral-commission"), "MEMBER");
-        grant(kkwAndTreasurer, body("district-slaskie-treasurer"), "TREASURER");
+        grant(kkwAndTreasurer, board("slaskie"), "TREASURER");
 
         assertThat(service.kkwMembersWithDistrictFunctions()).extracting(KkwDistrictFunction::memberId)
                                                              .containsExactlyInAnyOrder(kkwAndZo.getId(), kkwAndTreasurer.getId());

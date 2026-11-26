@@ -264,6 +264,7 @@ const enMessages = {
         bodyKind: {
             GENERAL_ASSEMBLY: "General Assembly (Walne Zebranie Osób Członkowskich)",
             NATIONAL_BOARD: "National Board (Zarząd Krajowy)",
+            NATIONAL_COUNCIL: "National Council (Rada Krajowa)",
             PEER_COURT: "National Peer Court (Krajowy Sąd Koleżeński)",
             AUDIT_COMMISSION: "National Audit Commission (Krajowa Komisja Rewizyjna)",
             ELECTORAL_COMMISSION: "National Electoral Commission (Krajowa Komisja Wyborcza)",
@@ -273,7 +274,6 @@ const enMessages = {
             DISTRICT: "District (Okręg)",
             DISTRICT_ASSEMBLY: "District Assembly (Walne Zebranie Okręgu)",
             DISTRICT_BOARD: "District Board (Zarząd Okręgu)",
-            DISTRICT_TREASURER: "District Treasurer",
             DISTRICT_COMMISSIONER: "District Commissioner (Osoba Komisarska Okręgu)",
             LOCAL_CIRCLE: "Local Circle (Koło terenowe)",
         },
