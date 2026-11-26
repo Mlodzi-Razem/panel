@@ -163,7 +163,11 @@ class RecruitmentEformApiTest extends ApiTestSupport {
     @Test
     void anonymousCandidateWalksLandingSubmitPdfAndSignature() throws Exception {
         long caseId = awaitingCase("edek-anon@example.org");
-        String token = createLink(201, zoA, caseId).body().path("token").asString();
+        Res link = createLink(201, zoA, caseId);
+        String token = link.body().path("token").asString();
+        // the default panel-web address of a local run; deployments set PANEL_WEB_URL
+        assertThat(link.body().path("formUrl").asString())
+            .isEqualTo("http://localhost:3000/rekrutacja/deklaracja/" + token);
         String pesel = SyntheticPesel.of(java.time.LocalDate.of(2007, 4, 1), 21);
 
         Res landing = call(HttpMethod.GET, "/public/declaration-form/" + token, null, null);
@@ -174,10 +178,11 @@ class RecruitmentEformApiTest extends ApiTestSupport {
         Res submit = call(HttpMethod.POST, "/public/declaration-form/" + token, null, submitBody(pesel));
         assertThat(submit.status()).isEqualTo(200);
         assertThat(submit.body().path("status").asString()).isEqualTo("FILLED");
-        assertThat(submit.body().path("pdfUrl").asString()).endsWith("/pdf");
+        String pdfUrl = submit.body().path("pdfUrl").asString();
+        assertThat(pdfUrl).isEqualTo("/public/declaration-form/" + token + "/pdf");
 
         ResponseEntity<byte[]> pdf = anon.get()
-            .uri("http://localhost:" + port + "/public/declaration-form/" + token + "/pdf")
+            .uri("http://localhost:" + port + pdfUrl)
             .retrieve().toEntity(byte[].class);
 
         assertThat(pdf.getStatusCode().value()).isEqualTo(200);

@@ -137,6 +137,11 @@ const PanelApi = z.object({
         externalized: False,
     }),
     config: z.union([z.json(), z.string()]),
+    declarations: z.object({
+        existingClaim: z.string().optional(),
+        storageClassName: z.string().optional(),
+        sizeGigabytes: z.number().int().min(1),
+    }).describe("Persistent volume of the signed declarations and paper scans (personal data)."),
     networkPolicy: z.object({
         enabled: z.boolean(),
         monitoringNamespace: z.string(),

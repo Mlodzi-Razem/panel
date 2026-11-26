@@ -51,6 +51,14 @@ panel:
     imagePullSecret: ''
     service:
       type: ClusterIP
+    # Persistent volume of the signed declarations and paper scans (personal data). The chart keeps the claim on
+    # helm uninstall. ReadWriteOnce: on a multi-node cluster a rolling update needs both pods on one node.
+    declarations:
+      # Use a claim created outside the chart instead of "panel-api-declarations"; the two settings below are then unused.
+      existingClaim: ''
+      # Empty = the cluster's default StorageClass. Immutable once the claim exists.
+      storageClassName: ''
+      sizeGigabytes: 1
     hpa:
       enabled: false #multiple replicas are not supported at the moment because of the lack of external cache support
     cache:

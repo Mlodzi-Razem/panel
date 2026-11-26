@@ -88,7 +88,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     groupadd --system --gid 10001 mrpanel && \
     useradd --system --uid 10001 --gid mrpanel --no-create-home \
-        --shell /usr/sbin/nologin mrpanel
+        --shell /usr/sbin/nologin mrpanel && \
+    install -d -o 10001 -g 10001 -m 700 /var/lib/panel/declarations
 
 WORKDIR /application
 

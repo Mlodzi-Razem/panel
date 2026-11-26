@@ -1,5 +1,6 @@
 {{- $defaultImage := print "ghcr.io/mlodzi-razem/panel-api:" .Chart.AppVersion -}}
 {{- $configMountPath := "/mnt/config" -}}
+{{- $declarationsMountPath := "/var/lib/panel/declarations" -}}
 {{- $cnpgEnabled := dig "cnpg" "install" false .Values.panel.postgres -}}
 {{- $jdbcUrl := (ternary
   (print "jdbc:postgresql://cnpg-rw." .Release.Namespace ".svc.cluster.local:5432/mrpanel")
@@ -36,7 +37,33 @@ spec:
             secretName: panel-api-config
             optional: false
             defaultMode: 0444
+        - name: declarations
+          persistentVolumeClaim:
+            claimName: {{ tpl (.Values.panel.api.declarations.existingClaim | default "panel-api-declarations") . }}
       hostname: {{ .Release.Namespace }}-panel-api
+      initContainers:
+        # Hands the volume to the API user and closes it to everyone else. Needed because kubelet's fsGroup
+        # does not apply to hostPath-backed classes (microk8s-hostpath). The only root container of the pod.
+        - name: declarations-permissions
+          image: {{ tpl (.Values.panel.api.image | default $defaultImage) . }}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c", "chown 10001:10001 {{ $declarationsMountPath }} && chmod 700 {{ $declarationsMountPath }}"]
+          volumeMounts:
+            - mountPath: {{ $declarationsMountPath }}
+              name: declarations
+          resources:
+            limits:
+              memory: 64Mi
+            requests:
+              cpu: 10m
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+              add: ["CHOWN", "FOWNER"]
       containers:
         - name: panel-api
           ports:
@@ -52,6 +79,8 @@ spec:
             - mountPath: {{ $configMountPath }}
               name: config
               readOnly: true
+            - mountPath: {{ $declarationsMountPath }}
+              name: declarations
           resources:
             limits:
               memory: {{ tpl (toString .Values.panel.api.replicaResources.maximumMemoryMb) . }}Mi
@@ -72,6 +101,11 @@ spec:
                   key: password
                   name: {{ $postgresSecret }}
                   optional: false
+            # e-declaration: files go to the persistent volume, the candidate link to the public web address
+            - name: PANEL_DECLARATIONS_DIR
+              value: {{ $declarationsMountPath }}
+            - name: PANEL_WEB_URL
+              value: {{ tpl .Values.panel.web.url . | quote }}
             # use the configuration file defined in panel.api.config
             - name: PANEL_CONFIG_FILE_PATH
               value: {{ $configMountPath }}/panel-pod-config.yaml

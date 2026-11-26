@@ -57,7 +57,12 @@ services:
       # No OTLP collector on stage; silence the export noise.
       MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: ${MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED:-false}
       MANAGEMENT_OTLP_TRACING_EXPORT_ENABLED: ${MANAGEMENT_OTLP_TRACING_EXPORT_ENABLED:-false}
+      # e-declaration: the candidate link is built on the public web address.
+      PANEL_WEB_URL: ${NEXTAUTH_URL:?Set NEXTAUTH_URL in .env.stage}
+      PANEL_DECLARATIONS_DIR: /var/lib/panel/declarations
     volumes:
+      # Signed declarations and paper scans (personal data); "down -v" deletes them.
+      - declarations-data:/var/lib/panel/declarations
       # Optional owner-only config (Entra certificates for SSO). The directory
       # is empty until the SSO checklist (RUNBOOK §8); PANEL_CONFIG_FILE_PATH
       # points at /panel-config/panel-config.yaml inside the container.
@@ -118,6 +123,7 @@ services:
     logging: *default-logging
 
 volumes:
+  declarations-data:
   postgres-data:
   caddy-data:
   caddy-config:
