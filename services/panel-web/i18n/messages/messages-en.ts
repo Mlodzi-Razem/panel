@@ -1311,6 +1311,8 @@ const enMessages = {
             birthDateConfirmation: "Confirm your birth date.",
             checkFields: "Check the marked fields and try again.",
             admissionAge: "Under the Statute, the declaration cannot be accepted due to the age criterion. Contact your District Board.",
+            DECLARATION_BLOCKED: "This declaration cannot be accepted. Contact your district board.",
+            PERSONAL_ID_INVALID: "This PESEL number cannot be accepted. Check that it is typed correctly. If it is, contact your district board.",
             server: "The declaration could not be saved. Please try again in a moment.",
         },
         upload: {
