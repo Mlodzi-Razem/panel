@@ -1313,6 +1313,8 @@ const plMessages: typeof enMessages = {
             birthDateConfirmation: "Potwierdź swoją datę urodzenia.",
             checkFields: "Sprawdź zaznaczone pola i spróbuj ponownie.",
             admissionAge: "Zgodnie ze Statutem deklaracja nie może zostać przyjęta ze względu na kryterium wieku. Skontaktuj się z Zarządem Okręgu.",
+            DECLARATION_BLOCKED: "Tej deklaracji nie można przyjąć. Skontaktuj się z Zarządem Okręgu.",
+            PERSONAL_ID_INVALID: "Nie można przyjąć tego numeru PESEL. Sprawdź, czy jest wpisany poprawnie. Jeśli tak, skontaktuj się z Zarządem Okręgu.",
             server: "Nie udało się zapisać deklaracji. Spróbuj ponownie za chwilę.",
         },
         upload: {
