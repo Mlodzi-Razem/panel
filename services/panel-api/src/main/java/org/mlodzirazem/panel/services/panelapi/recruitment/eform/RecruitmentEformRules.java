@@ -43,7 +43,7 @@ public final class RecruitmentEformRules {
     public static final int TOKEN_BYTES = 32;
 
     /** Versioned artifact of the rendered declaration (template family "MR-deklaracja-2026"). */
-    public static final String TEMPLATE_VERSION = "MR-deklaracja-2026.1";
+    public static final String TEMPLATE_VERSION = "MR-deklaracja-2026.2";
 
     /** Marker for a future supporting-membership template variant of the same document. */
     public static final String TEMPLATE_VARIANT_SUPPORTING = "supporting";

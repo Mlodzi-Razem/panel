@@ -66,6 +66,7 @@ export default function DeclarationFormStep({token, onSubmitted, onFatal}: {
     const [values, setValues] = useState<Record<TextFieldName, string>>(EMPTY_VALUES);
     const [consentImage, setConsentImage] = useState(false);
     const [consentSpecialCategory, setConsentSpecialCategory] = useState(false);
+    const [infoDutyAck, setInfoDutyAck] = useState(false);
     const [birthDateConfirmed, setBirthDateConfirmed] = useState(false);
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [notice, setNotice] = useState<string | null>(null);
@@ -104,6 +105,9 @@ export default function DeclarationFormStep({token, onSubmitted, onFatal}: {
         if (!consentSpecialCategory) {
             errors.consentSpecialCategory = tErrors("consentSpecial");
         }
+        if (!infoDutyAck) {
+            errors.infoDutyAck = tErrors("infoDutyAck");
+        }
         if (!birthDateConfirmed) {
             errors.birthDateConfirmation = tErrors("birthDateConfirmation");
         }
@@ -135,6 +139,7 @@ export default function DeclarationFormStep({token, onSubmitted, onFatal}: {
                 email: optional(values.email),
                 imageConsent: consentImage,
                 specialCategoryConsent: consentSpecialCategory,
+                infoDutyAcknowledged: infoDutyAck,
             });
 
             if (result.ok) {
@@ -180,12 +185,18 @@ export default function DeclarationFormStep({token, onSubmitted, onFatal}: {
         if (serverField === "specialCategoryConsent") {
             return "consentSpecialCategory";
         }
+        if (serverField === "infoDutyAcknowledged") {
+            return "infoDutyAck";
+        }
         return serverField;
     }
 
     function fieldMessage(code: string, field: string): string {
         if (code === "PERSONAL_ID_INVALID" && (field === "personalId" || field === "personalIdNumber")) {
             return tErrors("peselChecksum");
+        }
+        if (code === "FIELD_REQUIRED" && field === "infoDutyAcknowledged") {
+            return tErrors("infoDutyAck");
         }
         return code === "FIELD_REQUIRED" ? tErrors("required") : tErrors("server");
     }
@@ -368,6 +379,30 @@ export default function DeclarationFormStep({token, onSubmitted, onFatal}: {
                 <li>{t("form.infoDutyNoAutomated")}</li>
             </ul>
         </details>
+
+        <fieldset className={styles.checkboxRow}>
+            <input type="checkbox"
+                   id="declaration-info-duty-ack"
+                   className={styles.checkbox}
+                   required
+                   aria-required="true"
+                   aria-invalid={fieldErrors.infoDutyAck ? true : undefined}
+                   aria-describedby={fieldErrors.infoDutyAck
+                       ? "declaration-info-duty-ack-hint declaration-info-duty-ack-error"
+                       : "declaration-info-duty-ack-hint"}
+                   checked={infoDutyAck}
+                   onChange={event => setInfoDutyAck(event.target.checked)}/>
+            <label className={styles.checkboxLabel} htmlFor="declaration-info-duty-ack">
+                {t("form.infoDutyAckLabel")}
+                <span id="declaration-info-duty-ack-hint" className={styles.checkboxHint}>
+                    {t("form.infoDutyAckHint")}
+                </span>
+            </label>
+        </fieldset>
+        {fieldErrors.infoDutyAck && <p id="declaration-info-duty-ack-error"
+                                      className={styles.checkboxError}>
+            {fieldErrors.infoDutyAck}
+        </p>}
 
         {notice && <Notice tone="danger" role="alert"><p>{notice}</p></Notice>}
 

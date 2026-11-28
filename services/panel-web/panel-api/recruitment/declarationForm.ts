@@ -62,7 +62,7 @@ export type GetDeclarationFormResult =
 
 /**
  * The submit wire mirrors the panel-api `DeclarationFormRequest` record field-for-field:
- * canonical keys `personalId`, `imageConsent`, `specialCategoryConsent`, optional `email`.
+ * canonical keys `personalId`, `imageConsent`, `specialCategoryConsent`, `infoDutyAcknowledged`, optional `email`.
  * The birth-date confirmation is a DeclarationFormStep-local UX gate (FE asks only, never sends).
  */
 export const submissionValuesSchema = z.object({
@@ -76,6 +76,7 @@ export const submissionValuesSchema = z.object({
     email: z.string().trim().optional(),
     imageConsent: z.boolean(),
     specialCategoryConsent: z.boolean(),
+    infoDutyAcknowledged: z.boolean(),
 });
 export type SubmissionValues = z.infer<typeof submissionValuesSchema>;
 

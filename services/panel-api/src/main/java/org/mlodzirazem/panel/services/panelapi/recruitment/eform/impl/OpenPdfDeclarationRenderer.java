@@ -38,8 +38,9 @@ import java.util.function.Supplier;
 
 /**
  * Server-side rendering of the declaration PDF, paper-faithful layout of the versioned template
- * "MR-deklaracja-2026.1" (owner decisions of 2026-11-22): no correspondence address block, the
- * under-16 parent block dropped, the fill date canonic and server-set, no miejscowość field.
+ * "MR-deklaracja-2026.2" (owner decisions of 2026-11-22): no correspondence address block, the
+ * under-16 parent block dropped, the fill date canonic and server-set, no miejscowość field; 2026.2
+ * adds the information-duty acknowledgement line.
  * The supporting-membership variant is a template marker only (outside the workflow engine).
  * The RODO information duty lives in the footer of the rendered document.
  */
@@ -111,6 +112,8 @@ class OpenPdfDeclarationRenderer implements DeclarationPdfRenderer {
 
             document.add(new Paragraph("Do deklaracji dołączam:", body));
             document.add(new Paragraph("     zgodę na przetwarzanie danych osobowych", body));
+            document.add(emptyLine(body));
+            document.add(new Paragraph("Potwierdzam zapoznanie się z obowiązkiem informacyjnym: tak", body));
             document.add(emptyLine(body));
             document.add(emptyLine(body));
 
