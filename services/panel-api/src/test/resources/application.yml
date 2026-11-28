@@ -3,8 +3,26 @@ spring:
     active: test
   jpa:
     show-sql: true
+  # same as main application.yml: this file shadows it on the test classpath, so the block is repeated
+  modulith:
+    events:
+      jdbc:
+        schema-initialization:
+          enabled: false
+        schema: "events"
+      completion-mode: update
+      republish-outstanding-events-on-restart: true
+      staleness:
+        processing: 1h
+        published: 2h
+        resubmission: 1h
+        check-intervall: 15m
 debug: true
 panel:
   api:
     auth:
       secret: test-secret-test-secret-test-secret-0123456789
+  modulith:
+    events:
+      completed-retention-days: 30
+      alarm-attempts: 5

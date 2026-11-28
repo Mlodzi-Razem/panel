@@ -23,16 +23,24 @@ spring:
     locations: "classpath:db/migration"
   modulith:
     events:
+      # table events.event_publication is created by Flyway (V0.0.26.00), not by Modulith at startup
       jdbc:
         schema-initialization:
-          enabled: true
+          enabled: false
         schema: "events"
       completion-mode: update
+      republish-outstanding-events-on-restart: true
       staleness:
         processing: 1h
         published: 2h
         resubmission: 1h
+        # the key is spelled "check-intervall" in spring-modulith-events-core 2.0.1 metadata; "check-interval" is not a property
         check-intervall: 15m
+panel:
+  modulith:
+    events:
+      completed-retention-days: 30
+      alarm-attempts: 5
 server:
   port: 8080
   shutdown: graceful
