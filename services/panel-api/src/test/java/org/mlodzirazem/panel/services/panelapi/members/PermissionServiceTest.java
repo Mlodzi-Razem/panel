@@ -40,10 +40,13 @@ import static org.mlodzirazem.panel.services.panelapi.persistence.entity.permiss
 import static org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType.FORMAL_PERSONAL_DATA_MANAGE;
 import static org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType.FORMAL_PERSONAL_DATA_READ;
 import static org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType.RECRUITMENT_READ;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.MembershipRemovalGround;
 
 @SpringBootTest
 @PostgresTest
 class PermissionServiceTest extends DomainTestSupport {
+    @Autowired
+    MembershipActService acts;
     @Autowired
     PermissionService permissionService;
 
@@ -245,7 +248,8 @@ class PermissionServiceTest extends DomainTestSupport {
         grant(ended, board("opolskie"), "COORDINATOR", today.minusYears(2), today.minusDays(1));
         grant(future, board("opolskie"), "COORDINATOR", today.plusDays(5), null);
         grant(removed, board("opolskie"), "COORDINATOR");
-        memberService.update(removed.getId(), Map.of(MemberField.STATUS, MemberStatus.REMOVED));
+        acts.remove(new MembershipActService.Remove(removed.getId(), MembershipRemovalGround.RESIGNATION, today,
+            "TEST-REM-1"));
 
         assertThat(permissionService.of(ended.getId()).isEmpty()).isTrue();
         assertThat(permissionService.of(future.getId()).isEmpty()).isTrue();

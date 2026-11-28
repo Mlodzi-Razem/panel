@@ -22,17 +22,28 @@ import org.jspecify.annotations.Nullable;
 import java.time.LocalDate;
 import java.util.Map;
 
+/**
+ * @param allowMembershipType internal path only: membership type other than ORDINARY may be set on creation
+ *                            (membership acts and the transitional import of supporting members). Anything else
+ *                            goes through {@link MembershipActService}.
+ */
 public record NewMember(
     Map<MemberField, @Nullable Object> values,
     long primaryDistrictId,
     boolean enforceAdmissionAge,
-    @Nullable LocalDate affiliationValidFrom
+    @Nullable LocalDate affiliationValidFrom,
+    boolean allowMembershipType
 ) {
+    public NewMember(Map<MemberField, @Nullable Object> values, long primaryDistrictId, boolean enforceAdmissionAge,
+        @Nullable LocalDate affiliationValidFrom) {
+        this(values, primaryDistrictId, enforceAdmissionAge, affiliationValidFrom, false);
+    }
+
     public NewMember(Map<MemberField, @Nullable Object> values, long primaryDistrictId, boolean enforceAdmissionAge) {
-        this(values, primaryDistrictId, enforceAdmissionAge, null);
+        this(values, primaryDistrictId, enforceAdmissionAge, null, false);
     }
 
     public NewMember(Map<MemberField, @Nullable Object> values, long primaryDistrictId) {
-        this(values, primaryDistrictId, true, null);
+        this(values, primaryDistrictId, true, null, false);
     }
 }

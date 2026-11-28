@@ -60,12 +60,17 @@ function Input({def, values, requireMandatory}: {
                               defaultValue={asList(values[def.name])}
                               type={def.name.toLowerCase().includes('email') ? 'email'
                                   : def.name === 'phoneNumbers' ? 'tel' : 'text'}/>;
-        case 'status':
+        case 'status': {
+            // REMOVED is reached only by a removal act; it is offered only when the member already has it
+            const current = asString(values[def.name]);
             return <SelectField name={def.name}
                                 label={label}
-                                defaultValue={asString(values[def.name]) || (requireMandatory ? 'ACTIVE' : '')}
+                                defaultValue={current || (requireMandatory ? 'ACTIVE' : '')}
                                 emptyLabel={requireMandatory ? undefined : tMembers('notSet')}
-                                options={MEMBER_STATUSES.map(v => ({value: v, label: tEnums(`memberStatus.${v}`)}))}/>;
+                                options={MEMBER_STATUSES
+                                    .filter(v => v !== 'REMOVED' || current === 'REMOVED')
+                                    .map(v => ({value: v, label: tEnums(`memberStatus.${v}`)}))}/>;
+        }
         case 'membershipType':
             return <SelectField name={def.name}
                                 label={label}
@@ -96,9 +101,10 @@ function Input({def, values, requireMandatory}: {
 
 export default function FieldInputs({defs, values = {}, requireMandatory = false, showGroupTitles = true}: FieldInputsProps) {
     const tGroups = useTranslations('fieldGroups');
+    const editable = defs.filter(d => !d.readOnly);
     return <>
         {FIELD_GROUPS.map(group => {
-            const groupDefs = defs.filter(d => d.group === group);
+            const groupDefs = editable.filter(d => d.group === group);
             if (groupDefs.length === 0) {
                 return null;
             }

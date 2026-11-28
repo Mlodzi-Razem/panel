@@ -26,7 +26,6 @@ import org.mlodzirazem.panel.services.panelapi.core.error.ConstraintConflicts;
 import org.mlodzirazem.panel.services.panelapi.core.error.NotFoundException;
 import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
 import org.mlodzirazem.panel.services.panelapi.members.AffiliationService;
-import org.mlodzirazem.panel.services.panelapi.members.BodiesManagerGuard;
 import org.mlodzirazem.panel.services.panelapi.members.CurrentMemberResolver;
 import org.mlodzirazem.panel.services.panelapi.members.MemberFeeStateChanged;
 import org.mlodzirazem.panel.services.panelapi.members.MemberField;
@@ -95,7 +94,6 @@ class DefaultMemberService implements MemberService {
 
     private final TMemberRepository members;
     private final AffiliationService affiliations;
-    private final BodiesManagerGuard bodiesManagerGuard;
     private final CurrentMemberResolver currentMemberResolver;
     private final AuditLog auditLog;
     private final ApplicationEventPublisher events;
@@ -110,6 +108,8 @@ class DefaultMemberService implements MemberService {
     @Override
     @Transactional
     public TMember create(NewMember newMember) {
+        rejectMembershipActValuesOnCreate(newMember);
+
         for (MemberField required : List.of(
             MemberField.PREFERRED_NAME_FIRST,
             MemberField.PREFERRED_NAME_LAST,
@@ -155,19 +155,9 @@ class DefaultMemberService implements MemberService {
     @Override
     @Transactional
     public MemberUpdate update(long memberId, Map<MemberField, @Nullable Object> changes) {
-        boolean removing = changes.get(MemberField.STATUS) == MemberStatus.REMOVED;
-
-        if (removing) {
-            bodiesManagerGuard.lock();
-        }
-
         TMember member = get(memberId);
 
-        if (removing && member.getStatus() != MemberStatus.REMOVED
-            && bodiesManagerGuard.wouldLeaveNone(List.of(), memberId, 0)) {
-            throw new RuleViolationException(BodiesManagerGuard.VIOLATION_CODE,
-                "Removing this member would leave nobody able to manage bodies");
-        }
+        rejectMembershipActChanges(member, changes);
 
         Set<MemberField> changed = apply(member, changes);
 
@@ -201,6 +191,57 @@ class DefaultMemberService implements MemberService {
             EnumSet.of(MembershipType.ORDINARY, MembershipType.SUPPORTING),
             EnumSet.of(MemberStatus.ACTIVE, MemberStatus.SUSPENDED, MemberStatus.PROBATION)
         );
+    }
+
+    /**
+     * Status, membership type and removal date change only through {@link
+     * org.mlodzirazem.panel.services.panelapi.members.MembershipActService}: every such change is a resolution with a
+     * decision reference, recorded in the acts register. A plain update that would make or undo a removal, or change
+     * the membership type in any way (ordinary, supporting, honorary), or the removal date is refused.
+     */
+    private static void rejectMembershipActChanges(TMember member, Map<MemberField, @Nullable Object> changes) {
+        if (changes.containsKey(MemberField.STATUS)) {
+            Object next = changes.get(MemberField.STATUS);
+
+            boolean removal = next == MemberStatus.REMOVED || member.getStatus() == MemberStatus.REMOVED;
+
+            if (next != member.getStatus() && removal) {
+                throw membershipActRequired(MemberField.STATUS);
+            }
+        }
+
+        if (changes.containsKey(MemberField.REMOVED_AT) && !Objects.equals(changes.get(MemberField.REMOVED_AT),
+            member.getRemovedAt())) {
+            throw membershipActRequired(MemberField.REMOVED_AT);
+        }
+
+        if (changes.containsKey(MemberField.MEMBERSHIP_TYPE)) {
+            Object next = changes.get(MemberField.MEMBERSHIP_TYPE);
+
+            if (next != member.getMembershipType()) {
+                throw membershipActRequired(MemberField.MEMBERSHIP_TYPE);
+            }
+        }
+    }
+
+    /** Creation may not start a member as removed or as honorary/supporting, except through the acts service. */
+    private static void rejectMembershipActValuesOnCreate(NewMember newMember) {
+        Map<MemberField, @Nullable Object> values = newMember.values();
+
+        if (values.get(MemberField.STATUS) == MemberStatus.REMOVED || values.get(MemberField.REMOVED_AT) != null) {
+            throw membershipActRequired(MemberField.STATUS);
+        }
+
+        Object type = values.get(MemberField.MEMBERSHIP_TYPE);
+
+        if (type != null && type != MembershipType.ORDINARY && !newMember.allowMembershipType()) {
+            throw membershipActRequired(MemberField.MEMBERSHIP_TYPE);
+        }
+    }
+
+    private static ConflictException membershipActRequired(MemberField field) {
+        return new ConflictException("MEMBERSHIP_ACT_REQUIRED",
+            "This change is made only by a membership act with a decision reference", List.of(field.propertyName()));
     }
 
     private static Set<MemberField> apply(TMember member, Map<MemberField, @Nullable Object> values) {

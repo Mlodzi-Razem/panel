@@ -30,10 +30,13 @@ import java.time.LocalDate;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.MembershipRemovalGround;
 
 @SpringBootTest
 @PostgresTest
 class ElectoralRightsServiceTest extends DomainTestSupport {
+    @Autowired
+    MembershipActService acts;
     @Autowired
     ElectoralRightsService service;
 
@@ -65,9 +68,12 @@ class ElectoralRightsServiceTest extends DomainTestSupport {
         TMember pastSuspension = newMember("Pas", "Tsus", "mazowieckie");
         TMember eligible = newMember("Eli", "Gible", "mazowieckie");
 
-        memberService.update(supporting.getId(), Map.of(MemberField.MEMBERSHIP_TYPE, MembershipType.SUPPORTING));
-        memberService.update(honorary.getId(), Map.of(MemberField.MEMBERSHIP_TYPE, MembershipType.HONORARY));
-        memberService.update(removed.getId(), Map.of(MemberField.STATUS, MemberStatus.REMOVED));
+        acts.changeMembershipType(new MembershipActService.ChangeMembershipType(supporting.getId(),
+            MembershipType.SUPPORTING, LocalDate.now(), "TEST-TYPE-1", "zmiana rodzaju"));
+        acts.grantHonoraryToMember(new MembershipActService.GrantHonoraryToMember(honorary.getId(), LocalDate.now(),
+            "TEST-HON-1"));
+        acts.remove(new MembershipActService.Remove(removed.getId(), MembershipRemovalGround.RESIGNATION,
+            LocalDate.now(), "TEST-REM-1"));
         memberService.update(probation.getId(), Map.of(MemberField.STATUS, MemberStatus.PROBATION));
         memberService.update(statusSuspended.getId(), Map.of(MemberField.STATUS, MemberStatus.SUSPENDED));
         suspend(suspended, LocalDate.now().minusDays(10), null);

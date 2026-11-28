@@ -25,6 +25,8 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.Members
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember;
 import org.mlodzirazem.panel.services.panelapi.test.DomainTestSupport;
 import org.mlodzirazem.panel.services.panelapi.test.db.PostgresTest;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.MembershipRemovalGround;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.LocalDate;
@@ -38,6 +40,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest
 @PostgresTest
 class MemberServiceTest extends DomainTestSupport {
+    @Autowired
+    MembershipActService acts;
+
     @Test
     void roundTripsAllColumns() {
         Map<MemberField, Object> values = new EnumMap<>(MemberField.class);
@@ -59,7 +64,6 @@ class MemberServiceTest extends DomainTestSupport {
         values.put(MemberField.REQUEST_DATE, LocalDate.of(2024, 4, 1));
         values.put(MemberField.PROBATION_PERIOD_START_DATE, LocalDate.of(2024, 5, 1));
         values.put(MemberField.PROBATION_PERIOD_END_DATE, LocalDate.of(2024, 8, 1));
-        values.put(MemberField.REMOVED_AT, LocalDate.of(2030, 1, 1));
         values.put(MemberField.FORMAL_IDENTIFIER, "03030300000");
         values.put(MemberField.BIRTH_DATE, LocalDate.of(2003, 3, 3));
         values.put(MemberField.ADDRESS_LINE, "ul. Testowa 1/2, Warszawa");
@@ -75,7 +79,8 @@ class MemberServiceTest extends DomainTestSupport {
         values.put(MemberField.STATUS, MemberStatus.PROBATION);
         values.put(MemberField.MEMBERSHIP_TYPE, MembershipType.SUPPORTING);
 
-        TMember created = memberService.create(new NewMember(values, district("mazowieckie").getId(), false));
+        TMember created = memberService.create(new NewMember(values, district("mazowieckie").getId(), false, null,
+            true));
         TMember loaded = memberRepository.findById(created.getId()).orElseThrow();
 
         for (MemberField field : MemberField.values()) {
@@ -135,15 +140,15 @@ class MemberServiceTest extends DomainTestSupport {
             .isInstanceOf(RuleViolationException.class)
             .extracting("code").isEqualTo("ADMISSION_AGE");
 
-        TMember honorary = memberService.create(new NewMember(
+        assertThatThrownBy(() -> memberService.create(new NewMember(
             Map.of(
                 MemberField.PREFERRED_NAME_FIRST, "Old", MemberField.PREFERRED_NAME_LAST, "Timer",
                 MemberField.FORMAL_NAME_FIRST, "Old", MemberField.FORMAL_NAME_LAST, "Timer",
                 MemberField.BIRTH_DATE, LocalDate.now().minusYears(40),
                 MemberField.MEMBERSHIP_TYPE, MembershipType.HONORARY),
-            district("mazowieckie").getId()));
-
-        assertThat(honorary.getMembershipType()).isEqualTo(MembershipType.HONORARY);
+            district("mazowieckie").getId())))
+            .isInstanceOf(ConflictException.class)
+            .extracting("code").isEqualTo("MEMBERSHIP_ACT_REQUIRED");
     }
 
     @Test
@@ -270,13 +275,16 @@ class MemberServiceTest extends DomainTestSupport {
 
         LocalDate bornInYear = LocalDate.of(year - 26, 12, 31);
         memberService.update(ending.getId(), Map.of(MemberField.BIRTH_DATE, LocalDate.of(year - 26, 1, 1)));
-        memberService.update(supportingEnding.getId(), Map.of(MemberField.BIRTH_DATE, bornInYear,
-            MemberField.MEMBERSHIP_TYPE, MembershipType.SUPPORTING));
-        memberService.update(honorary.getId(), Map.of(MemberField.BIRTH_DATE, bornInYear,
-            MemberField.MEMBERSHIP_TYPE, MembershipType.HONORARY));
+        memberService.update(supportingEnding.getId(), Map.of(MemberField.BIRTH_DATE, bornInYear));
+        acts.changeMembershipType(new MembershipActService.ChangeMembershipType(supportingEnding.getId(),
+            MembershipType.SUPPORTING, LocalDate.now(), "TEST-TYPE-1", "zmiana rodzaju"));
+        memberService.update(honorary.getId(), Map.of(MemberField.BIRTH_DATE, bornInYear));
+        acts.grantHonoraryToMember(new MembershipActService.GrantHonoraryToMember(honorary.getId(), LocalDate.now(),
+            "TEST-HON-1"));
         memberService.update(later.getId(), Map.of(MemberField.BIRTH_DATE, LocalDate.of(year - 25, 1, 1)));
-        memberService.update(removed.getId(), Map.of(MemberField.BIRTH_DATE, bornInYear,
-            MemberField.STATUS, MemberStatus.REMOVED));
+        memberService.update(removed.getId(), Map.of(MemberField.BIRTH_DATE, bornInYear));
+        acts.remove(new MembershipActService.Remove(removed.getId(), MembershipRemovalGround.RESIGNATION,
+            LocalDate.now(), "TEST-REM-1"));
 
         assertThat(memberService.membersEndingIn(year)).extracting(TMember::getId)
                                                        .containsExactly(ending.getId(), supportingEnding.getId());

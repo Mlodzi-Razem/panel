@@ -88,6 +88,8 @@ public abstract class DomainTestSupport {
         jdbc.execute("DELETE FROM suspensions");
         jdbc.execute("DELETE FROM bodies WHERE code IS NULL OR code LIKE 'test-%'");
         jdbc.execute("DELETE FROM member_identities");
+        // append-only register (DELETE is refused by trigger): TRUNCATE is not a row-level event, so it passes
+        jdbc.execute("TRUNCATE member_membership_acts");
         jdbc.execute("DELETE FROM members");
     }
 

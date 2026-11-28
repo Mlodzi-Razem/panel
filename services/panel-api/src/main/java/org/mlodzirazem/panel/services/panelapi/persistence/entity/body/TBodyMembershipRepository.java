@@ -273,4 +273,23 @@ public interface TBodyMembershipRepository extends JpaRepository<TBodyMembership
 
     @Query(value = "select 1 from (select pg_advisory_xact_lock(:key)) l", nativeQuery = true)
     int lockTransactionally(@Param("key") long key);
+
+    /**
+     * Open-ended mandates of a member (valid_to NULL, live status). A membership act refuses an honorary grant
+     * while any exist, instead of ending them silently.
+     */
+    @Query("""
+        select count(bm) from TBodyMembership bm
+        where bm.member.id = :memberId
+          and bm.status = :status
+          and bm.validTo is null
+        """)
+    long countOpenEndedByMemberIdAndStatus(
+        @Param("memberId") Long memberId,
+        @Param("status") BodyMembershipStatus status
+    );
+
+    default long countOpenEndedByMemberId(Long memberId) {
+        return countOpenEndedByMemberIdAndStatus(memberId, BodyMembershipStatus.ACTIVE);
+    }
 }

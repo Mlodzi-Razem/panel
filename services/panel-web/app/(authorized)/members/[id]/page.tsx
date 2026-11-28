@@ -20,6 +20,7 @@ import { getTranslations } from "next-intl/server";
 import { updateMemberAction } from "@/app/actions/members";
 import EditCard from "@/components/form/EditCard";
 import AffiliationsCard from "@/components/members/AffiliationsCard";
+import MembershipActsCard from "@/components/members/MembershipActsCard";
 import ApiErrorNotice from "@/components/members/ApiErrorNotice";
 import FieldInputs from "@/components/members/FieldInputs";
 import { Empty, GroupedFieldList, hasAnyField } from "@/components/members/format";
@@ -28,6 +29,7 @@ import RecordShell, { RecordTab, resolveTab } from "@/components/members/record/
 import RevealIdentifier from "@/components/members/RevealIdentifier";
 import { Card, Page } from "@/components/page/Page";
 import { FieldDef, fieldsOfGroups } from "@/panel-api/members/fields";
+import { listMembershipActs } from "@/panel-api/members/membershipActs";
 import { getMember, listDistricts } from "@/panel-api/members/members";
 import { requireMe } from "@/panel-api/members/requireMe";
 import { PERMISSIONS } from "@/panel-api/members/types";
@@ -71,6 +73,7 @@ export default async function MemberPage({params, searchParams}: {
     const orgDefs = present(fieldsOfGroups(['ORGANISATIONAL']));
     const identifier = typeof fields['formalIdentifier'] === 'string' ? fields['formalIdentifier'] : null;
     const updateAction = updateMemberAction.bind(null, id);
+    const history = access.manageFormal ? await listMembershipActs(id) : null;
 
     const tabs: RecordTab[] = [{key: 'details', label: t('tabDetails')}];
     if (member.affiliations) {
@@ -129,6 +132,14 @@ export default async function MemberPage({params, searchParams}: {
                 : <Card id="member-organisational" title={t('organisationalTitle')}>
                     <GroupedFieldList defs={orgDefs} values={fields}/>
                 </Card>)}
+
+            {history && (history.ok
+                ? <MembershipActsCard memberId={id}
+                                      status={String(fields['status'] ?? '')}
+                                      membershipType={String(fields['membershipType'] ?? '')}
+                                      acts={history.data}
+                                      canGrantHonorary={me.permissions.global.includes(PERMISSIONS.formalManage)}/>
+                : <ApiErrorNotice error={history.error}/>)}
 
             <ElectoralRights member={member}/>
             <MembershipEndNotice endsOn={member.membershipEndsOn}/>
