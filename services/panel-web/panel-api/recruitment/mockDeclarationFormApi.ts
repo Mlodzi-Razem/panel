@@ -105,6 +105,9 @@ export function mockSubmitForm(token: string, values: SubmissionValues): MockDra
     if (!values.specialCategoryConsent) {
         return {"error": "CONSENT_REQUIRED:specialCategoryConsent"};
     }
+    if (!values.infoDutyAcknowledged) {
+        return {"error": "FIELD_REQUIRED:infoDutyAcknowledged"};
+    }
     current.status = "FILLED";
     return current;
 }

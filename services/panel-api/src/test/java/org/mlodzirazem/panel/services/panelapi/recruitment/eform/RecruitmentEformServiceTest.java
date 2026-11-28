@@ -117,7 +117,7 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
                                                                          String formalFirst) {
         return new RecruitmentEformService.DeclarationFormSubmission(
             formalFirst, "Formalna", "Falka", "Formalniakowa", "ona", pesel,
-            "+48 600 100 200", "kolendra.kontakt@example.org", true, true);
+            "+48 600 100 200", "kolendra.kontakt@example.org", true, true, true);
     }
 
     private String submissionPesel() {
@@ -346,7 +346,8 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
             "SELECT consent_kind::text FROM recruitment_consents WHERE case_id = ? ORDER BY id",
             String.class, candidateCase.getId());
 
-        assertThat(consentKinds).containsExactlyInAnyOrder("IMAGE", "SPECIAL_CATEGORY_9_2D");
+        assertThat(consentKinds).containsExactlyInAnyOrder("IMAGE", "SPECIAL_CATEGORY_9_2D",
+            "INFO_DUTY_ACKNOWLEDGED");
 
         List<String> artifactKinds = jdbc.queryForList(
             "SELECT artifact_kind::text FROM declaration_artifacts WHERE case_id = ?",
@@ -384,14 +385,14 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
 
         RecruitmentEformService.DeclarationFormSubmission noConsent =
             new RecruitmentEformService.DeclarationFormSubmission(
-                "Felicja", "Formalna", null, null, null, submissionPesel(), null, null, true, false);
+                "Felicja", "Formalna", null, null, null, submissionPesel(), null, null, true, false, true);
         assertThatThrownBy(() -> eform.submitForm(link.token(), noConsent))
             .isInstanceOf(RuleViolationException.class)
             .extracting("code").isEqualTo("FIELD_REQUIRED");
 
         RecruitmentEformService.DeclarationFormSubmission halfAPair =
             new RecruitmentEformService.DeclarationFormSubmission(
-                "Felicja", null, null, null, null, submissionPesel(), null, null, true, true);
+                "Felicja", null, null, null, null, submissionPesel(), null, null, true, true, true);
         assertThatThrownBy(() -> eform.submitForm(link.token(), halfAPair))
             .isInstanceOf(RuleViolationException.class)
             .extracting("code").isEqualTo("NAMES_ARE_A_PAIR");
@@ -412,6 +413,50 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
             submission(SyntheticPesel.of(tooYoung, 7), "Felicja")))
             .isInstanceOf(RuleViolationException.class)
             .extracting("code").isEqualTo("ADMISSION_AGE");
+    }
+
+    @Test
+    void submitRefusesTheFormWithoutTheInformationDutyAcknowledgement() {
+        long actor = districtActor();
+        TRecruitmentCase candidateCase = awaitingCase("bez-obowiazku@example.org");
+        RecruitmentEformService.DeclarationLink link =
+            eform.createDeclarationLink(candidateCase.getId(), actor);
+
+        RecruitmentEformService.DeclarationFormSubmission withoutDuty =
+            new RecruitmentEformService.DeclarationFormSubmission(
+                "Felicja", "Formalna", null, null, null, submissionPesel(), null, null, true, true, false);
+
+        assertThatThrownBy(() -> eform.submitForm(link.token(), withoutDuty))
+            .isInstanceOf(RuleViolationException.class)
+            .extracting("code").isEqualTo("FIELD_REQUIRED");
+
+        Integer consentCount = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM recruitment_consents WHERE case_id = ?", Integer.class,
+            candidateCase.getId());
+        assertThat(consentCount).isZero();
+    }
+
+    @Test
+    void paperScanRecordsTheInformationDutyOnlyWhenItIsConfirmed() {
+        long actor = districtActor();
+        TRecruitmentCase confirmed = awaitingCase("skan-potwierdzony@example.org");
+        eform.attachScan(confirmed.getId(), actor, SCAN, submission(submissionPesel(), "Felicja"));
+
+        assertThat(jdbc.queryForObject(
+            "SELECT COUNT(*) FROM recruitment_consents WHERE case_id = ?"
+                + " AND consent_kind::text = 'INFO_DUTY_ACKNOWLEDGED' AND granted_by = 'paper'",
+            Integer.class, confirmed.getId())).isEqualTo(1);
+
+        TRecruitmentCase unconfirmed = awaitingCase("skan-bez-potwierdzenia@example.org");
+        RecruitmentEformService.DeclarationFormSubmission noDuty =
+            new RecruitmentEformService.DeclarationFormSubmission("Felicja", "Formalna", null, null, null,
+                SyntheticPesel.of(LocalDate.of(2007, 4, 1), 5), null, null, true, true, false);
+        eform.attachScan(unconfirmed.getId(), actor, SCAN, noDuty);
+
+        assertThat(jdbc.queryForObject(
+            "SELECT COUNT(*) FROM recruitment_consents WHERE case_id = ?"
+                + " AND consent_kind::text = 'INFO_DUTY_ACKNOWLEDGED'",
+            Integer.class, unconfirmed.getId())).isZero();
     }
 
     @Test
@@ -596,12 +641,12 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
 
         eform.submitForm(link.token(), submission(pesel, "Felicja"));
         eform.submitForm(link.token(), new RecruitmentEformService.DeclarationFormSubmission(
-            "Felicja", "Formalna", "Falka", "Formalniakowa", "ona/on", pesel, null, null, true, true));
+            "Felicja", "Formalna", "Falka", "Formalniakowa", "ona/on", pesel, null, null, true, true, true));
 
         Integer consentCount = jdbc.queryForObject(
             "SELECT COUNT(*) FROM recruitment_consents WHERE case_id = ?", Integer.class, caseId);
 
-        assertThat(consentCount).isEqualTo(2);
+        assertThat(consentCount).isEqualTo(3);
 
         byte[] template = eform.declarationPdf(link.token());
         byte[] p12 = PadesSignatures.selfSignedP12("Felicja Formalna (test)", pesel,
@@ -679,7 +724,7 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
         // no special-category consent ticked on the paper declaration: the same refusal as in the e-form
         assertThatThrownBy(() -> eform.attachScan(candidateCase.getId(), actor, SCAN,
             new RecruitmentEformService.DeclarationFormSubmission("Felicja", "Formalna", null, null, null,
-                submissionPesel(), null, null, true, false)))
+                submissionPesel(), null, null, true, false, false)))
             .isInstanceOf(RuleViolationException.class)
             .extracting("code").isEqualTo("FIELD_REQUIRED");
 
@@ -697,7 +742,7 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
 
         eform.attachScan(candidateCase.getId(), actor, SCAN, new RecruitmentEformService.DeclarationFormSubmission(
             "Felicja", "Formalna", "Fela", "Falkowa", "ona", submissionPesel(), "+48 600 100 200",
-            "skan.kontakt@example.org", false, true));
+            "skan.kontakt@example.org", false, true, false));
 
         TRecruitmentCase stored = caseRepository.findById(candidateCase.getId()).orElseThrow();
         assertThat(stored.getCandidatePreferredFirstName()).isEqualTo("Fela");
@@ -744,7 +789,7 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
 
         assertThatThrownBy(() -> eform.attachScan(candidateCase.getId(), actor, SCAN,
             new RecruitmentEformService.DeclarationFormSubmission("Felicja", null, null, null, null,
-                submissionPesel(), null, null, true, true)))
+                submissionPesel(), null, null, true, true, false)))
             .isInstanceOf(RuleViolationException.class).extracting("code").isEqualTo("NAMES_ARE_A_PAIR");
 
         TMember existing = newMember("Istniejaca", "Czlonkini", "slaskie");

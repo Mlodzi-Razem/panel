@@ -65,7 +65,8 @@ public class RecruitmentDeclarationFormsController {
         @Nullable String phone,
         @Nullable String email,
         @Nullable Boolean imageConsent,
-        @Nullable Boolean specialCategoryConsent
+        @Nullable Boolean specialCategoryConsent,
+        @Nullable Boolean infoDutyAcknowledged
     ) {
     }
 
@@ -93,7 +94,8 @@ public class RecruitmentDeclarationFormsController {
             request.preferredLastName(), request.pronouns(), request.personalId(),
             request.phone(), request.email(),
             Boolean.TRUE.equals(request.imageConsent()),
-            Boolean.TRUE.equals(request.specialCategoryConsent())));
+            Boolean.TRUE.equals(request.specialCategoryConsent()),
+            Boolean.TRUE.equals(request.infoDutyAcknowledged())));
     }
 
     @GetMapping(value = "/public/declaration-form/{token}/pdf",
@@ -123,14 +125,16 @@ public class RecruitmentDeclarationFormsController {
         @RequestParam(name = "phone", required = false) @Nullable String phone,
         @RequestParam(name = "email", required = false) @Nullable String email,
         @RequestParam(name = "imageConsent", required = false) @Nullable Boolean imageConsent,
-        @RequestParam(name = "specialCategoryConsent", required = false) @Nullable Boolean specialCategoryConsent
+        @RequestParam(name = "specialCategoryConsent", required = false) @Nullable Boolean specialCategoryConsent,
+        @RequestParam(name = "infoDutyAcknowledged", required = false) @Nullable Boolean infoDutyAcknowledged
     ) {
         long caller = callers.require().id();
 
         return eform.attachScan(caseId, caller, read(file),
             new RecruitmentEformService.DeclarationFormSubmission(formalFirstName, formalLastName,
                 preferredFirstName, preferredLastName, pronouns, personalId, phone, email,
-                Boolean.TRUE.equals(imageConsent), Boolean.TRUE.equals(specialCategoryConsent)));
+                Boolean.TRUE.equals(imageConsent), Boolean.TRUE.equals(specialCategoryConsent),
+                Boolean.TRUE.equals(infoDutyAcknowledged)));
     }
 
     private static byte[] read(MultipartFile file) {

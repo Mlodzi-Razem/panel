@@ -120,7 +120,7 @@ class RecruitmentEformApiTest extends ApiTestSupport {
     }
 
     private Map<String, Object> submitBody(String pesel) {
-        return Map.of(
+        Map<String, Object> body = new java.util.LinkedHashMap<>(Map.of(
             "formalFirstName", "Edmunda",
             "formalLastName", "Elektroniczna",
             "preferredFirstName", "Edka",
@@ -130,8 +130,9 @@ class RecruitmentEformApiTest extends ApiTestSupport {
             "phone", "+48 600 200 100",
             "email", "edka.kontakt@example.org",
             "imageConsent", true,
-            "specialCategoryConsent", true
-        );
+            "specialCategoryConsent", true));
+        body.put("infoDutyAcknowledged", true);
+        return body;
     }
 
     @Test
@@ -287,6 +288,19 @@ class RecruitmentEformApiTest extends ApiTestSupport {
         Res broken = call(HttpMethod.POST, "/public/declaration-form/" + token, null, half);
         assertThat(broken.status()).isEqualTo(422);
         assertThat(broken.code()).isEqualTo("NAMES_ARE_A_PAIR");
+    }
+
+    @Test
+    void submitWithoutTheInformationDutyAcknowledgementIsUnprocessable() throws Exception {
+        long caseId = awaitingCase("edek-obowiazek@example.org");
+        String token = createLink(201, zoA, caseId).body().path("token").asString();
+        Map<String, Object> unconfirmed = new java.util.LinkedHashMap<>(
+            submitBody(SyntheticPesel.of(java.time.LocalDate.of(2007, 4, 1), 23)));
+        unconfirmed.put("infoDutyAcknowledged", false);
+
+        Res refused = call(HttpMethod.POST, "/public/declaration-form/" + token, null, unconfirmed);
+        assertThat(refused.status()).isEqualTo(422);
+        assertThat(refused.code()).isEqualTo("FIELD_REQUIRED");
     }
 
     @Test

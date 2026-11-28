@@ -56,7 +56,8 @@ public interface RecruitmentEformService {
         @Nullable String phone,
         @Nullable String email,
         boolean imageConsent,
-        boolean specialCategoryConsent
+        boolean specialCategoryConsent,
+        boolean infoDutyAcknowledged
     ) {
     }
 

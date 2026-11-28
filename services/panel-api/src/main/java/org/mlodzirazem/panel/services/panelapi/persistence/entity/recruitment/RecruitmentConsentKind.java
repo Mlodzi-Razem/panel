@@ -19,5 +19,5 @@ package org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment;
 
 /** Consents of the Zgoda form given with the declaration. */
 public enum RecruitmentConsentKind {
-    IMAGE, SPECIAL_CATEGORY_9_2D
+    IMAGE, SPECIAL_CATEGORY_9_2D, INFO_DUTY_ACKNOWLEDGED
 }

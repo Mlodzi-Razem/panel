@@ -243,6 +243,12 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
                 "The declaration of this form has already been signed");
         }
 
+        // art. 13 ust. 1 RODO: the information duty is acknowledged in the e-form; the paper scan carries its own clause
+        if (!submission.infoDutyAcknowledged()) {
+            throw new RuleViolationException("FIELD_REQUIRED",
+                "The information duty acknowledgement is required");
+        }
+
         applyDeclarationData(candidateCase, submission);
 
         byte[] template = pdfRenderer.render(candidateCase, null);
@@ -462,7 +468,7 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
         } else {
             // a missing data block fails the same required-field checks as an empty e-form
             applyDeclarationData(candidateCase, data != null ? data
-                : new DeclarationFormSubmission(null, null, null, null, null, null, null, null, false, false));
+                : new DeclarationFormSubmission(null, null, null, null, null, null, null, null, false, false, false));
         }
 
         // no electronic signature can arrive once the paper declaration is recorded
@@ -666,6 +672,11 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
 
         if (submission.imageConsent()) {
             recordConsent(candidateCase, existing, RecruitmentConsentKind.IMAGE, templateArtifact, grantedBy);
+        }
+
+        if (submission.infoDutyAcknowledged()) {
+            recordConsent(candidateCase, existing, RecruitmentConsentKind.INFO_DUTY_ACKNOWLEDGED,
+                templateArtifact, grantedBy);
         }
     }
 
