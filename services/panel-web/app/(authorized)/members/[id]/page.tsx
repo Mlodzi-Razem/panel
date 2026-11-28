@@ -23,7 +23,7 @@ import AffiliationsCard from "@/components/members/AffiliationsCard";
 import ApiErrorNotice from "@/components/members/ApiErrorNotice";
 import FieldInputs from "@/components/members/FieldInputs";
 import { Empty, GroupedFieldList, hasAnyField } from "@/components/members/format";
-import { BodyFunctionsCard, ElectoralRights, MembershipEndNotice } from "@/components/members/MemberOverview";
+import { BodyFunctionsCard, ElectoralRights, FunctionHistoryCard, functionHistoryPaging, MembershipEndNotice } from "@/components/members/MemberOverview";
 import RecordShell, { RecordTab, resolveTab } from "@/components/members/record/RecordShell";
 import RevealIdentifier from "@/components/members/RevealIdentifier";
 import { Card, Page } from "@/components/page/Page";
@@ -77,7 +77,9 @@ export default async function MemberPage({params, searchParams}: {
         tabs.push({key: 'districts', label: t('tabDistricts'), count: member.affiliations.length});
     }
     tabs.push({key: 'functions', label: t('tabFunctions'), count: member.bodyFunctions.length});
-    const activeTab = resolveTab((await searchParams)['tab'], tabs);
+    const query = await searchParams;
+    const activeTab = resolveTab(query['tab'], tabs);
+    const historyPaging = functionHistoryPaging(query);
 
     return <RecordShell title={`#${id}`}
                         member={member}
@@ -140,6 +142,10 @@ export default async function MemberPage({params, searchParams}: {
                                  readOnly={!access.manageFormal}
                                  targetDistricts={targetDistricts.map(d => ({id: d.id, name: d.name}))}/>}
 
-        {activeTab === 'functions' && <BodyFunctionsCard functions={member.bodyFunctions}/>}
+        {activeTab === 'functions' && <>
+            <BodyFunctionsCard functions={member.bodyFunctions}/>
+            <FunctionHistoryCard history={member.functionHistory} basePath={`/members/${id}`}
+                                 page={historyPaging.page} size={historyPaging.size}/>
+        </>}
     </RecordShell>;
 }

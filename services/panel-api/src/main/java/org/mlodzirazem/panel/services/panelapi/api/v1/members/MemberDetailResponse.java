@@ -33,6 +33,7 @@ public record MemberDetailResponse(
     Access access,
     @Nullable List<AffiliationView> affiliations,
     List<BodyFunctionView> bodyFunctions,
+    List<FunctionHistoryView> functionHistory,
     @Nullable LocalDate membershipEndsOn,
     @Nullable ElectoralRightsView electoralRights
 ) {
@@ -66,6 +67,24 @@ public record MemberDetailResponse(
         LocalDate validFrom,
         @Nullable LocalDate validTo
     ) {
+    }
+
+    /**
+     * One mandate of the member's function history: the same {@link BodyFunctionView} as in
+     * {@code bodyFunctions}, plus its state today and the appointing resolution name (never its contents).
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record FunctionHistoryView(
+        BodyFunctionView function,
+        FunctionState state,
+        @Nullable String decisionReference
+    ) {
+    }
+
+    public enum FunctionState {
+        CURRENT,
+        UPCOMING,
+        ENDED
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)

@@ -62,6 +62,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -337,7 +338,11 @@ class DefaultBodyMembershipService implements BodyMembershipService {
     @Override
     @Transactional(readOnly = true)
     public List<TBodyMembership> historyOf(long memberId) {
-        return memberships.findAllByMemberId(memberId);
+        return memberships.findAllByMemberId(memberId).stream()
+                          .sorted(Comparator.comparing(TBodyMembership::getValidFrom)
+                                            .thenComparing(TBodyMembership::getId)
+                                            .reversed())
+                          .toList();
     }
 
     @Override

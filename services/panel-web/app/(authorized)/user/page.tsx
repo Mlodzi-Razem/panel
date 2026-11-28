@@ -20,5 +20,6 @@ import OwnRecord from "@/components/members/OwnRecord";
 export default async function UserPage({searchParams}: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    return <OwnRecord basePath="/user" tab={(await searchParams)['tab']}/>;
+    const query = await searchParams;
+    return <OwnRecord basePath="/user" tab={query['tab']} query={query}/>;
 }
