@@ -39,7 +39,9 @@ export const rejectionReasonSchema = z.enum([
 export const caseEventTypeSchema = z.enum([
     'CASE_CREATED', 'STATUS_CHANGED', 'REMINDER_SENT', 'ZK_NOTIFIED_PROBATION_START',
     'DECLARATION_RECORDED', 'DECLARATION_LINK_CREATED', 'RECOMMENDATION_SENT', 'VOTE_STARTED',
-    'DECISION_RECORDED', 'CASE_CLOSED', 'NOTE_ADDED', 'CANDIDATE_DATA_CORRECTED',
+    'DECISION_RECORDED', 'CASE_CLOSED', 'NOTE_ADDED', 'CANDIDATE_DATA_CORRECTED', 'DECLARATION_BLOCKED',
+    // written by retention (C1); without them the timeline of an anonymised case fails to parse
+    'ARTIFACTS_PURGED', 'CASE_ANONYMIZED',
 ]);
 
 /** Post-declaration metadata served by the M3 engine (statute clocks and collegial decisions). */

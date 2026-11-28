@@ -484,6 +484,9 @@ const plMessages: typeof enMessages = {
             CASE_CLOSED: "Sprawa zamknięta",
             NOTE_ADDED: "Notatka",
             CANDIDATE_DATA_CORRECTED: "Korekta danych kandydata",
+            DECLARATION_BLOCKED: "Deklaracja zablokowana",
+            ARTIFACTS_PURGED: "Pliki deklaracji usunięte",
+            CASE_ANONYMIZED: "Sprawa zanonimizowana",
         },
     },
     teams: {
@@ -888,6 +891,18 @@ const plMessages: typeof enMessages = {
         },
         timelineCorrectionFields: "Zmienione pola",
         timelineCorrectionReason: "Powód",
+        timelineBlockReason: "Powód",
+        timelineBlockChannel: "Kanał",
+        blockReason: {
+            EXISTING_MEMBER: "osoba jest już członkiem (PESEL w rejestrze)",
+            ADMISSION_BAN: "aktywny zakaz przyjęcia",
+            DUPLICATE_OPEN_CASE: "inna otwarta sprawa z tym samym PESEL",
+        },
+        blockChannel: {
+            EFORM: "e-deklaracja",
+            CORRECTION: "korekta danych",
+            SCAN: "skan papierowej deklaracji",
+        },
         dataFields: {
             candidate_formal_first_name: "imię formalne",
             candidate_formal_last_name: "nazwisko formalne",
