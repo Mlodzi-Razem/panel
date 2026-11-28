@@ -70,6 +70,12 @@ export const caseDistrictRefSchema = z.object({
     code: z.string().nullish(),
 });
 
+const nameAtStageSchema = z.object({
+    stage: z.enum(["CASE", "DECLARATION_PREFERRED", "DECLARATION_FORMAL"]),
+    first: z.string().nullish(),
+    last: z.string().nullish(),
+});
+
 export const caseSummarySchema = z.object({
     id: z.number(),
     district: caseDistrictRefSchema,
@@ -77,6 +83,10 @@ export const caseSummarySchema = z.object({
     candidateLastName: z.string().nullish(),
     candidateEmail: z.string().nullish(),
     candidatePhone: z.string().nullish(),
+    // display name (PN): declared preferred, then the case name, then formal; see RecruitmentCandidateNames
+    candidateDisplayFirstName: z.string().nullish(),
+    candidateDisplayLastName: z.string().nullish(),
+    candidateNameSource: z.enum(["DECLARATION_PREFERRED", "CASE", "DECLARATION_FORMAL", "NONE"]).nullish(),
     status: caseStatusSchema,
     source: caseSourceSchema,
     createdAt: z.string(),
@@ -119,6 +129,15 @@ export const caseDetailSchema = z.object({
     candidatePreferredFirstName: z.string().nullish(),
     candidatePreferredLastName: z.string().nullish(),
     candidatePronouns: z.string().nullish(),
+    candidateDisplayFirstName: z.string().nullish(),
+    candidateDisplayLastName: z.string().nullish(),
+    candidateNameSource: z.enum(["DECLARATION_PREFERRED", "CASE", "DECLARATION_FORMAL", "NONE"]).nullish(),
+    // intake name against the declared preferred name; formal data is never compared here
+    candidateNameComparison: z.object({
+        caseName: nameAtStageSchema,
+        declarationPreferred: nameAtStageSchema,
+        match: z.enum(["SAME", "DIFFERENT", "INCOMPLETE"]),
+    }).nullish(),
     formalIdentifierPresent: z.boolean().default(false),
     status: caseStatusSchema,
     source: caseSourceSchema,

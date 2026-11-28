@@ -50,6 +50,7 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TR
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMember;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.TMemberRepository;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType;
+import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentCandidateNames;
 import org.mlodzirazem.panel.services.panelapi.recruitment.eform.DeclarationArtifactStore;
 import org.mlodzirazem.panel.services.panelapi.recruitment.eform.DeclarationFormAccessException;
 import org.mlodzirazem.panel.services.panelapi.recruitment.eform.DeclarationPdfRenderer;
@@ -506,7 +507,7 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
                 .withOutcome(DeclarationArtifactKind.SCAN.name()));
 
         return new DeclarationForm(DeclarationFormSessionStatus.SIGNED.name(), null,
-            greeting(candidateCase), null);
+            greeting(candidateCase, true), null);
     }
 
     @Override
@@ -711,13 +712,12 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
     }
 
     private DeclarationForm formView(TDeclarationFormSession session, String token) {
-        String pdfUrl = switch (session.getStatus()) {
-            case FILLED, SIGNED -> PDF_PATH_PREFIX + token + "/pdf";
-            default -> null;
-        };
+        boolean filled = session.getStatus() == DeclarationFormSessionStatus.FILLED
+            || session.getStatus() == DeclarationFormSessionStatus.SIGNED;
+        String pdfUrl = filled ? PDF_PATH_PREFIX + token + "/pdf" : null;
 
         return new DeclarationForm(session.getStatus().name(), session.getExpiresAt(),
-            greeting(session.getRecruitmentCase()), pdfUrl);
+            greeting(session.getRecruitmentCase(), filled), pdfUrl);
     }
 
     private void requireLive(TDeclarationFormSession session, TRecruitmentCase candidateCase) {
@@ -809,7 +809,18 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
         return jsonMapper.writeValueAsString(node);
     }
 
-    private static String greeting(TRecruitmentCase candidateCase) {
+    /**
+     * Before the form is filled the greeting keeps the intake name. Once the declaration is filled or signed
+     * it uses the display rule, so a declared preferred name is the one the candidate sees.
+     */
+    private static String greeting(TRecruitmentCase candidateCase, boolean filled) {
+        if (filled) {
+            RecruitmentCandidateNames.Display name = RecruitmentCandidateNames.display(candidateCase);
+
+            return name.source() == RecruitmentCandidateNames.Source.NONE
+                ? "" : (name.first() + " " + name.last()).strip();
+        }
+
         String first = candidateCase.getCandidateFirstName() == null
             ? "" : candidateCase.getCandidateFirstName();
         String last = candidateCase.getCandidateLastName() == null

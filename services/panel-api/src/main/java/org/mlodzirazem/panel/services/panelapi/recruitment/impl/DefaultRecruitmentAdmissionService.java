@@ -40,6 +40,7 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TR
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TRecruitmentDecision;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TRecruitmentDecisionRepository;
 import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentAdmissionService;
+import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentCandidateNames;
 import org.mlodzirazem.panel.services.panelapi.recruitment.eform.RecruitmentEformRules;
 import org.mlodzirazem.panel.services.panelapi.recruitment.workflow.RecruitmentWorkflowService;
 import org.springframework.stereotype.Service;
@@ -125,22 +126,19 @@ class DefaultRecruitmentAdmissionService implements RecruitmentAdmissionService 
     }
 
     /**
-     * Copies only what the case holds and the member model has a column for. Preferred names fall back
-     * to the intake names and finally to the formal ones (the member row needs a preferred name; the
-     * candidate then goes by the official one).
+     * Copies only what the case holds and the member model has a column for. Preferred names follow
+     * {@link RecruitmentCandidateNames#display} (declared preferred, then intake, then formal); the member
+     * row needs a preferred name, so with no complete pair at all the raw formal values go through as before
+     * ({@code put} drops blanks).
      */
-    private static Map<MemberField, Object> memberValues(TRecruitmentCase c, LocalDate acceptedOn) {
+    static Map<MemberField, Object> memberValues(TRecruitmentCase c, LocalDate acceptedOn) {
         Map<MemberField, Object> values = new EnumMap<>(MemberField.class);
 
-        String preferredFirst = c.getCandidatePreferredFirstName();
-        String preferredLast = c.getCandidatePreferredLastName();
+        RecruitmentCandidateNames.Display name = RecruitmentCandidateNames.display(c);
+        String preferredFirst = name.first();
+        String preferredLast = name.last();
 
-        if (blank(preferredFirst) || blank(preferredLast)) {
-            preferredFirst = c.getCandidateFirstName();
-            preferredLast = c.getCandidateLastName();
-        }
-
-        if (blank(preferredFirst) || blank(preferredLast)) {
+        if (name.source() == RecruitmentCandidateNames.Source.NONE) {
             preferredFirst = c.getCandidateFormalFirstName();
             preferredLast = c.getCandidateFormalLastName();
         }

@@ -21,7 +21,13 @@ import { UserPlusIcon } from "@phosphor-icons/react/ssr";
 import { Badge, TableWrap } from "@/components/page/Page";
 import { EmptyState, NameCell } from "@/components/ui/Blocks";
 import styles from "@/components/recruitment/recruitment.module.scss";
-import { candidateName, caseAgeDays, caseStatusTone, FormattedCaseDate } from "@/components/recruitment/format";
+import {
+    candidateName,
+    caseAgeDays,
+    caseStatusTone,
+    FormattedCaseDate,
+    intakeNameIfDiffers,
+} from "@/components/recruitment/format";
 import { CasePage } from "@/panel-api/members/recruitment";
 
 export default function RecruitmentCasesTable({page}: { page: CasePage }) {
@@ -52,6 +58,9 @@ export default function RecruitmentCasesTable({page}: { page: CasePage }) {
                     <NameCell
                         name={candidateName(item) || `#${item.id}`}
                         href={`/rekrutacja/${item.id}`}/>
+                    {intakeNameIfDiffers(item) && <div className={styles.reason}>
+                        {t("intakeNameHint", {name: intakeNameIfDiffers(item) ?? ""})}
+                    </div>}
                 </td>
                 <td>{item.district.name}</td>
                 <td>

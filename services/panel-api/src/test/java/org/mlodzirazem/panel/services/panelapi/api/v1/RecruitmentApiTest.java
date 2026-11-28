@@ -27,6 +27,7 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TR
 import org.mlodzirazem.panel.services.panelapi.recruitment.eform.SyntheticPesel;
 import org.mlodzirazem.panel.services.panelapi.recruitment.workflow.RecruitmentWorkflowService;
 import org.springframework.beans.factory.annotation.Autowired;
+import tools.jackson.databind.JsonNode;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -637,5 +638,46 @@ class RecruitmentApiTest extends ApiTestSupport {
         options.body().path("transitions").get(1).path("rejectionReasons")
             .forEach(node -> reasons.add(node.asText()));
         assertThat(reasons).containsExactly("VOTE_FAILED", "ZK_BAN");
+    }
+
+    @Test
+    void summaryAndDetailServeTheDisplayNameAndTheIntakeComparison() {
+        Res created = post(zoA, "/recruitment-cases",
+            caseBody(mazowieckie(), candidate("Testowa", "Pierwsza", "wyswietlanie@example.org")));
+        long id = created.body().path("id").asLong();
+
+        Res beforeDeclaration = get(zoA, "/recruitment-cases/" + id);
+        assertThat(beforeDeclaration.body().path("candidateDisplayFirstName").asString()).isEqualTo("Testowa");
+        assertThat(beforeDeclaration.body().path("candidateNameSource").asString()).isEqualTo("CASE");
+        assertThat(beforeDeclaration.body().path("candidateNameComparison").path("match").asString())
+            .isEqualTo("INCOMPLETE");
+
+        TRecruitmentCase stored = caseRepository.findById(id).orElseThrow();
+        stored.setCandidatePreferredFirstName("Druga");
+        stored.setCandidatePreferredLastName("Pierwsza");
+        caseRepository.saveAndFlush(stored);
+
+        Res detail = get(zoA, "/recruitment-cases/" + id);
+        assertThat(detail.body().path("candidateFirstName").asString()).isEqualTo("Testowa");
+        assertThat(detail.body().path("candidateDisplayFirstName").asString()).isEqualTo("Druga");
+        assertThat(detail.body().path("candidateDisplayLastName").asString()).isEqualTo("Pierwsza");
+        assertThat(detail.body().path("candidateNameSource").asString()).isEqualTo("DECLARATION_PREFERRED");
+        assertThat(detail.body().path("candidateNameComparison").path("match").asString()).isEqualTo("DIFFERENT");
+        assertThat(detail.body().path("candidateNameComparison").path("caseName").path("stage").asString())
+            .isEqualTo("CASE");
+        assertThat(detail.body().path("candidateNameComparison").path("declarationPreferred").path("first").asString())
+            .isEqualTo("Druga");
+
+        Res list = get(zoA, "/recruitment-cases?size=100");
+        JsonNode row = null;
+        for (var node : list.body().path("items")) {
+            if (node.path("id").asLong() == id) {
+                row = node;
+            }
+        }
+        assertThat(row).isNotNull();
+        assertThat(row.path("candidateFirstName").asString()).isEqualTo("Testowa");
+        assertThat(row.path("candidateDisplayFirstName").asString()).isEqualTo("Druga");
+        assertThat(row.path("candidateNameSource").asString()).isEqualTo("DECLARATION_PREFERRED");
     }
 }

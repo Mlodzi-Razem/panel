@@ -50,6 +50,7 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.TR
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType;
 import org.mlodzirazem.panel.services.panelapi.recruitment.NewRecruitmentCase;
 import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentAdmissionService;
+import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentCandidateNames;
 import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentCaseService;
 import org.mlodzirazem.panel.services.panelapi.recruitment.eform.RecruitmentEformService;
 import org.mlodzirazem.panel.services.panelapi.recruitment.retention.RecruitmentRetention;
@@ -490,6 +491,8 @@ public class RecruitmentCasesController {
     }
 
     private CaseDetailResponse detail(TRecruitmentCase candidateCase, List<TRecruitmentCaseEvent> timeline) {
+        RecruitmentCandidateNames.Display displayName = RecruitmentCandidateNames.display(candidateCase);
+
         return new CaseDetailResponse(
             candidateCase.getId(),
             district(candidateCase.getDistrict()),
@@ -535,7 +538,11 @@ public class RecruitmentCasesController {
             candidateCase.getAnonymizedAt(),
             candidateCase.getArtifactsPurgedAt(),
             artifactsDueOn(candidateCase),
-            anonymizationDueOn(candidateCase)
+            anonymizationDueOn(candidateCase),
+            displayName.first(),
+            displayName.last(),
+            displayName.source(),
+            RecruitmentCandidateNames.compare(candidateCase)
         );
     }
 
@@ -551,6 +558,8 @@ public class RecruitmentCasesController {
     }
 
     private CaseSummaryResponse summary(TRecruitmentCase candidateCase) {
+        RecruitmentCandidateNames.Display displayName = RecruitmentCandidateNames.display(candidateCase);
+
         return new CaseSummaryResponse(
             candidateCase.getId(),
             district(candidateCase.getDistrict()),
@@ -565,7 +574,10 @@ public class RecruitmentCasesController {
             candidateCase.getClosedAt(),
             candidateCase.getRejectionReason(),
             candidateCase.getAnonymizedAt(),
-            anonymizationDueOn(candidateCase)
+            anonymizationDueOn(candidateCase),
+            displayName.first(),
+            displayName.last(),
+            displayName.source()
         );
     }
 

@@ -688,7 +688,7 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
             actor, scan, submission(submissionPesel(), "Felicja"));
 
         assertThat(result.status()).isEqualTo("SIGNED");
-        assertThat(result.greeting()).isEqualTo("Kolendra Kowalska");
+        assertThat(result.greeting()).isEqualTo("Falka Formalniakowa");
 
         TRecruitmentCase stored = caseRepository.findById(candidateCase.getId()).orElseThrow();
         assertThat(stored.getStatus()).isEqualTo(RecruitmentCaseStatus.DECLARATION_RECEIVED);
