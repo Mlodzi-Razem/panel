@@ -82,5 +82,9 @@ public interface BodyMembershipService {
 
     List<TBodyMembership> activeOf(long memberId);
 
+    /**
+     * Every non-voided mandate of the member — current, upcoming and ended — newest {@code validFrom} first.
+     * VOIDED rows are excluded (a mistaken entry is not part of the function history).
+     */
     List<TBodyMembership> historyOf(long memberId);
 }

@@ -21,7 +21,8 @@ import { TeamsPage } from "@/components/teams/TeamsBlocks";
 export default async function TeamsMembership({searchParams}: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+    const query = await searchParams;
     return <TeamsPage>
-        <OwnRecord basePath="/teams/membership" tab={(await searchParams)['tab']}/>
+        <OwnRecord basePath="/teams/membership" tab={query['tab']} query={query}/>
     </TeamsPage>;
 }

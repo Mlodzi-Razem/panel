@@ -47,6 +47,12 @@ export const bodyFunctionSchema = z.object({
     validTo: z.string().nullish(),
 });
 
+export const functionHistoryItemSchema = z.object({
+    function: bodyFunctionSchema,
+    state: z.enum(['CURRENT', 'UPCOMING', 'ENDED']),
+    decisionReference: z.string().nullish(),
+});
+
 export const electoralRightsSchema = z.object({
     activeOrdinaryMember: z.boolean(),
     suspended: z.boolean(),
@@ -63,6 +69,7 @@ export const memberDetailSchema = z.object({
     access: accessSchema,
     affiliations: z.array(affiliationSchema).nullish(),
     bodyFunctions: z.array(bodyFunctionSchema).default([]),
+    functionHistory: z.array(functionHistoryItemSchema).default([]),
     membershipEndsOn: z.string().nullish(),
     electoralRights: electoralRightsSchema.nullish(),
 });
@@ -248,6 +255,7 @@ export type MemberSummary = z.infer<typeof memberSummarySchema>;
 export type MemberPage = z.infer<typeof memberPageSchema>;
 export type Affiliation = z.infer<typeof affiliationSchema>;
 export type BodyFunction = z.infer<typeof bodyFunctionSchema>;
+export type FunctionHistoryItem = z.infer<typeof functionHistoryItemSchema>;
 export type ChangeRequest = z.infer<typeof changeRequestSchema>;
 export type ChangeRequestDetail = z.infer<typeof changeRequestDetailSchema>;
 export type ChangeRequestStatus = z.infer<typeof changeRequestStatusSchema>;

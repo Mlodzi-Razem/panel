@@ -25,7 +25,7 @@ import ApiErrorNotice from "@/components/members/ApiErrorNotice";
 import ChangeRequestList from "@/components/members/ChangeRequestList";
 import FieldInputs from "@/components/members/FieldInputs";
 import { Empty, GroupedFieldList, hasAnyField } from "@/components/members/format";
-import { BodyFunctionsCard, ElectoralRights, MembershipEndNotice } from "@/components/members/MemberOverview";
+import { BodyFunctionsCard, ElectoralRights, FunctionHistoryCard, functionHistoryPaging, MembershipEndNotice } from "@/components/members/MemberOverview";
 import AccessMatrix from "@/components/members/record/AccessMatrix";
 import RecordShell, { RecordTab, resolveTab } from "@/components/members/record/RecordShell";
 import { Card, LinkButton } from "@/components/page/Page";
@@ -37,9 +37,11 @@ import { requireMe } from "@/panel-api/members/requireMe";
  * The signed-in member's own record: profile, formal data change requests, districts, functions and access.
  * Rendered at `/user` and in the Teams tab _Moje członkostwo_.
  */
-export default async function OwnRecord({basePath, tab}: {
+export default async function OwnRecord({basePath, tab, query = {}}: {
     basePath: string;
     tab: string | string[] | undefined;
+    /** Search params of the page (function history paging). */
+    query?: Record<string, string | string[] | undefined>;
 }) {
     const me = await requireMe();
     if (!me) {
@@ -116,7 +118,11 @@ export default async function OwnRecord({basePath, tab}: {
         {activeTab === 'districts' && member.affiliations
             && <AffiliationsCard memberId={member.id} affiliations={member.affiliations} readOnly/>}
 
-        {activeTab === 'functions' && <BodyFunctionsCard functions={member.bodyFunctions}/>}
+        {activeTab === 'functions' && <>
+            <BodyFunctionsCard functions={member.bodyFunctions}/>
+            <FunctionHistoryCard history={member.functionHistory} basePath={basePath}
+                                 {...functionHistoryPaging(query)}/>
+        </>}
 
         {activeTab === 'requests' && (requests.ok
             ? <ChangeRequestList requests={requests.data}/>

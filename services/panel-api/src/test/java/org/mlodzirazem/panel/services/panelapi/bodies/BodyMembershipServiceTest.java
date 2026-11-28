@@ -214,6 +214,27 @@ class BodyMembershipServiceTest extends DomainTestSupport {
             .containsExactly(FunctionWarning.Code.DISTRICT_BOARD_SIZE_EXCEEDS_STATUTE);
     }
 
+    /**
+     * H1 diagnosis (art. 18 ust. 1 pkt 6): a backdated assignment overlapping an ENDED incompatible mandate
+     * must be reported, not only overlaps with mandates that are open today.
+     */
+    @Test
+    void backdatedAssignmentIsCheckedAgainstAnEndedIncompatibleMandate() {
+        TMember member = newMember("Dora", "Wsteczna", "mazowieckie");
+        TBodyMembership ended = grant(member, body("national-board"), "SECRETARY",
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 30));
+        AssignMembership backdated = assign(member, body("peer-court"), "MEMBER", LocalDate.of(2026, 3, 1), null);
+
+        AssignmentCheck check = service.check(backdated);
+
+        assertThat(check.violations()).singleElement().satisfies(v -> {
+            assertThat(v.code()).isEqualTo(FunctionViolation.Code.INCOMPATIBLE_MEMBERSHIP);
+            assertThat(v.conflictingMembershipId()).isEqualTo(ended.getId());
+        });
+        assertThatThrownBy(() -> service.assign(backdated)).isInstanceOf(AssignmentBlockedException.class);
+        assertThat(membershipCount(member)).isEqualTo(1);
+    }
+
     @Test
     void anIncompatibleMandateStartingLaterIsAlsoBlocked() {
         TMember member = newMember("Lara", "Later", "mazowieckie");

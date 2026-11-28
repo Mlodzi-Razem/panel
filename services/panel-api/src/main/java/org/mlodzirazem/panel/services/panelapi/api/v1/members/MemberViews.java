@@ -167,6 +167,7 @@ public class MemberViews {
                 visibility.manageContact(), visibility.manageFormal(), revealed),
             affiliationViews,
             bodyFunctions(member.getId()),
+            functionHistory(member.getId()),
             endsOn,
             rights
         );
@@ -249,6 +250,22 @@ public class MemberViews {
 
     private List<MemberDetailResponse.BodyFunctionView> bodyFunctions(long memberId) {
         return bodyMemberships.activeOf(memberId).stream().map(MemberViews::function).toList();
+    }
+
+    private List<MemberDetailResponse.FunctionHistoryView> functionHistory(long memberId) {
+        LocalDate today = LocalDate.now(clock);
+        Set<Long> current = bodyMemberships.activeOf(memberId).stream()
+                                            .map(TBodyMembership::getId)
+                                            .collect(Collectors.toSet());
+
+        return bodyMemberships.historyOf(memberId).stream()
+                              .map(bm -> new MemberDetailResponse.FunctionHistoryView(
+                                  function(bm),
+                                  current.contains(bm.getId()) ? MemberDetailResponse.FunctionState.CURRENT
+                                      : bm.getValidFrom().isAfter(today) ? MemberDetailResponse.FunctionState.UPCOMING
+                                      : MemberDetailResponse.FunctionState.ENDED,
+                                  bm.getDecisionReference()))
+                              .toList();
     }
 
     private static MemberDetailResponse.BodyFunctionView function(TBodyMembership bm) {
