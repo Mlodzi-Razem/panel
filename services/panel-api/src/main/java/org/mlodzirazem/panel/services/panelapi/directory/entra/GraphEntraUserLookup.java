@@ -83,9 +83,12 @@ class GraphEntraUserLookup implements EntraUserLookup {
             if (e.getStatusCode().isSameCodeAs(HttpStatus.NOT_FOUND)) {
                 return Optional.empty();
             }
-            throw new IllegalStateException("Microsoft Graph rejected the user lookup: " + e.getStatusCode(), e);
+            // No cause and no response body: Graph quotes the requested user principal name in its error text (W5, SEC-51).
+            log.warn("Microsoft Graph user lookup failed: {} {}", e.getClass().getSimpleName(), e.getStatusCode());
+            throw new IllegalStateException("Microsoft Graph rejected the user lookup: " + e.getStatusCode());
         } catch (RestClientException e) {
-            throw new IllegalStateException("Microsoft Graph is not reachable", e);
+            log.warn("Microsoft Graph user lookup failed: {}", e.getClass().getSimpleName());
+            throw new IllegalStateException("Microsoft Graph is not reachable");
         }
 
         if (user == null) {

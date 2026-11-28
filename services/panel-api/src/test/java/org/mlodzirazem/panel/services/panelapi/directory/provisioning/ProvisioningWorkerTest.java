@@ -20,6 +20,8 @@ package org.mlodzirazem.panel.services.panelapi.directory.provisioning;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.logging.LogLevel;
+import org.springframework.boot.logging.LoggingSystem;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.mlodzirazem.panel.services.panelapi.directory.api.provisioning.AccountProvisioningFinished;
 import org.mlodzirazem.panel.services.panelapi.directory.api.provisioning.AccountState;
@@ -690,18 +692,31 @@ class ProvisioningWorkerTest extends EnabledProvisioningTest {
 
     @Test
     void aGraphErrorThatQuotesAPersonDoesNotReachTheLogOrTheDatabase(org.springframework.boot.test.system.CapturedOutput output) {
-        String quoted = "jan.kowalski@" + DOMAIN;
-        stubUserAbsent("100071@" + DOMAIN);
-        stubEmployeeIdHolders();
-        GRAPH.stubFor(post(urlPathEqualTo("/v1.0/directory/administrativeUnits/" + AU_MEMBERS + "/members")).willReturn(aResponse().withStatus(400)
-            .withHeader("Content-Type", "application/json")
-            .withBody("{\"error\":{\"code\":\"Request_Bad Request@x\",\"message\":\"The value " + quoted + " is invalid\"}}")));
-        long task = enqueue(new ProvisioningRequest.CreateMemberAccount(71));
+        // D10 (SEC-51): the shared context runs org.springframework.web.client at TRACE, and the Spring HTTP client then
+        // prints the request body (the userPrincipalName of the account being created) and the URL (users/{upn}).
+        // Production runs at WARN (application.yml), so this test lowers the level to WARN for its duration only.
+        LoggingSystem logging = LoggingSystem.get(getClass().getClassLoader());
+        String httpClientLogger = "org.springframework.web.client";
+        LogLevel previousLevel = logging.getLoggerConfiguration(httpClientLogger).getEffectiveLevel();
+        logging.setLogLevel(httpClientLogger, LogLevel.WARN);
+        try {
+            String quoted = "jan.kowalski@" + DOMAIN;
+            stubUserAbsent("100071@" + DOMAIN);
+            stubEmployeeIdHolders();
+            GRAPH.stubFor(post(urlPathEqualTo("/v1.0/directory/administrativeUnits/" + AU_MEMBERS + "/members")).willReturn(aResponse().withStatus(400)
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"error\":{\"code\":\"Request_Bad Request@x\",\"message\":\"The value " + quoted + " is invalid\"}}")));
+            long task = enqueue(new ProvisioningRequest.CreateMemberAccount(71));
 
-        worker.runOnce();
+            worker.runOnce();
 
-        assertThat(taskError(task)).isEqualTo("GRAPH_REJECTED");
-        assertThat(output.getAll()).doesNotContain(quoted, "jan.kowalski");
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM directory_provisioning_tasks WHERE last_error_code LIKE '%jan%'", Integer.class)).isZero();
+            assertThat(taskError(task)).isEqualTo("GRAPH_REJECTED");
+            assertThat(output.getAll()).doesNotContain(quoted, "jan.kowalski");
+            // D10: the UPN path segment (users/{upn}) and the UPN in the created-user body must not reach the log.
+            assertThat(output.getAll()).doesNotContain("100071@");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM directory_provisioning_tasks WHERE last_error_code LIKE '%jan%'", Integer.class)).isZero();
+        } finally {
+            logging.setLogLevel(httpClientLogger, previousLevel);
+        }
     }
 }
