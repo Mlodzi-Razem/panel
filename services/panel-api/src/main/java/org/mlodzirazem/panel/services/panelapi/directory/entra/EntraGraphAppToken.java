@@ -39,6 +39,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.io.ByteArrayInputStream;
 import java.security.GeneralSecurityException;
@@ -149,7 +150,12 @@ class EntraGraphAppToken implements GraphAppToken {
                 .retrieve()
                 .body(JSON_OBJECT);
         } catch (RestClientException e) {
-            throw new IllegalStateException("Cannot obtain a Microsoft Graph token", e);
+            // No cause and no response body: the token endpoint quotes the request in error_description (W5, SEC-51).
+            String status = e instanceof RestClientResponseException rejection
+                ? String.valueOf(rejection.getStatusCode())
+                : "no response";
+            log.warn("Cannot obtain a Microsoft Graph token: {} {}", e.getClass().getSimpleName(), status);
+            throw new IllegalStateException("Cannot obtain a Microsoft Graph token: " + status);
         }
 
         if (response == null || !(response.get("access_token") instanceof String token) || token.isBlank()) {

@@ -251,6 +251,40 @@ class GraphEntraUserLookupTest {
         assertThatThrownBy(() -> lookup(secretConfigured()).find(OID)).isInstanceOf(IllegalStateException.class);
     }
 
+    @Test
+    void aGraphErrorQuotingAPersonLeavesNoCauseAndNoTraceInTheLog(CapturedOutput output) {
+        server.expect(requestTo(TOKEN_URL))
+              .andRespond(withSuccess("{\"access_token\":\"tok\",\"expires_in\":3599}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(USER_URL))
+              .andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .body("{\"error\":{\"code\":\"Request_BadRequest\",\"message\":\"Invalid value test.person@example.org\"}}"));
+
+        assertThatThrownBy(() -> lookup(secretConfigured()).find(OID))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("400")
+            .hasMessageNotContaining("test.person")
+            .hasNoCause();
+        assertThat(output.getAll()).doesNotContain("test.person", "example.org");
+        server.verify();
+    }
+
+    @Test
+    void aTokenErrorQuotingAPersonLeavesNoCauseAndNoTraceInTheLog(CapturedOutput output) {
+        server.expect(requestTo(TOKEN_URL))
+              .andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .body("{\"error\":\"invalid_request\",\"error_description\":\"AADSTS900144: test.person@example.org\"}"));
+
+        assertThatThrownBy(() -> lookup(secretConfigured()).find(OID))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("400")
+            .hasMessageNotContaining("test.person")
+            .hasNoCause();
+        assertThat(output.getAll()).doesNotContain("test.person", "example.org");
+        server.verify();
+    }
+
     private static MultiValueMap<String, String> form(String formBody) {
         try {
             return new FormHttpMessageConverter()
