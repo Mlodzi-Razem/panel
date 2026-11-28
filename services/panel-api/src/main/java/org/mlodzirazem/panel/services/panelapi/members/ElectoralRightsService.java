@@ -30,9 +30,9 @@ public interface ElectoralRightsService {
     ElectoralRights rightsOf(long memberId);
 
     /**
-     * Whether a suspension row of the member covers any day of {@code [from, to)} ({@code to == null}: open
-     * ended). A row ends on its end date or on the day it was lifted, whichever comes first (both exclusive).
-     * The register does not record what a suspension covers (art. 10 ust. 3), so every row counts.
+     * Whether an active suspension of the member covering the competences (scope FULL or PASSIVE_ELECTORAL)
+     * covers any day of {@code [from, to)} ({@code to == null}: open ended). A row ends on its end date or on the
+     * day it was lifted, whichever comes first (both exclusive). Voided rows and PARTIAL_OTHER rows do not count.
      */
     boolean suspendedDuring(long memberId, LocalDate from, @Nullable LocalDate to);
 

@@ -48,7 +48,7 @@ class FunctionEligibilityRulesTest extends DomainTestSupport {
 
     @BeforeEach
     void cleanSuspensions() {
-        jdbc.execute("DELETE FROM suspensions");
+        jdbc.execute("TRUNCATE TABLE suspension_mandate_endings, suspensions");
     }
 
     @Test
@@ -183,7 +183,7 @@ class FunctionEligibilityRulesTest extends DomainTestSupport {
 
     private void suspend(TMember member, LocalDate start, LocalDate end, LocalDate liftedAt) {
         jdbc.update("INSERT INTO suspensions (suspended_user_id, suspending_body_id, suspension_start, "
-            + "suspension_end, lifted_at, lifted_reason) VALUES (?, ?, ?, ?, ?, ?)", member.getId(),
-            body("national-board").getId(), start, end, liftedAt, liftedAt == null ? null : "test");
+            + "suspension_end, decision_date, lifted_at, lifted_reason) VALUES (?, ?, ?, ?, ?, ?, ?)", member.getId(),
+            body("national-board").getId(), start, end, start, liftedAt, liftedAt == null ? null : "test");
     }
 }

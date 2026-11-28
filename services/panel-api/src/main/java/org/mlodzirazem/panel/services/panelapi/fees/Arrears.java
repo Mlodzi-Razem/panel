@@ -63,14 +63,14 @@ public record Arrears(
     }
 
     /**
-     * Art. 14: longer than {@link ArrearsService#ELECTORAL_RIGHTS_MONTHS} months.
+     * Longer than {@link ArrearsService#ELECTORAL_RIGHTS_MONTHS} months (the electoral rights rule of the register).
      */
     public boolean suspendsElectoralRights() {
         return longerThan(ArrearsService.ELECTORAL_RIGHTS_MONTHS);
     }
 
     /**
-     * Art. 17.1.4b: longer than {@link ArrearsService#EXCLUSION_MONTHS} months.
+     * Longer than {@link ArrearsService#EXCLUSION_MONTHS} months.
      */
     public boolean groundsForExclusion() {
         return longerThan(ArrearsService.EXCLUSION_MONTHS);

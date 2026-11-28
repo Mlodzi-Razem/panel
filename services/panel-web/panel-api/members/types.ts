@@ -193,6 +193,17 @@ export const membershipSchema = z.object({
     validTo: z.string().nullish(),
 });
 
+export const mandateRefSchema = z.object({
+    membershipId: z.number(),
+    bodyId: z.number(),
+    bodyName: z.string(),
+    bodyKind: z.string().nullish(),
+    memberTypeCode: z.string().nullish(),
+    memberTypeName: z.string(),
+    validFrom: z.string(),
+    validTo: z.string().nullish(),
+});
+
 export const assignmentCheckSchema = z.object({
     conflicts: z.array(z.object({
         membershipId: z.number(),
@@ -262,12 +273,25 @@ export type AssignmentCheck = z.infer<typeof assignmentCheckSchema>;
 export type AssignmentResponse = z.infer<typeof assignmentResponseSchema>;
 export type LinkedMe = z.infer<typeof meLinkedSchema>;
 
+export const suspensionCheckSchema = z.object({
+    violations: z.array(z.object({code: z.string(), message: z.string()})).default([]),
+    warnings: z.array(z.object({
+        code: z.string(),
+        message: z.string(),
+        confirmed: z.boolean().default(false),
+    })).default([]),
+    mandatesAtStake: z.array(mandateRefSchema).default([]),
+});
+
+export type SuspensionCheck = z.infer<typeof suspensionCheckSchema>;
+export type MandateRef = z.infer<typeof mandateRefSchema>;
+
 export type ApiError = {
     status: number;
     code: string;
     message: string;
     fields?: string[];
-    check?: AssignmentCheck;
+    check?: AssignmentCheck | SuspensionCheck;
 };
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: ApiError };
@@ -287,4 +311,6 @@ export const PERMISSIONS = {
     recruitmentApprove: 'RECRUITMENT_APPROVE',
     feesRead: 'FEES_READ',
     feesManage: 'FEES_MANAGE',
+    suspensionsRead: 'SUSPENSIONS_READ',
+    suspensionsManage: 'SUSPENSIONS_MANAGE',
 } as const;

@@ -27,12 +27,13 @@ import java.util.List;
  */
 public interface ArrearsService {
     /**
-     * Art. 14: arrears longer than this many months suspend electoral rights.
+     * Art. 10 ust. 1 pkt 1 and art. 42 ust. 2 pkt 8 (statute 2026): arrears of at least three full calendar months
+     * are the statutory ground for a ZO resolution suspending the person. Panel only reads them (G-10).
      */
     int ELECTORAL_RIGHTS_MONTHS = 3;
 
     /**
-     * Art. 17.1.4b: arrears longer than this many months are grounds for exclusion.
+     * Arrears longer than this many months, the threshold used by the exclusion checks.
      */
     int EXCLUSION_MONTHS = 4;
 

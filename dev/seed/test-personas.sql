@@ -195,8 +195,8 @@ ON CONFLICT (member_id, body_id, member_type_id) WHERE valid_to IS NULL AND stat
 -- pattern that recruitment decisions (uchwała o przyjęciu, ≤ 7 dni od oceny,
 -- art. 9 ust. 4 pkt 8) are expected to copy. suspensions has no natural unique
 -- key, so idempotency uses NOT EXISTS instead of ON CONFLICT.
-INSERT INTO suspensions (suspended_user_id, suspending_body_id, suspension_start, decision_signature)
-SELECT m.id, zb.id, CURRENT_DATE - 30, 'ZO/MZ/01/2026'
+INSERT INTO suspensions (suspended_user_id, suspending_body_id, suspension_start, decision_signature, decision_date)
+SELECT m.id, zb.id, CURRENT_DATE - 30, 'ZO/MZ/01/2026', CURRENT_DATE - 31
 FROM members m
          JOIN bodies zb ON zb.name = 'Zarząd Okręgu Mazowieckiego'
 WHERE m.member_id = '950009'

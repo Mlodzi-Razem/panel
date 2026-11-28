@@ -232,7 +232,7 @@ public interface TBodyMembershipRepository extends JpaRepository<TBodyMembership
           join bm.memberType mt
           join mt.permissionGroup g
         where g.scope = :scope and :permission member of g.permissions
-          and m.status <> :excludedStatus and m.id <> :excludedMemberId
+          and m.status <> :excludedStatus and m.id not in :excludedMemberIds
           and bm.id not in :excludedMembershipIds
           and bm.status = :membershipStatus
           and bm.validFrom <= :today and bm.validTo is null
@@ -241,7 +241,7 @@ public interface TBodyMembershipRepository extends JpaRepository<TBodyMembership
         @Param("scope") PermissionScope scope,
         @Param("permission") PermissionType permission,
         @Param("excludedStatus") MemberStatus excludedStatus,
-        @Param("excludedMemberId") Long excludedMemberId,
+        @Param("excludedMemberIds") Collection<Long> excludedMemberIds,
         @Param("excludedMembershipIds") Collection<Long> excludedMembershipIds,
         @Param("today") LocalDate today,
         @Param("membershipStatus") BodyMembershipStatus membershipStatus
@@ -251,11 +251,11 @@ public interface TBodyMembershipRepository extends JpaRepository<TBodyMembership
         PermissionScope scope,
         PermissionType permission,
         MemberStatus excludedStatus,
-        Long excludedMemberId,
+        Collection<Long> excludedMemberIds,
         Collection<Long> excludedMembershipIds,
         LocalDate today
     ) {
-        return countOpenEndedHoldersOfStatus(scope, permission, excludedStatus, excludedMemberId,
+        return countOpenEndedHoldersOfStatus(scope, permission, excludedStatus, excludedMemberIds,
             excludedMembershipIds, today, BodyMembershipStatus.ACTIVE);
     }
 

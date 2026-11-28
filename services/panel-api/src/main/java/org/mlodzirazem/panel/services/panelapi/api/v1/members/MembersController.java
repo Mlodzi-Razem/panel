@@ -25,6 +25,7 @@ import org.mlodzirazem.panel.services.panelapi.api.v1.common.CallerResolver;
 import org.mlodzirazem.panel.services.panelapi.api.v1.common.MemberFieldParser;
 import org.mlodzirazem.panel.services.panelapi.api.v1.common.PageResponse;
 import org.mlodzirazem.panel.services.panelapi.core.error.ForbiddenException;
+import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
 import org.mlodzirazem.panel.services.panelapi.members.MemberField;
 import org.mlodzirazem.panel.services.panelapi.members.MemberService;
 import org.mlodzirazem.panel.services.panelapi.members.NewMember;
@@ -181,6 +182,12 @@ public class MembersController {
         Caller caller = callers.require();
         TMember member = memberService.get(id);
         Map<MemberField, @Nullable Object> changes = parser.parse(request.fields());
+
+        // art. 10: a suspension is recorded as an entry with a resolution, never by changing the status
+        if (changes.get(MemberField.STATUS) == MemberStatus.SUSPENDED && member.getStatus() != MemberStatus.SUSPENDED) {
+            throw new RuleViolationException("USE_SUSPENSION_OPERATION",
+                "A suspension is recorded in the suspensions register, not by changing the status");
+        }
         MemberViews.Visibility visibility = views.visibility(caller, member, false);
 
         List<String> forbidden = changes.keySet()

@@ -126,8 +126,27 @@ class ElectoralRightsServiceTest extends DomainTestSupport {
                                                              });
     }
 
+    @Test
+    void onlyAnActiveFullSuspensionTakesTheVoteButAPassiveOneStillBlocksFunctions() {
+        TMember passive = newMember("Pas", "Sive", "mazowieckie");
+        jdbc.update("INSERT INTO suspensions (suspended_user_id, suspending_body_id, suspension_start, decision_date, "
+            + "scope) VALUES (?, ?, ?, CURRENT_DATE - 30, 'PASSIVE_ELECTORAL')", passive.getId(),
+            body("peer-court").getId(), LocalDate.now().minusDays(5));
+
+        assertThat(service.rightsOf(passive.getId()).suspended()).isFalse();
+        assertThat(service.suspendedDuring(passive.getId(), LocalDate.now().minusDays(1), null)).isTrue();
+
+        TMember voided = newMember("Voi", "Ded", "mazowieckie");
+        jdbc.update("INSERT INTO suspensions (suspended_user_id, suspending_body_id, suspension_start, decision_date, "
+            + "status, void_reason, voided_at) VALUES (?, ?, ?, CURRENT_DATE - 30, 'VOIDED', 'omyłka', now())", voided.getId(),
+            body("peer-court").getId(), LocalDate.now().minusDays(5));
+
+        assertThat(service.rightsOf(voided.getId()).suspended()).isFalse();
+        assertThat(service.suspendedDuring(voided.getId(), LocalDate.now().minusDays(1), null)).isFalse();
+    }
+
     private void suspend(TMember member, LocalDate start, LocalDate end) {
-        jdbc.update("INSERT INTO suspensions (suspended_user_id, suspending_body_id, suspension_start, suspension_end) "
-            + "VALUES (?, ?, ?, ?)", member.getId(), body("peer-court").getId(), start, end);
+        jdbc.update("INSERT INTO suspensions (suspended_user_id, suspending_body_id, suspension_start, suspension_end, "
+            + "decision_date) VALUES (?, ?, ?, ?, ?)", member.getId(), body("peer-court").getId(), start, end, start);
     }
 }

@@ -25,6 +25,7 @@ import org.mlodzirazem.panel.services.panelapi.members.CurrentMemberResolver;
 import org.mlodzirazem.panel.services.panelapi.members.EffectivePermissions;
 import org.mlodzirazem.panel.services.panelapi.members.PermissionGrant;
 import org.mlodzirazem.panel.services.panelapi.members.PermissionService;
+import org.mlodzirazem.panel.services.panelapi.members.SuspensionRegistry;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.BodyKind;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBody;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBodyMembership;
@@ -53,6 +54,7 @@ class DefaultPermissionService implements PermissionService {
     private final TBodyRepository bodies;
     private final AffiliationService affiliations;
     private final CurrentMemberResolver currentMemberResolver;
+    private final SuspensionRegistry suspensions;
     private final Clock clock;
 
     @Override
@@ -61,6 +63,11 @@ class DefaultPermissionService implements PermissionService {
         Optional<TMember> member = members.findById(memberId);
 
         if (member.isEmpty() || member.get().getStatus() == MemberStatus.REMOVED) {
+            return EffectivePermissions.none();
+        }
+
+        // art. 10 ust. 3: while competences are suspended the function-based permissions are not exercised
+        if (suspensions.competencesSuspended(memberId, LocalDate.now(clock))) {
             return EffectivePermissions.none();
         }
 

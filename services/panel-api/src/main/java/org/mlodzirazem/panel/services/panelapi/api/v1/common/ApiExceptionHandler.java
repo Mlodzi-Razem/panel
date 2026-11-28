@@ -27,6 +27,7 @@ import org.mlodzirazem.panel.services.panelapi.core.error.DomainException;
 import org.mlodzirazem.panel.services.panelapi.core.error.ForbiddenException;
 import org.mlodzirazem.panel.services.panelapi.core.error.NotFoundException;
 import org.mlodzirazem.panel.services.panelapi.core.error.RuleViolationException;
+import org.mlodzirazem.panel.services.panelapi.suspensions.SuspensionConfirmationRequiredException;
 import org.mlodzirazem.panel.services.panelapi.recruitment.eform.DeclarationFormAccessException;
 import org.mlodzirazem.panel.services.panelapi.recruitment.intake.IntakeFormException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -61,6 +62,11 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(ConfirmationRequiredException.class)
     ResponseEntity<ErrorResponse> confirmation(ConfirmationRequiredException e) {
+        return respond(HttpStatus.CONFLICT, new ErrorResponse(e.getCode(), e.getMessage(), null, e.getCheck()));
+    }
+
+    @ExceptionHandler(SuspensionConfirmationRequiredException.class)
+    ResponseEntity<ErrorResponse> suspensionConfirmation(SuspensionConfirmationRequiredException e) {
         return respond(HttpStatus.CONFLICT, new ErrorResponse(e.getCode(), e.getMessage(), null, e.getCheck()));
     }
 
