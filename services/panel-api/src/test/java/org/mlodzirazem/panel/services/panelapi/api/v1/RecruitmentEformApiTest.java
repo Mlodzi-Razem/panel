@@ -230,6 +230,51 @@ class RecruitmentEformApiTest extends ApiTestSupport {
             .containsExactly(409, "CASE_CLOSED");
     }
 
+    /**
+     * The FE BFF proxy fetches /pdf with {@code Accept: application/pdf}. Dead links must answer
+     * with the contract codes there too, not with a 401 from the error dispatch.
+     */
+    @Test
+    void pdfEndpointAnswersDeadLinksWithTheContractCodes() throws Exception {
+        long caseId = awaitingCase("edek-pdf-kody@example.org");
+        String token = createLink(201, zoA, caseId).body().path("token").asString();
+        String pesel = SyntheticPesel.of(java.time.LocalDate.of(2007, 4, 1), 21);
+        assertThat(call(HttpMethod.POST, "/public/declaration-form/" + token, null, submitBody(pesel))
+            .status()).isEqualTo(200);
+
+        ResponseEntity<byte[]> live = pdfAccepted("/public/declaration-form/" + token + "/pdf");
+        assertThat(live.getStatusCode().value()).isEqualTo(200);
+        assertThat(new String(live.getBody(), 0, 5, java.nio.charset.StandardCharsets.US_ASCII))
+            .isEqualTo("%PDF-");
+
+        assertDeadPdf("/public/declaration-form/zlfiony-token/pdf", 404, "TOKEN_INVALID");
+
+        jdbc.update("UPDATE declaration_form_sessions SET expires_at = now() - interval '1 hour'"
+            + " WHERE case_id = ?", caseId);
+        assertDeadPdf("/public/declaration-form/" + token + "/pdf", 410, "TOKEN_EXPIRED");
+
+        long closedCase = awaitingCase("edek-pdf-zamknieta@example.org");
+        String closedToken = createLink(201, zoA, closedCase).body().path("token").asString();
+        jdbc.update("UPDATE recruitment_cases SET status = 'REJECTED',"
+            + " rejection_reason = 'NOT_FIT', closed_at = CURRENT_DATE WHERE id = ?",
+            closedCase);
+        assertDeadPdf("/public/declaration-form/" + closedToken + "/pdf", 409, "CASE_CLOSED");
+    }
+
+    private ResponseEntity<byte[]> pdfAccepted(String path) {
+        return anon.get()
+            .uri("http://localhost:" + port + path)
+            .accept(MediaType.APPLICATION_PDF)
+            .retrieve().toEntity(byte[].class);
+    }
+
+    private void assertDeadPdf(String path, int status, String code) {
+        ResponseEntity<byte[]> entity = pdfAccepted(path);
+
+        assertThat(entity.getStatusCode().value()).isEqualTo(status);
+        assertThat(json.readTree(entity.getBody()).path("code").asString()).isEqualTo(code);
+    }
+
     @Test
     void submitRejectsIncompletePairsWithUnprocessableEntity() throws Exception {
         long caseId = awaitingCase("edek-pola@example.org");

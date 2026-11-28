@@ -33,6 +33,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -148,7 +149,13 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(statusCode).headers(headers).body(ErrorResponse.of(code, reason));
     }
 
+    /**
+     * The error body is always JSON. The content type is preset so that Spring does not negotiate it
+     * against the request's Accept header: on the PDF endpoint the client asks for
+     * {@code application/pdf}, the JSON body then has no acceptable representation, the handler
+     * fails and the error falls through to the authenticated /error dispatch (401 instead of 404/409/410).
+     */
     private static ResponseEntity<ErrorResponse> respond(HttpStatus status, ErrorResponse body) {
-        return ResponseEntity.status(status).body(body);
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(body);
     }
 }
