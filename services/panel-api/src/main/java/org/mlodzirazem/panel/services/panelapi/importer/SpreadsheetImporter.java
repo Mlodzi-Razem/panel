@@ -500,7 +500,9 @@ class SpreadsheetImporter {
                 }
             }
 
-            TMember created = memberService.create(new NewMember(plan.values, plan.primaryId, false));
+            // the transitional supporting type is written on creation only (art. 48 ust. 1)
+            TMember created = memberService.create(
+                new NewMember(plan.values, plan.primaryId, false, null, plan.transitionalSupporting));
 
             return new Outcome(Kind.CREATED, created.getId());
         }

@@ -42,12 +42,17 @@ import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.mlodzirazem.panel.services.panelapi.members.MembershipActService;
+import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.MembershipRemovalGround;
 
 @SpringBootTest
 @PostgresTest
 class LastBodiesManagerTest extends DomainTestSupport {
     @Autowired
     BodyMembershipService service;
+
+    @Autowired
+    MembershipActService acts;
 
     private final LocalDate today = LocalDate.now();
 
@@ -180,7 +185,7 @@ class LastBodiesManagerTest extends DomainTestSupport {
 
     @Test
     void removingTheLastManagerIsRefusedButOtherStatusChangesAreNot() {
-        assertLastManagerRefusal(() -> memberService.update(last.getId(), Map.of(MemberField.STATUS, MemberStatus.REMOVED)));
+        assertLastManagerRefusal(() -> acts.remove(removal(last)));
         assertThat(jdbc.queryForObject("SELECT status::text FROM members WHERE id = ?", String.class, last.getId()))
             .isEqualTo("ACTIVE");
 
@@ -189,12 +194,11 @@ class LastBodiesManagerTest extends DomainTestSupport {
         TMember other = newMember("Olek", "Other", "slaskie");
         grant(other, body("national-board"), "CO_CHAIR");
 
-        memberService.update(last.getId(), Map.of(MemberField.STATUS, MemberStatus.REMOVED));
+        acts.remove(removal(last));
 
         assertThat(jdbc.queryForObject("SELECT status::text FROM members WHERE id = ?", String.class, last.getId()))
             .isEqualTo("REMOVED");
-        assertLastManagerRefusal(() -> memberService.update(other.getId(),
-            Map.of(MemberField.STATUS, MemberStatus.REMOVED)));
+        assertLastManagerRefusal(() -> acts.remove(removal(other)));
     }
 
     @Test
@@ -246,6 +250,10 @@ class LastBodiesManagerTest extends DomainTestSupport {
     private AssignMembership toKsk(TMember member, String typeCode) {
         return new AssignMembership(member.getId(), body("peer-court").getId(),
             memberType(BodyKind.PEER_COURT, typeCode).getId(), today, null);
+    }
+
+    private MembershipActService.Remove removal(TMember member) {
+        return new MembershipActService.Remove(member.getId(), MembershipRemovalGround.RESIGNATION, today, "TEST-REM-1");
     }
 
     private void assertLastManagerRefusal(Runnable action) {

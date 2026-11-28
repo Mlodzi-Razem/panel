@@ -24,6 +24,11 @@ export type FieldDef = {
     kind: FieldKind;
     autoComplete?: string;
     required?: boolean;
+    /**
+     * Changed only by a membership act (statute art. 9, 11, 12), never by a plain edit; the panel API answers 409
+     * MEMBERSHIP_ACT_REQUIRED. Such fields are not rendered as inputs and are left out of payloads.
+     */
+    readOnly?: boolean;
 };
 
 export const FIELD_GROUPS: readonly FieldGroup[] = ['CONTACT', 'NAMING', 'FORMAL', 'ORGANISATIONAL'];
@@ -58,13 +63,13 @@ export const FIELDS: readonly FieldDef[] = [
     {name: 'addressApartment', group: 'FORMAL', kind: 'text'},
 
     {name: 'status', group: 'ORGANISATIONAL', kind: 'status'},
-    {name: 'membershipType', group: 'ORGANISATIONAL', kind: 'membershipType'},
+    {name: 'membershipType', group: 'ORGANISATIONAL', kind: 'membershipType', readOnly: true},
     {name: 'memberId', group: 'ORGANISATIONAL', kind: 'text'},
     {name: 'memberSince', group: 'ORGANISATIONAL', kind: 'date'},
     {name: 'probationPeriodStartDate', group: 'ORGANISATIONAL', kind: 'date'},
     {name: 'probationPeriodEndDate', group: 'ORGANISATIONAL', kind: 'date'},
     {name: 'requestDate', group: 'ORGANISATIONAL', kind: 'date'},
-    {name: 'removedAt', group: 'ORGANISATIONAL', kind: 'date'},
+    {name: 'removedAt', group: 'ORGANISATIONAL', kind: 'date', readOnly: true},
     {name: 'domainEmail', group: 'ORGANISATIONAL', kind: 'email'},
     {name: 'domainEmailAliases', group: 'ORGANISATIONAL', kind: 'list'},
     {name: 'declarationReference', group: 'ORGANISATIONAL', kind: 'text'},
@@ -79,6 +84,8 @@ export function fieldDef(name: string): FieldDef | undefined {
 }
 
 export const IDENTIFIER_FIELD = 'formalIdentifier';
+
+const READ_ONLY_FIELDS = new Set(FIELDS.filter(f => f.readOnly).map(f => f.name));
 
 export type SubmittedValue = string | string[];
 
@@ -120,7 +127,7 @@ export function changedPayload(
     const result: Record<string, string | string[] | null> = {};
     for (const def of defs) {
         const value = submitted[def.name];
-        if (value === undefined) {
+        if (def.readOnly || value === undefined) {
             continue;
         }
         if (def.name === IDENTIFIER_FIELD && value === '') {
@@ -140,7 +147,7 @@ export function createPayload(
     const result: Record<string, string | string[] | null> = {};
     for (const [name, value] of Object.entries(submitted)) {
         const payload = toPayload(value);
-        if (payload !== null) {
+        if (payload !== null && !READ_ONLY_FIELDS.has(name)) {
             result[name] = payload;
         }
     }
