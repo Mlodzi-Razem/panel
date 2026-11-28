@@ -256,7 +256,7 @@ export default function DeclarationFormStep({token, onSubmitted, onFatal}: {
                    maxLength={11}/>
         </div>
         {birthDate && <p className={styles.cardHint}>
-            {t("form.birthDateLabel", {date: new Intl.DateTimeFormat(locale, {dateStyle: "long"}).format(birthDate)})}
+            {t("form.birthDateLabel", {date: new Intl.DateTimeFormat(locale, {dateStyle: "long", timeZone: "UTC"}).format(birthDate)})}
         </p>}
         <fieldset className={styles.checkboxRow}>
             <input type="checkbox"
