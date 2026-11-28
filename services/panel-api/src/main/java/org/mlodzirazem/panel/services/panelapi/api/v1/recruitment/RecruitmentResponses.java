@@ -27,6 +27,7 @@ import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.Re
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentDecisionKind;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentRejectionReason;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentSource;
+import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentCandidateNames;
 import tools.jackson.databind.JsonNode;
 
 import java.time.LocalDate;
@@ -55,7 +56,10 @@ public final class RecruitmentResponses {
         @Nullable LocalDate closedAt,
         @Nullable RecruitmentRejectionReason rejectionReason,
         @Nullable ZonedDateTime anonymizedAt,
-        @Nullable LocalDate anonymizationDueOn
+        @Nullable LocalDate anonymizationDueOn,
+        @Nullable String candidateDisplayFirstName,
+        @Nullable String candidateDisplayLastName,
+        RecruitmentCandidateNames.Source candidateNameSource
     ) {
     }
 
@@ -100,7 +104,11 @@ public final class RecruitmentResponses {
         @Nullable ZonedDateTime anonymizedAt,
         @Nullable ZonedDateTime artifactsPurgedAt,
         @Nullable LocalDate artifactsDueOn,
-        @Nullable LocalDate anonymizationDueOn
+        @Nullable LocalDate anonymizationDueOn,
+        @Nullable String candidateDisplayFirstName,
+        @Nullable String candidateDisplayLastName,
+        RecruitmentCandidateNames.Source candidateNameSource,
+        RecruitmentCandidateNames.Comparison candidateNameComparison
     ) {
     }
 

@@ -18,13 +18,48 @@
 import React from "react";
 import { useFormatter } from "next-intl";
 import { Tone } from "@/components/page/Page";
-import { CaseSummary } from "@/panel-api/members/recruitment";
 
-/** The candidate's name; M2 requires first and last together, so a single name cannot render. */
-export function candidateName(
-    item: Pick<CaseSummary, "candidateFirstName" | "candidateLastName">,
-): string {
-    return [item.candidateFirstName, item.candidateLastName].filter(v => typeof v === "string").join(" ");
+/** Name fields of a case summary or detail; the display fields are absent on responses without them. */
+export type CandidateNameFields = {
+    candidateFirstName?: string | null;
+    candidateLastName?: string | null;
+    candidateDisplayFirstName?: string | null;
+    candidateDisplayLastName?: string | null;
+    candidateNameSource?: string | null;
+};
+
+const nonEmpty = (v: string | null | undefined): v is string => typeof v === "string" && v.trim() !== "";
+
+const normalizeName = (v: string) => v.normalize("NFC").trim().replace(/\s+/g, " ").toLowerCase();
+
+/**
+ * The name the Panel uses (declared preferred, else the case name, else formal). Falls back to the intake
+ * fields when the response carries no display source. M2 requires first and last together.
+ */
+export function candidateName(item: CandidateNameFields): string {
+    const parts = item.candidateNameSource == null
+        ? [item.candidateFirstName, item.candidateLastName]
+        : [item.candidateDisplayFirstName, item.candidateDisplayLastName];
+
+    return parts.filter(nonEmpty).join(" ");
+}
+
+/**
+ * The intake name, shown as a muted second line in the list when the displayed name is a declared preferred
+ * name that differs from it (PN-3). Null in every other case.
+ */
+export function intakeNameIfDiffers(item: CandidateNameFields): string | null {
+    if (item.candidateNameSource !== "DECLARATION_PREFERRED") {
+        return null;
+    }
+
+    const intake = [item.candidateFirstName, item.candidateLastName].filter(nonEmpty).join(" ");
+
+    if (intake === "") {
+        return null;
+    }
+
+    return normalizeName(intake) === normalizeName(candidateName(item)) ? null : intake;
 }
 
 export function FormattedCaseDate({value}: { value: string | null | undefined }) {

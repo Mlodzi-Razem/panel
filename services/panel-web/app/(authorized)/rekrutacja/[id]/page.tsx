@@ -45,6 +45,8 @@ import { getCaseTransitions, getRecruitmentCase } from "@/panel-api/members/recr
 import { listBodies } from "@/panel-api/members/bodies";
 import { PERMISSIONS } from "@/panel-api/members/types";
 
+const nonBlank = (v: string | null | undefined): v is string => typeof v === "string" && v.trim() !== "";
+
 /** The statuses whose edges belong to the M3 engine — decision input appears from here on. */
 const POST_DECLARATION_STATUSES = [
     'DECLARATION_RECEIVED', 'PROBATION', 'PROBATION_EXTENDED', 'ZO_RECOMMENDED', 'ZK_VOTING', 'ACCEPTED', 'REJECTED',
@@ -90,6 +92,13 @@ export default async function RecruitmentCasePage({params}: { params: Promise<{ 
             ?? null;
         nationalBoard = bodiesResult.data.find(body => body.kind === "NATIONAL_BOARD") ?? null;
     }
+
+    const nameComparison = candidateCase.candidateNameComparison ?? null;
+    const intakeName = [candidateCase.candidateFirstName, candidateCase.candidateLastName]
+        .filter(nonBlank).join(" ");
+    const declaredName = [nameComparison?.declarationPreferred?.first, nameComparison?.declarationPreferred?.last]
+        .filter(nonBlank).join(" ");
+    const nameMatch = nameComparison?.match ?? "INCOMPLETE";
 
     return <Page title={candidateName(candidateCase) || t("caseTitle", {id})}
                  backHref="/rekrutacja"
@@ -169,6 +178,31 @@ export default async function RecruitmentCasePage({params}: { params: Promise<{ 
                     && <DeclarationScanButton caseId={caseId}
                                               formalIdentifierPresent={candidateCase.formalIdentifierPresent}/>}
             </div>}
+        </Card>
+
+        <Card title={t("stageNamesCard")} hint={t("stageNamesHint")}>
+            <DescriptionList>
+                <div><dt>{t("stageCase")}</dt><dd>{intakeName || "—"}</dd></div>
+                <div>
+                    <dt>{t("stageDeclaration")}</dt>
+                    <dd>{declaredName
+                        ? <>
+                            {declaredName}{" "}
+                            {nameMatch === "SAME" && <Badge tone="success">{t("matchSame")}</Badge>}
+                            {nameMatch === "DIFFERENT" && <Badge tone="info">{t("matchDifferent")}</Badge>}
+                        </>
+                        : <Muted>{candidateCase.formalIdentifierPresent ? t("declarationNotGiven") : t("declarationPending")}</Muted>}
+                    </dd>
+                </div>
+                <div>
+                    <dt>{t("stageInUse")}</dt>
+                    <dd>
+                        <strong>{candidateName(candidateCase) || "—"}</strong>
+                        {candidateCase.candidateNameSource && <> <Muted>{t(`nameSource.${candidateCase.candidateNameSource}`)}</Muted></>}
+                        {candidateCase.candidatePronouns && <> <Muted>({candidateCase.candidatePronouns})</Muted></>}
+                    </dd>
+                </div>
+            </DescriptionList>
         </Card>
 
         {candidateCase.formalIdentifierPresent && <Card title={t("formalDataCard")} hint={t("formalDataHint")}>
