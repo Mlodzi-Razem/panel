@@ -94,7 +94,9 @@ function formatDateTime(iso: string, locale: string): string {
         if (Number.isNaN(date.getTime())) {
             return "";
         }
-        return new Intl.DateTimeFormat(locale, {dateStyle: "medium", timeStyle: "short"}).format(date);
+        // Fixed zone: this client component is also rendered on the server (UTC on stage); formatting in the
+        // runtime's own zone made the two renders differ and broke hydration (minified React error #418).
+        return new Intl.DateTimeFormat(locale, {dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Warsaw"}).format(date);
     } catch {
         return "";
     }
