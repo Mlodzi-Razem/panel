@@ -18,6 +18,9 @@
 package org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -25,4 +28,15 @@ import java.util.List;
 @Repository
 public interface TRecruitmentCaseEventRepository extends JpaRepository<TRecruitmentCaseEvent, Long> {
     List<TRecruitmentCaseEvent> findAllByRecruitmentCaseIdOrderByCreatedAtAscIdAsc(long recruitmentCaseId);
+
+    /**
+     * Retention (M8): the reason of a candidate-data correction is free text typed by a case manager and may
+     * carry personal data; the key is dropped and replaced by a marker, the event itself (type, time, actor and
+     * changed field names) stays.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query(value = "UPDATE recruitment_case_events SET payload = (payload - 'reason') || CAST('{\"reasonRedacted\": true}' AS jsonb)"
+        + " WHERE case_id = :caseId AND event_type = CAST('CANDIDATE_DATA_CORRECTED' AS recruitment_case_event_type)"
+        + " AND payload ->> 'reason' IS NOT NULL", nativeQuery = true)
+    int redactCorrectionReasons(@Param("caseId") long caseId);
 }

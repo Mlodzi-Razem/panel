@@ -101,6 +101,15 @@ class FilesystemDeclarationArtifactStore implements DeclarationArtifactStore {
         }
     }
 
+    @Override
+    public void delete(String storageRef) {
+        try {
+            Files.deleteIfExists(directory().resolve(storageRef));
+        } catch (IOException failure) {
+            throw new UncheckedIOException("Cannot delete a declaration artifact " + storageRef, failure);
+        }
+    }
+
     private Path directory() {
         return Path.of(properties.getStorageDir()).toAbsolutePath().normalize();
     }

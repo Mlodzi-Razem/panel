@@ -52,6 +52,7 @@ import org.mlodzirazem.panel.services.panelapi.recruitment.NewRecruitmentCase;
 import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentAdmissionService;
 import org.mlodzirazem.panel.services.panelapi.recruitment.RecruitmentCaseService;
 import org.mlodzirazem.panel.services.panelapi.recruitment.eform.RecruitmentEformService;
+import org.mlodzirazem.panel.services.panelapi.recruitment.retention.RecruitmentRetention;
 import org.mlodzirazem.panel.services.panelapi.recruitment.workflow.RecruitmentRules;
 import org.mlodzirazem.panel.services.panelapi.recruitment.workflow.RecruitmentWorkflowService;
 import org.springframework.http.HttpStatus;
@@ -98,6 +99,7 @@ public class RecruitmentCasesController {
     private final TRecruitmentDecisionRepository decisions;
     private final TBodyRepository bodies;
     private final JsonMapper json;
+    private final RecruitmentRetention retention;
 
     public record CreateCaseRequest(
         @Nullable Long districtBodyId,
@@ -529,7 +531,11 @@ public class RecruitmentCasesController {
                     .thenComparing(TRecruitmentDecision::getId))
                 .map(this::decision)
                 .toList(),
-            timeline.stream().map(this::event).toList()
+            timeline.stream().map(this::event).toList(),
+            candidateCase.getAnonymizedAt(),
+            candidateCase.getArtifactsPurgedAt(),
+            artifactsDueOn(candidateCase),
+            anonymizationDueOn(candidateCase)
         );
     }
 
@@ -557,8 +563,21 @@ public class RecruitmentCasesController {
             candidateCase.getCreatedAt(),
             candidateCase.getUpdatedAt(),
             candidateCase.getClosedAt(),
-            candidateCase.getRejectionReason()
+            candidateCase.getRejectionReason(),
+            candidateCase.getAnonymizedAt(),
+            anonymizationDueOn(candidateCase)
         );
+    }
+
+    /** Retention dates exist for rejected cases only; accepted and open cases have no retention clock. */
+    private @Nullable LocalDate anonymizationDueOn(TRecruitmentCase candidateCase) {
+        return candidateCase.getStatus() == RecruitmentCaseStatus.REJECTED && candidateCase.getClosedAt() != null
+            ? retention.caseDueOn(candidateCase.getClosedAt()) : null;
+    }
+
+    private @Nullable LocalDate artifactsDueOn(TRecruitmentCase candidateCase) {
+        return candidateCase.getStatus() == RecruitmentCaseStatus.REJECTED && candidateCase.getClosedAt() != null
+            ? retention.artifactsDueOn(candidateCase.getClosedAt()) : null;
     }
 
     private static DistrictRef district(TBody body) {

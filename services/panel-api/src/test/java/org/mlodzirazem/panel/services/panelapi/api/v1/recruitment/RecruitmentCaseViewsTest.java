@@ -90,6 +90,22 @@ class RecruitmentCaseViewsTest extends DomainTestSupport {
     }
 
     @Test
+    void toDeleteViewStartsOnTheRetentionDayAndSkipsAnonymisedCases() {
+        TRecruitmentCase rejected = newCase(RecruitmentCaseStatus.IN_PROGRESS);
+        jdbc.update("UPDATE recruitment_cases SET status = 'REJECTED', rejection_reason = 'NOT_FIT',"
+            + " closed_at = current_date - 364 WHERE id = ?", rejected.getId());
+        assertThat(ids(RecruitmentCaseView.TO_DELETE)).doesNotContain(rejected.getId());
+
+        jdbc.update("UPDATE recruitment_cases SET closed_at = current_date - 365 WHERE id = ?", rejected.getId());
+        assertThat(ids(RecruitmentCaseView.TO_DELETE)).contains(rejected.getId());
+
+        jdbc.update("UPDATE recruitment_cases SET anonymized_at = now(), candidate_email = NULL,"
+            + " candidate_birth_date = NULL, candidate_first_name = NULL, candidate_last_name = NULL WHERE id = ?",
+            rejected.getId());
+        assertThat(ids(RecruitmentCaseView.TO_DELETE)).doesNotContain(rejected.getId());
+    }
+
+    @Test
     void viewsRespectTheDistrictScopeOfTheCaller() {
         newCase(RecruitmentCaseStatus.NEW);
         RecruitmentCaseSearch.Scope other = new RecruitmentCaseSearch.Scope(false, Set.of(-1L));

@@ -26,4 +26,7 @@ public interface DeclarationArtifactStore {
     String save(byte[] content);
 
     byte[] load(String storageRef);
+
+    /** Removes the stored artifact; an already missing artifact is not an error (idempotent). */
+    void delete(String storageRef);
 }

@@ -18,6 +18,9 @@
 package org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -30,4 +33,9 @@ public interface TRecruitmentDecisionRepository extends JpaRepository<TRecruitme
                                                                            RecruitmentDecisionKind decisionKind);
 
     List<TRecruitmentDecision> findAllByRecruitmentCaseId(Long caseId);
+
+    /** Retention (M8): the free-text note of a decision may carry personal data; the decision itself stays. */
+    @Modifying(flushAutomatically = true)
+    @Query("update TRecruitmentDecision d set d.note = null where d.recruitmentCase.id = :caseId and d.note is not null")
+    int clearNotes(@Param("caseId") long caseId);
 }

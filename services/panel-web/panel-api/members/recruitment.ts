@@ -73,7 +73,7 @@ export const caseDistrictRefSchema = z.object({
 export const caseSummarySchema = z.object({
     id: z.number(),
     district: caseDistrictRefSchema,
-    candidateFirstName: z.string(),
+    candidateFirstName: z.string().nullish(),
     candidateLastName: z.string().nullish(),
     candidateEmail: z.string().nullish(),
     candidatePhone: z.string().nullish(),
@@ -83,6 +83,9 @@ export const caseSummarySchema = z.object({
     updatedAt: z.string().nullish(),
     closedAt: z.string().nullish(),
     rejectionReason: rejectionReasonSchema.nullish(),
+    // retention (M8): anonymized cases have no candidate name; due dates exist for rejected cases only
+    anonymizedAt: z.string().nullish(),
+    anonymizationDueOn: z.string().nullish(),
 });
 
 export const casePageSchema = z.object({
@@ -104,7 +107,7 @@ export const caseEventSchema = z.object({
 export const caseDetailSchema = z.object({
     id: z.number(),
     district: caseDistrictRefSchema,
-    candidateFirstName: z.string(),
+    candidateFirstName: z.string().nullish(),
     candidateLastName: z.string().nullish(),
     candidateEmail: z.string().nullish(),
     candidatePhone: z.string().nullish(),
@@ -139,6 +142,10 @@ export const caseDetailSchema = z.object({
     acceptedMemberNumber: z.string().nullish(),
     decisions: z.array(caseDecisionSchema),
     events: z.array(caseEventSchema),
+    anonymizedAt: z.string().nullish(),
+    artifactsPurgedAt: z.string().nullish(),
+    artifactsDueOn: z.string().nullish(),
+    anonymizationDueOn: z.string().nullish(),
 });
 
 /** One candidate move served by GET /recruitment-cases/{id}/transitions — the server's truth. */

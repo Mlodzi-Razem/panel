@@ -20,6 +20,7 @@ package org.mlodzirazem.panel.services.panelapi.api.v1.recruitment;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment.RecruitmentCaseStatus;
+import org.mlodzirazem.panel.services.panelapi.recruitment.retention.RetentionProperties;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
@@ -27,7 +28,6 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,10 +45,8 @@ class RecruitmentCaseSearch {
     private final JdbcClient jdbc;
     private final Clock clock;
     private final RecruitmentViewProperties viewProperties;
-
-    /** Owned by the anonymisation job (C1): the retention period of rejected cases. */
-    @org.springframework.beans.factory.annotation.Value("${panel.recruitment.retention.rejected-case-days:365}")
-    private int rejectedCaseDays = 365;
+    /** Single source of the retention period of rejected cases, shared with the anonymisation job (C1). */
+    private final RetentionProperties retention;
 
     record Scope(boolean global, Set<Long> readDistricts) {
         boolean empty() {
@@ -144,8 +142,9 @@ class RecruitmentCaseSearch {
             case RECOMMENDED -> "c.status = 'ZO_RECOMMENDED'";
             case ZK_VOTING -> "c.status = 'ZK_VOTING'";
             case TO_DELETE -> {
-                params.put("toDeleteBefore", LocalDate.ofInstant(now, ZoneOffset.UTC)
-                    .minusDays(rejectedCaseDays));
+                // same day arithmetic as RecruitmentRetention.runAt: closed_at + days <= today (clock zone)
+                params.put("toDeleteBefore", LocalDate.ofInstant(now, clock.getZone())
+                    .minusDays(retention.getRejectedCaseDays()));
                 yield "c.status = 'REJECTED' AND c.anonymized_at IS NULL AND c.closed_at <= :toDeleteBefore";
             }
         };

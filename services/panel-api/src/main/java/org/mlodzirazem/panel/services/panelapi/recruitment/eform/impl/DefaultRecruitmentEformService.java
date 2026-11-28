@@ -360,7 +360,13 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
             .orElseThrow(() -> new ConflictException("FORM_NOT_FILLED",
                 "The form must be submitted before the declaration PDF becomes available"));
 
-        return artifactStore.load(template.getStorageRef());
+        String storageRef = template.getStorageRef();
+
+        if (storageRef == null) {
+            throw new ConflictException("ARTIFACT_PURGED", "The declaration PDF was removed by the retention job");
+        }
+
+        return artifactStore.load(storageRef);
     }
 
     @Override

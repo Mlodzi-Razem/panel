@@ -175,4 +175,8 @@ public class TRecruitmentCase extends TBaseEntity {
 
     @Column(name = "anonymized_at")
     private @Nullable ZonedDateTime anonymizedAt;
+
+    /** Retention (M8): when the declaration artifacts of the rejected case were purged. */
+    @Column(name = "artifacts_purged_at")
+    private @Nullable ZonedDateTime artifactsPurgedAt;
 }

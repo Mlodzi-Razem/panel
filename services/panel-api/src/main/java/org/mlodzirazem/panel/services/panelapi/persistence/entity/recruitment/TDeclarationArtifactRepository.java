@@ -27,4 +27,11 @@ public interface TDeclarationArtifactRepository extends JpaRepository<TDeclarati
     List<TDeclarationArtifact> findAllByRecruitmentCaseId(Long caseId);
 
     List<TDeclarationArtifact> findAllBySessionId(Long sessionId);
+
+    /**
+     * Stored files are content-addressed, so another (unpurged) artifact row can point at the same file;
+     * the retention job removes a file only when no unpurged row still points at it (it checks after
+     * detaching its own rows).
+     */
+    boolean existsByStorageRefAndPurgedAtIsNull(String storageRef);
 }
