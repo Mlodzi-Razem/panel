@@ -19,7 +19,7 @@ import * as z from "zod";
 import { getPanelServerSession } from "@/auth/authOptions";
 import FetchPanelApiClient from "@/panel-api/FetchPanelApiClient";
 import type { PanelApiRequest } from "@/panel-api/IPanelApiClient";
-import { ApiError, ApiResult, assignmentCheckSchema } from "@/panel-api/members/types";
+import { ApiError, ApiResult, assignmentCheckSchema, suspensionCheckSchema } from "@/panel-api/members/types";
 
 const client = new FetchPanelApiClient();
 
@@ -76,7 +76,10 @@ async function parseError(response: Response): Promise<ApiError> {
             message: response.statusText || 'Request failed',
         };
     }
-    const check = assignmentCheckSchema.safeParse(parsed.data.check);
+    // a suspension check carries mandatesAtStake; the assignment schema would strip it
+    const raw = parsed.data.check;
+    const isSuspension = typeof raw === 'object' && raw !== null && 'mandatesAtStake' in raw;
+    const check = isSuspension ? suspensionCheckSchema.safeParse(raw) : assignmentCheckSchema.safeParse(raw);
     return {
         status: response.status,
         code: parsed.data.code,

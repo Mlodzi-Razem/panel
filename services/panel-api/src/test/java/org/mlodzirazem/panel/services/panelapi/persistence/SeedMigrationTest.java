@@ -108,11 +108,14 @@ class SeedMigrationTest extends DomainTestSupport {
     void seedsPermissionGroupsPerSpec() {
         assertThat(permissions("District board")).containsExactlyInAnyOrder("CONTACT_PERSONAL_DATA_READ",
             "CONTACT_PERSONAL_DATA_MANAGE", "FORMAL_PERSONAL_DATA_READ", "FORMAL_PERSONAL_DATA_MANAGE",
-            "RECRUITMENT_READ", "RECRUITMENT_MANAGE", "FEES_READ");
+            "RECRUITMENT_READ", "RECRUITMENT_MANAGE", "FEES_READ", "SUSPENSIONS_READ", "SUSPENSIONS_MANAGE");
         // Art. 43 ust. 3: the treasurer is a ZO member, so never less than "District board" (owner decision).
-        assertThat(permissions("District treasurer")).containsAll(permissions("District board")).contains("FEES_READ")
-                                                     .doesNotContain("FEES_MANAGE", "BODIES_MANAGE",
-                                                         "RECRUITMENT_APPROVE");
+        // G-10: suspensions are the board's competence, not the treasurer's (the treasurer does not suspend).
+        assertThat(permissions("District treasurer"))
+            .containsAll(permissions("District board").stream().filter(p -> !p.startsWith("SUSPENSIONS_")).toList())
+            .contains("FEES_READ")
+            .doesNotContain("FEES_MANAGE", "BODIES_MANAGE", "RECRUITMENT_APPROVE", "SUSPENSIONS_READ",
+                "SUSPENSIONS_MANAGE");
         assertThat(jdbc.queryForList("SELECT t.kind::text || ':' || mt.code FROM body_template_member_types mt "
             + "JOIN body_templates t ON t.id = mt.body_template_id "
             + "JOIN permission_group g ON g.id = mt.permission_group_id WHERE g.name = 'District treasurer'",
@@ -120,7 +123,7 @@ class SeedMigrationTest extends DomainTestSupport {
         assertThat(permissions("National board")).containsExactlyInAnyOrder("CONTACT_PERSONAL_DATA_READ",
             "CONTACT_PERSONAL_DATA_MANAGE", "FORMAL_PERSONAL_DATA_READ", "FORMAL_PERSONAL_DATA_MANAGE",
             "BODIES_MANAGE", "DIRECTORY_GROUPS_MANAGE", "DIRECTORY_USERS_MANAGE",
-            "RECRUITMENT_READ", "RECRUITMENT_APPROVE", "FEES_READ");
+            "RECRUITMENT_READ", "RECRUITMENT_APPROVE", "FEES_READ", "SUSPENSIONS_READ", "SUSPENSIONS_MANAGE");
         assertThat(permissions("Audit commission")).containsExactly("FEES_READ");
         assertThat(permissions("National board treasurer")).hasSize(9).contains("FEES_READ", "FEES_MANAGE");
         assertThat(permissions("National IT proxy")).containsExactlyInAnyOrder("CONTACT_PERSONAL_DATA_READ",

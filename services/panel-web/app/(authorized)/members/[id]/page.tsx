@@ -24,12 +24,15 @@ import ApiErrorNotice from "@/components/members/ApiErrorNotice";
 import FieldInputs from "@/components/members/FieldInputs";
 import { Empty, GroupedFieldList, hasAnyField } from "@/components/members/format";
 import { BodyFunctionsCard, ElectoralRights, FunctionHistoryCard, functionHistoryPaging, MembershipEndNotice } from "@/components/members/MemberOverview";
+import SuspensionsCard from "@/components/members/SuspensionsCard";
 import RecordShell, { RecordTab, resolveTab } from "@/components/members/record/RecordShell";
 import RevealIdentifier from "@/components/members/RevealIdentifier";
 import { Card, Page } from "@/components/page/Page";
 import { FieldDef, fieldsOfGroups } from "@/panel-api/members/fields";
 import { getMember, listDistricts } from "@/panel-api/members/members";
+import { getSuspensionOptions, getSuspensionOverview } from "@/panel-api/members/suspensions";
 import { requireMe } from "@/panel-api/members/requireMe";
+import { hasPermission } from "@/panel-api/members/me";
 import { PERMISSIONS } from "@/panel-api/members/types";
 
 export default async function MemberPage({params, searchParams}: {
@@ -78,8 +81,20 @@ export default async function MemberPage({params, searchParams}: {
     }
     tabs.push({key: 'functions', label: t('tabFunctions'), count: member.bodyFunctions.length});
     const query = await searchParams;
-    const activeTab = resolveTab(query['tab'], tabs);
     const historyPaging = functionHistoryPaging(query);
+
+    const canReadSuspensions = hasPermission(me, PERMISSIONS.suspensionsRead);
+    const canManageSuspensions = hasPermission(me, PERMISSIONS.suspensionsManage);
+    const canBodiesManage = hasPermission(me, PERMISSIONS.bodiesManage);
+    const suspensionsResult = canReadSuspensions ? await getSuspensionOverview(id) : null;
+    const suspensions = suspensionsResult?.ok ? suspensionsResult.data : null;
+    const suspensionsError = suspensionsResult && !suspensionsResult.ok ? suspensionsResult.error : null;
+    const suspensionOptions = canManageSuspensions && suspensions ? await getSuspensionOptions(id) : null;
+    if (canReadSuspensions) {
+        const open = suspensions?.items.filter(s => s.state === 'ACTIVE' || s.state === 'SCHEDULED').length ?? 0;
+        tabs.push({key: 'suspensions', label: t('tabSuspensions'), count: open});
+    }
+    const activeTab = resolveTab(query['tab'], tabs);
 
     return <RecordShell title={`#${id}`}
                         member={member}
@@ -147,5 +162,13 @@ export default async function MemberPage({params, searchParams}: {
             <FunctionHistoryCard history={member.functionHistory} basePath={`/members/${id}`}
                                  page={historyPaging.page} size={historyPaging.size}/>
         </>}
+
+        {activeTab === 'suspensions' && (suspensions
+            ? <SuspensionsCard memberId={id}
+                               overview={suspensions}
+                               options={suspensionOptions?.ok ? suspensionOptions.data : null}
+                               canManage={canManageSuspensions}
+                               canBodiesManage={canBodiesManage}/>
+            : suspensionsError && <ApiErrorNotice error={suspensionsError}/>)}
     </RecordShell>;
 }

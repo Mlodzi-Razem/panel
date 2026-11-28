@@ -109,7 +109,7 @@ export default function AssignFunctionForm({bodyId, bodyKind, memberTypes}: {
             return;
         }
         setConfirm(null);
-        if (outcome.error.code === 'CONFIRMATION_REQUIRED' && outcome.error.check) {
+        if (outcome.error.code === 'CONFIRMATION_REQUIRED' && outcome.error.check && 'conflicts' in outcome.error.check) {
             askToConfirm(outcome.error.check, input);
             return;
         }

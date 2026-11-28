@@ -34,6 +34,8 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType.BODIES_MANAGE;
+import static org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType.SUSPENSIONS_MANAGE;
+import static org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType.SUSPENSIONS_READ;
 import static org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType.CONTACT_PERSONAL_DATA_READ;
 import static org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType.FEES_MANAGE;
 import static org.mlodzirazem.panel.services.panelapi.persistence.entity.permission.PermissionType.FEES_READ;
@@ -177,10 +179,13 @@ class PermissionServiceTest extends DomainTestSupport {
         EffectivePermissions permissions = permissionService.of(treasurer.getId());
         Long ownDistrict = district("podlaskie").getId();
 
+        // G-10: suspensions belong to the board, not to the treasurer (the treasurer does not suspend)
         assertThat(permissions.inDistrict(ownDistrict))
-            .containsAll(permissionService.of(plainMember.getId()).inDistrict(ownDistrict))
+            .containsAll(permissionService.of(plainMember.getId()).inDistrict(ownDistrict).stream()
+                                          .filter(p -> p != SUSPENSIONS_READ && p != SUSPENSIONS_MANAGE)
+                                          .toList())
             .contains(FEES_READ)
-            .doesNotContain(FEES_MANAGE, BODIES_MANAGE);
+            .doesNotContain(FEES_MANAGE, BODIES_MANAGE, SUSPENSIONS_READ, SUSPENSIONS_MANAGE);
         assertThat(permissionService.can(treasurer.getId(), FORMAL_PERSONAL_DATA_MANAGE, target.getId())).isTrue();
         assertThat(permissions.inDistrict(district("slaskie").getId())).isEmpty();
         assertThat(permissions.canGlobally(FEES_READ)).isFalse();

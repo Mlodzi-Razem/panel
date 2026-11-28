@@ -45,7 +45,7 @@ class SchemaFixesTest {
 
     @BeforeEach
     void cleanUp() {
-        jdbc.execute("TRUNCATE suspensions, body_template_member_types, bodies, body_templates, "
+        jdbc.execute("TRUNCATE suspension_mandate_endings, suspensions, body_template_member_types, bodies, body_templates, "
             + "permission_group, audited_operations, member_emails, members CASCADE");
     }
 
@@ -163,8 +163,8 @@ class SchemaFixesTest {
         long body = insertBody();
 
         assertSqlState(FOREIGN_KEY_VIOLATION, () -> jdbc.update(
-            "INSERT INTO suspensions (suspended_user_id, suspending_body_id, suspension_start) "
-                + "VALUES (999999, ?, CURRENT_DATE)", body));
+            "INSERT INTO suspensions (suspended_user_id, suspending_body_id, suspension_start, decision_date) "
+                + "VALUES (999999, ?, CURRENT_DATE, CURRENT_DATE)", body));
     }
 
     @Test
@@ -172,8 +172,8 @@ class SchemaFixesTest {
         long member = insertMember("A", null, "One", "Form One", null, null, "{}", "{}");
         long body = insertBody();
 
-        jdbc.update("INSERT INTO suspensions (suspended_user_id, suspending_body_id, suspension_start) "
-            + "VALUES (?, ?, CURRENT_DATE)", member, body);
+        jdbc.update("INSERT INTO suspensions (suspended_user_id, suspending_body_id, suspension_start, decision_date) "
+            + "VALUES (?, ?, CURRENT_DATE, CURRENT_DATE)", member, body);
 
         assertThat(jdbc.queryForObject("SELECT id FROM suspensions", Long.class)).isPositive();
     }

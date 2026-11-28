@@ -65,7 +65,10 @@ function Input({def, values, requireMandatory}: {
                                 label={label}
                                 defaultValue={asString(values[def.name]) || (requireMandatory ? 'ACTIVE' : '')}
                                 emptyLabel={requireMandatory ? undefined : tMembers('notSet')}
-                                options={MEMBER_STATUSES.map(v => ({value: v, label: tEnums(`memberStatus.${v}`)}))}/>;
+                                options={MEMBER_STATUSES
+                                    // G-10: "suspended" is recorded in the suspensions register, not as a status
+                                    .filter(v => v !== 'SUSPENDED' || asString(values[def.name]) === 'SUSPENDED')
+                                    .map(v => ({value: v, label: tEnums(`memberStatus.${v}`)}))}/>;
         case 'membershipType':
             return <SelectField name={def.name}
                                 label={label}

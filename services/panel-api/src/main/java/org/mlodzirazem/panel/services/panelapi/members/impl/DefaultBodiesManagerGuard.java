@@ -20,6 +20,7 @@ package org.mlodzirazem.panel.services.panelapi.members.impl;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.mlodzirazem.panel.services.panelapi.members.BodiesManagerGuard;
+import org.mlodzirazem.panel.services.panelapi.members.SuspensionRegistry;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBodyMembershipRepository;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.body.TBodyTemplateMemberType;
 import org.mlodzirazem.panel.services.panelapi.persistence.entity.member.MemberStatus;
@@ -35,6 +36,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -43,6 +45,7 @@ class DefaultBodiesManagerGuard implements BodiesManagerGuard {
     private static final long NO_ID = -1L;
 
     private final TBodyMembershipRepository memberships;
+    private final SuspensionRegistry suspensions;
     private final Clock clock;
 
     @Override
@@ -72,17 +75,28 @@ class DefaultBodiesManagerGuard implements BodiesManagerGuard {
         @Nullable Long memberLosingPermissions,
         int successors
     ) {
-        List<Long> excluded = new ArrayList<>(membershipsLosingOpenEnd);
-        excluded.add(NO_ID);
+        LocalDate today = LocalDate.now(clock);
+        Set<Long> suspended = suspensions.competenceSuspendedMemberIds(today);
 
-        long before = count(List.of(NO_ID), NO_ID);
-        long after = count(excluded, memberLosingPermissions == null ? NO_ID : memberLosingPermissions);
+        List<Long> excludedMembers = new ArrayList<>(suspended);
+        excludedMembers.add(NO_ID);
+
+        List<Long> excludedMembershipIds = new ArrayList<>(membershipsLosingOpenEnd);
+        excludedMembershipIds.add(NO_ID);
+
+        long before = count(excludedMembers, List.of(NO_ID), today);
+
+        if (memberLosingPermissions != null) {
+            excludedMembers.add(memberLosingPermissions);
+        }
+
+        long after = count(excludedMembers, excludedMembershipIds, today);
 
         return before > after && after + successors == 0;
     }
 
-    private long count(Collection<Long> excludedMembershipIds, long excludedMemberId) {
+    private long count(Collection<Long> excludedMemberIds, Collection<Long> excludedMembershipIds, LocalDate today) {
         return memberships.countOpenEndedHolders(PermissionScope.GLOBAL, PermissionType.BODIES_MANAGE,
-            MemberStatus.REMOVED, excludedMemberId, excludedMembershipIds, LocalDate.now(clock));
+            MemberStatus.REMOVED, excludedMemberIds, excludedMembershipIds, today);
     }
 }

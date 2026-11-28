@@ -207,11 +207,16 @@ class MembersApiTest extends ApiTestSupport {
 
     @Test
     void patchChecksTheFieldGroupPermissions() {
-        Res ok = patch(zoA, "/members/" + inA.getId(), fields("pseudonym", "P", "addressLine", "ul. X 1", "status", "SUSPENDED"));
+        Res ok = patch(zoA, "/members/" + inA.getId(), fields("pseudonym", "P", "addressLine", "ul. X 1"));
         assertThat(ok.status()).isEqualTo(200);
         TMember reloaded = memberRepository.findById(inA.getId()).orElseThrow();
         assertThat(reloaded.getPseudonym()).isEqualTo("P");
-        assertThat(reloaded.getStatus().name()).isEqualTo("SUSPENDED");
+
+        // G-10: a suspension is never set through the status field; it is recorded in the suspensions register
+        Res suspendedByStatus = patch(zoA, "/members/" + inA.getId(), fields("status", "SUSPENDED"));
+        assertThat(suspendedByStatus.status()).isEqualTo(422);
+        assertThat(suspendedByStatus.code()).isEqualTo("USE_SUSPENSION_OPERATION");
+        assertThat(memberRepository.findById(inA.getId()).orElseThrow().getStatus().name()).isNotEqualTo("SUSPENDED");
 
         Map<String, Object> clear = new LinkedHashMap<>();
         clear.put("pseudonym", null);

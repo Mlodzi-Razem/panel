@@ -41,6 +41,10 @@ panel:
     events:
       completed-retention-days: 30
       alarm-attempts: 5
+  suspensions:
+    # Podpowiedź dla daty ustania zdolności odwoławczej (decyzja W4, 2026-11-27): proponowana data = start + N dni.
+    # Operacja appeal-ended zawsze wymaga jawnej daty.
+    appeal-hint-days: 14
 server:
   port: 8080
   shutdown: graceful

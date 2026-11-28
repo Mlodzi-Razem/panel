@@ -57,7 +57,9 @@ import java.util.function.Predicate;
 class DefaultElectoralRightsService implements ElectoralRightsService {
     private static final String ACTIVE_SUSPENSIONS = """
         SELECT suspended_user_id FROM suspensions
-        WHERE suspension_start <= :today
+        WHERE status = 'ACTIVE'
+          AND scope = 'FULL'
+          AND suspension_start <= :today
           AND (suspension_end IS NULL OR suspension_end > :today)
           AND (lifted_at IS NULL OR lifted_at > :today)
         """;
@@ -66,6 +68,8 @@ class DefaultElectoralRightsService implements ElectoralRightsService {
     private static final String SUSPENSIONS_OVERLAPPING = """
         SELECT COUNT(*) FROM suspensions
         WHERE suspended_user_id = :memberId
+          AND status = 'ACTIVE'
+          AND scope IN ('FULL', 'PASSIVE_ELECTORAL')
           AND (CAST(:to AS DATE) IS NULL OR suspension_start < CAST(:to AS DATE))
           AND (LEAST(suspension_end, lifted_at) IS NULL
                OR (LEAST(suspension_end, lifted_at) > CAST(:from AS DATE)

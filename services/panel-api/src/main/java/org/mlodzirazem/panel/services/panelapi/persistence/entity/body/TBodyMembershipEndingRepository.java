@@ -20,6 +20,10 @@ package org.mlodzirazem.panel.services.panelapi.persistence.entity.body;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public interface TBodyMembershipEndingRepository extends JpaRepository<TBodyMembershipEnding, Long> {
+    /** The newest ending of a mandate (endings are only ever inserted, so the highest id is the latest). */
+    Optional<TBodyMembershipEnding> findFirstByMembershipIdOrderByIdDesc(long membershipId);
 }

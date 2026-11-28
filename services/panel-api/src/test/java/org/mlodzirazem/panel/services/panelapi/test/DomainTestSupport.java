@@ -67,6 +67,8 @@ public abstract class DomainTestSupport {
 
     @BeforeEach
     protected void cleanDomainData() {
+        // TRUNCATE, not DELETE: the register is append-only (row triggers reject DELETE, G-10)
+        jdbc.execute("TRUNCATE TABLE suspension_mandate_endings, suspensions");
         cleanFees();
         jdbc.execute("DELETE FROM recruitment_intake_events");
         jdbc.execute("DELETE FROM recruitment_intake_slots");
@@ -85,7 +87,6 @@ public abstract class DomainTestSupport {
         jdbc.execute("DELETE FROM body_membership_endings");
         jdbc.execute("DELETE FROM body_memberships");
         removeDistrictReaderFunction();
-        jdbc.execute("DELETE FROM suspensions");
         jdbc.execute("DELETE FROM bodies WHERE code IS NULL OR code LIKE 'test-%'");
         jdbc.execute("DELETE FROM member_identities");
         jdbc.execute("DELETE FROM members");
