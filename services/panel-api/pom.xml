@@ -70,6 +70,13 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- fake Microsoft Graph for the provisioning tests (shaded: brings no Jetty of its own onto the classpath) -->
+        <dependency>
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <version>3.13.1</version>
+            <scope>test</scope>
+        </dependency>
 
         <!-- Actuator -->
         <dependency>

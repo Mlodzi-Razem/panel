@@ -73,3 +73,8 @@ management:
       enabled: true
       correlation:
         enabled: true
+logging:
+  level:
+    # D10 (SEC-51): HTTP client traces quote request URLs, which carry the user principal name of a member
+    org.springframework.web.client: WARN
+    jdk.httpclient.HttpClient: WARN
