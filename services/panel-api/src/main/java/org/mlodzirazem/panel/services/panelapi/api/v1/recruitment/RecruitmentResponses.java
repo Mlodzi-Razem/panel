@@ -44,7 +44,7 @@ public final class RecruitmentResponses {
     public record CaseSummaryResponse(
         long id,
         DistrictRef district,
-        String candidateFirstName,
+        @Nullable String candidateFirstName,
         @Nullable String candidateLastName,
         @Nullable String candidateEmail,
         @Nullable String candidatePhone,
@@ -53,7 +53,9 @@ public final class RecruitmentResponses {
         ZonedDateTime createdAt,
         @Nullable ZonedDateTime updatedAt,
         @Nullable LocalDate closedAt,
-        @Nullable RecruitmentRejectionReason rejectionReason
+        @Nullable RecruitmentRejectionReason rejectionReason,
+        @Nullable ZonedDateTime anonymizedAt,
+        @Nullable LocalDate anonymizationDueOn
     ) {
     }
 
@@ -61,7 +63,7 @@ public final class RecruitmentResponses {
     public record CaseDetailResponse(
         long id,
         DistrictRef district,
-        String candidateFirstName,
+        @Nullable String candidateFirstName,
         @Nullable String candidateLastName,
         @Nullable String candidateEmail,
         @Nullable String candidatePhone,
@@ -94,7 +96,11 @@ public final class RecruitmentResponses {
         @Nullable Long acceptedMemberId,
         @Nullable String acceptedMemberNumber,
         List<CaseDecisionResponse> decisions,
-        List<CaseEventResponse> events
+        List<CaseEventResponse> events,
+        @Nullable ZonedDateTime anonymizedAt,
+        @Nullable ZonedDateTime artifactsPurgedAt,
+        @Nullable LocalDate artifactsDueOn,
+        @Nullable LocalDate anonymizationDueOn
     ) {
     }
 

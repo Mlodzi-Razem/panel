@@ -74,8 +74,9 @@ public class TDeclarationArtifact extends TBaseEntity {
     @Column(name = "content_sha256", nullable = false)
     private String contentSha256;
 
-    @Column(name = "storage_ref", nullable = false)
-    private String storageRef;
+    /** Null once the artifact was purged by the retention job (see {@link #purgedAt}). */
+    @Column(name = "storage_ref")
+    private @Nullable String storageRef;
 
     /** SHA-256 of the rendered template the candidate signed; null for scans. */
     @Column(name = "document_sha256")
@@ -94,6 +95,10 @@ public class TDeclarationArtifact extends TBaseEntity {
 
     @Column(name = "validated_at")
     private @Nullable ZonedDateTime validatedAt;
+
+    /** Retention (M8): the stored file and the signer's name are gone; hashes and check names remain. */
+    @Column(name = "purged_at")
+    private @Nullable ZonedDateTime purgedAt;
 
     /** Names of the performed validation checks; no values, no certificate dumps. */
     @ColumnTransformer(write = "?::jsonb")

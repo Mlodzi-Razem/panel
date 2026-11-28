@@ -104,7 +104,19 @@ export default async function RecruitmentCasePage({params}: { params: Promise<{ 
                     {tEnums(`recruitmentRejectionReason.${candidateCase.rejectionReason}`)}
                 </Badge>}
                 {!open && <Muted>{t("closedOn")} <FormattedCaseDate value={candidateCase.closedAt}/></Muted>}
+                {candidateCase.anonymizedAt && <Badge tone="neutral">{t("anonymizedBadge")}</Badge>}
             </div>
+            {candidateCase.anonymizedAt
+                ? <p className={styles.reason}>
+                    {t("anonymizedOn")} <FormattedCaseDate value={candidateCase.anonymizedAt}/>
+                    {" · "}{t("artifactsPurgedOn")} <FormattedCaseDate value={candidateCase.artifactsPurgedAt}/>
+                </p>
+                : candidateCase.anonymizationDueOn && <p className={styles.reason}>
+                    {t("anonymizationDue")} <FormattedCaseDate value={candidateCase.anonymizationDueOn}/>
+                    {candidateCase.artifactsDueOn && <>
+                        {" · "}{t("artifactsDue")} <FormattedCaseDate value={candidateCase.artifactsDueOn}/>
+                    </>}
+                </p>}
             <DescriptionList>
                 <div><dt>{t("fields.district")}</dt><dd>{candidateCase.district.name}</dd></div>
                 <div><dt>{t("fields.email")}</dt><dd>{candidateCase.candidateEmail ?? "—"}</dd></div>
@@ -195,7 +207,7 @@ export default async function RecruitmentCasePage({params}: { params: Promise<{ 
                 <TextField name="candidateFirstName"
                            label={t("fields.firstName")}
                            required
-                           defaultValue={candidateCase.candidateFirstName}/>
+                           defaultValue={candidateCase.candidateFirstName ?? undefined}/>
                 <TextField name="candidateLastName"
                            label={t("fields.lastName")}
                            required

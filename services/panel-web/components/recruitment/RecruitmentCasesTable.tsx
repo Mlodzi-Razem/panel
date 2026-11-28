@@ -59,6 +59,9 @@ export default function RecruitmentCasesTable({page}: { page: CasePage }) {
                     {item.rejectionReason && <div className={styles.reason}>
                         {tEnums(`recruitmentRejectionReason.${item.rejectionReason}`)}
                     </div>}
+                    {item.anonymizedAt && <div className={styles.reason}>
+                        <Badge tone="neutral">{t("anonymizedBadge")}</Badge>
+                    </div>}
                 </td>
                 <td>{tEnums(`recruitmentSource.${item.source}`)}</td>
                 <td>{t("days", {count: caseAgeDays(item.createdAt)})}</td>

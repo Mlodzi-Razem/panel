@@ -18,12 +18,15 @@
 package org.mlodzirazem.panel.services.panelapi.persistence.entity.recruitment;
 
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -52,4 +55,23 @@ public interface TRecruitmentCaseRepository extends JpaRepository<TRecruitmentCa
         + " where lower(c.candidateEmail) = lower(:email) and c.closedAt is null and c.district.id in :districtIds")
     boolean existsOpenByEmailInDistricts(@Param("email") String email,
                                          @Param("districtIds") java.util.Collection<Long> districtIds);
+
+    /** Retention (M8): rejected, not anonymized cases whose artifacts are still stored; keyset by id. */
+    @Query("select c.id from TRecruitmentCase c where c.status = 'REJECTED' and c.anonymizedAt is null"
+        + " and c.artifactsPurgedAt is null and c.closedAt <= :closedOnOrBefore and c.id > :afterId"
+        + " order by c.id")
+    List<Long> findIdsDueForArtifactPurge(
+        @Param("closedOnOrBefore") LocalDate closedOnOrBefore,
+        @Param("afterId") long afterId,
+        Pageable page
+    );
+
+    /** Retention (M8): rejected cases whose personal data is due to be wiped; keyset by id. */
+    @Query("select c.id from TRecruitmentCase c where c.status = 'REJECTED' and c.anonymizedAt is null"
+        + " and c.closedAt <= :closedOnOrBefore and c.id > :afterId order by c.id")
+    List<Long> findIdsDueForAnonymization(
+        @Param("closedOnOrBefore") LocalDate closedOnOrBefore,
+        @Param("afterId") long afterId,
+        Pageable page
+    );
 }
