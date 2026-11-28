@@ -55,6 +55,23 @@ function CorrectionSummary({payload}: { payload: unknown }) {
     </>;
 }
 
+/** A refused declaration: the rule that refused it and the channel (codes only, never the PESEL). */
+function BlockedSummary({payload}: { payload: unknown }) {
+    const t = useTranslations("recruitment");
+    const data = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
+    const reason = typeof data["reason"] === "string" ? data["reason"] : null;
+    const channel = typeof data["channel"] === "string" ? data["channel"] : null;
+
+    return <>
+        {reason && <p className={styles.timelinePayload}>
+            {t("timelineBlockReason")}: {t.has(`blockReason.${reason}`) ? t(`blockReason.${reason}`) : reason}
+        </p>}
+        {channel && <p className={styles.timelinePayload}>
+            {t("timelineBlockChannel")}: {t.has(`blockChannel.${channel}`) ? t(`blockChannel.${channel}`) : channel}
+        </p>}
+    </>;
+}
+
 export default function CaseTimeline({events}: { events: CaseEvent[] }) {
     const t = useTranslations("recruitment");
     const tEnums = useTranslations("enums");
@@ -78,9 +95,10 @@ export default function CaseTimeline({events}: { events: CaseEvent[] }) {
                 </time>
                 {event.actor && <span className={styles.mutedText}>{event.actor.displayName}</span>}
             </div>
-            {event.eventType === "CANDIDATE_DATA_CORRECTED"
-                ? <CorrectionSummary payload={event.payload}/>
-                : payloadSummary(event) && <p className={styles.timelinePayload}>{payloadSummary(event)}</p>}
+            {event.eventType === "CANDIDATE_DATA_CORRECTED" && <CorrectionSummary payload={event.payload}/>}
+            {event.eventType === "DECLARATION_BLOCKED" && <BlockedSummary payload={event.payload}/>}
+            {event.eventType !== "CANDIDATE_DATA_CORRECTED" && event.eventType !== "DECLARATION_BLOCKED"
+                && payloadSummary(event) && <p className={styles.timelinePayload}>{payloadSummary(event)}</p>}
         </li>)}
     </ol>;
 }

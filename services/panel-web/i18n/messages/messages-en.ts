@@ -482,6 +482,9 @@ const enMessages = {
             CASE_CLOSED: "Case closed",
             NOTE_ADDED: "Note added",
             CANDIDATE_DATA_CORRECTED: "Candidate data corrected",
+            DECLARATION_BLOCKED: "Declaration blocked",
+            ARTIFACTS_PURGED: "Declaration files deleted",
+            CASE_ANONYMIZED: "Case anonymised",
         },
     },
     teams: {
@@ -886,6 +889,18 @@ const enMessages = {
         },
         timelineCorrectionFields: "Changed fields",
         timelineCorrectionReason: "Reason",
+        timelineBlockReason: "Reason",
+        timelineBlockChannel: "Channel",
+        blockReason: {
+            EXISTING_MEMBER: "the person is already a member (PESEL in the register)",
+            ADMISSION_BAN: "an active admission ban",
+            DUPLICATE_OPEN_CASE: "another open case with the same PESEL",
+        },
+        blockChannel: {
+            EFORM: "e-declaration",
+            CORRECTION: "data correction",
+            SCAN: "paper declaration scan",
+        },
         dataFields: {
             candidate_formal_first_name: "formal first name",
             candidate_formal_last_name: "formal last name",

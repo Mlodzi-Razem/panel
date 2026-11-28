@@ -24,10 +24,14 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface TRecruitmentCaseEventRepository extends JpaRepository<TRecruitmentCaseEvent, Long> {
     List<TRecruitmentCaseEvent> findAllByRecruitmentCaseIdOrderByCreatedAtAscIdAsc(long recruitmentCaseId);
+
+    Optional<TRecruitmentCaseEvent> findFirstByRecruitmentCaseIdAndEventTypeOrderByCreatedAtDescIdDesc(
+        long recruitmentCaseId, RecruitmentCaseEventType eventType);
 
     /**
      * Retention (M8): the reason of a candidate-data correction is free text typed by a case manager and may

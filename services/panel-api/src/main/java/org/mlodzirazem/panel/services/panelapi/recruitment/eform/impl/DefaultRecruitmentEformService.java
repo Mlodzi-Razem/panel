@@ -59,11 +59,15 @@ import org.mlodzirazem.panel.services.panelapi.recruitment.eform.DeclarationSign
 import org.mlodzirazem.panel.services.panelapi.recruitment.eform.RecruitmentEformRules;
 import org.mlodzirazem.panel.services.panelapi.recruitment.eform.RecruitmentEformService;
 import org.mlodzirazem.panel.services.panelapi.recruitment.workflow.RecruitmentWorkflowService;
+import org.mlodzirazem.panel.services.panelapi.recruitment.eform.impl.DeclarationBlockRecorder.BlockChannel;
+import org.mlodzirazem.panel.services.panelapi.recruitment.eform.impl.DeclarationBlockRecorder.BlockReason;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.security.SecureRandom;
 import java.time.Clock;
@@ -126,6 +130,7 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
     private final DeclarationProperties properties;
     private final TransactionalMail transactionalMail;
     private final AuditLog auditLog;
+    private final DeclarationBlockRecorder blockRecorder;
     private final JsonMapper jsonMapper;
     private final Clock clock;
     private final SecureRandom secureRandom = new SecureRandom();
@@ -250,7 +255,7 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
                 "The information duty acknowledgement is required");
         }
 
-        applyDeclarationData(candidateCase, submission);
+        applyDeclarationData(candidateCase, submission, BlockChannel.EFORM, null);
 
         byte[] template = pdfRenderer.render(candidateCase, null);
         TDeclarationArtifact templateArtifact = new TDeclarationArtifact();
@@ -296,7 +301,12 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
      * special-category consent, PESEL checksum, admission age and the generic block rules; then the
      * case columns are set.
      */
-    private void applyDeclarationData(TRecruitmentCase candidateCase, DeclarationFormSubmission submission) {
+    private void applyDeclarationData(
+        TRecruitmentCase candidateCase,
+        DeclarationFormSubmission submission,
+        @Nullable BlockChannel blockChannel,
+        @Nullable Long actorMemberId
+    ) {
         RecruitmentEformRules.assertNamePair(submission.formalFirstName(), submission.formalLastName(),
             "NAMES_ARE_A_PAIR");
         RecruitmentEformRules.assertNamePair(submission.preferredFirstName(),
@@ -313,7 +323,7 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
 
         String personalId = validPersonalId(candidateCase, submission.personalId(), LocalDate.now(clock));
 
-        requireNotBlocked(personalId, candidateCase);
+        requireNotBlocked(personalId, candidateCase, blockChannel, actorMemberId);
 
         candidateCase.setCandidateFormalFirstName(submission.formalFirstName().strip());
         candidateCase.setCandidateFormalLastName(submission.formalLastName().strip());
@@ -469,7 +479,8 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
         } else {
             // a missing data block fails the same required-field checks as an empty e-form
             applyDeclarationData(candidateCase, data != null ? data
-                : new DeclarationFormSubmission(null, null, null, null, null, null, null, null, false, false, false));
+                : new DeclarationFormSubmission(null, null, null, null, null, null, null, null, false, false, false),
+                BlockChannel.SCAN, actorMemberId);
         }
 
         // no electronic signature can arrive once the paper declaration is recorded
@@ -589,7 +600,7 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
             String personalId = validPersonalId(candidateCase, correction.personalId(), ageDate);
 
             if (!personalId.equals(candidateCase.getCandidateFormalIdentifier())) {
-                requireNotBlocked(personalId, candidateCase);
+                requireNotBlocked(personalId, candidateCase, BlockChannel.CORRECTION, actorMemberId);
                 candidateCase.setCandidateFormalIdentifier(personalId);
                 changed.add("candidate_formal_identifier");
             }
@@ -632,11 +643,20 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
             });
     }
 
-    private void requireNotBlocked(String personalId, TRecruitmentCase candidateCase) {
+    /**
+     * @param blockChannel where the declaration comes from; null only logs the refusal
+     * @param actorMemberId the member acting in the back office; null for the anonymous public form
+     */
+    private void requireNotBlocked(
+        String personalId,
+        TRecruitmentCase candidateCase,
+        @Nullable BlockChannel blockChannel,
+        @Nullable Long actorMemberId
+    ) {
         // one generic message, no detail which rule fired (phishing/ban hygiene, art. 9 ust. 5);
-        // the reason category stays in the server log for the okręg board (case-level, no values)
+        // the reason category stays in the server log and, as a code, on the case timeline
         if (members.findByFormalIdentifier(personalId).isPresent()) {
-            blocked(candidateCase, "existing-member");
+            blocked(candidateCase, BlockReason.EXISTING_MEMBER, blockChannel, actorMemberId);
         }
 
         LocalDate today = LocalDate.now(clock);
@@ -646,18 +666,63 @@ class DefaultRecruitmentEformService implements RecruitmentEformService {
             .anyMatch(ban -> !today.isBefore(ban.getEffectiveFrom()) && !today.isAfter(ban.getEffectiveUntil()));
 
         if (activeBan) {
-            blocked(candidateCase, "admission-ban");
+            blocked(candidateCase, BlockReason.ADMISSION_BAN, blockChannel, actorMemberId);
         }
 
         if (cases.existsAnotherOpenCaseByFormalIdentifier(personalId, candidateCase.getId())) {
-            blocked(candidateCase, "duplicate-open-case");
+            blocked(candidateCase, BlockReason.DUPLICATE_OPEN_CASE, blockChannel, actorMemberId);
         }
     }
 
-    private void blocked(TRecruitmentCase candidateCase, String reason) {
+    private void blocked(
+        TRecruitmentCase candidateCase,
+        BlockReason reason,
+        @Nullable BlockChannel blockChannel,
+        @Nullable Long actorMemberId
+    ) {
         log.warn("declaration blocked for case {} of district {}: {}",
-            candidateCase.getId(), candidateCase.getDistrict().getId(), reason);
+            candidateCase.getId(), candidateCase.getDistrict().getId(), reason.logKey);
+
+        if (blockChannel != null) {
+            recordBlockAfterRollback(candidateCase.getId(), reason, blockChannel, actorMemberId);
+        }
+
         throw RecruitmentEformService.declarationBlocked();
+    }
+
+    /**
+     * The refusing transaction still holds the case row lock (the session or case lock of the caller), so the
+     * event is written only once that transaction rolled back: a REQUIRES_NEW insert referencing the case
+     * would wait for the caller's lock and never return. A failure here is logged by type only.
+     */
+    private void recordBlockAfterRollback(
+        long caseId,
+        BlockReason reason,
+        BlockChannel channel,
+        @Nullable Long actorMemberId
+    ) {
+        Runnable record = () -> {
+            try {
+                blockRecorder.record(caseId, actorMemberId, reason, channel);
+            } catch (RuntimeException e) {
+                log.warn("declaration-blocked event not recorded for case {}: {}",
+                    caseId, e.getClass().getSimpleName());
+            }
+        };
+
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            record.run();
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_ROLLED_BACK) {
+                    record.run();
+                }
+            }
+        });
     }
 
     private void recordConsents(

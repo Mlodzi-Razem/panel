@@ -541,6 +541,84 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
     }
 
     @Test
+    void refusedDeclarationLeavesOneBlockEventWithCodesOnlyAndKeepsTheCaseUntouched() {
+        long actor = districtActor();
+        String memberPesel = SyntheticPesel.of(LocalDate.of(2007, 4, 1), 51);
+        TMember existingMember = newMember("Marcin", "Juzblock", "mazowieckie");
+        jdbc.update("UPDATE members SET formal_identifier = ? WHERE id = ?", memberPesel,
+            existingMember.getId());
+
+        TRecruitmentCase candidateCase = awaitingCase("blokada-czlonek@example.org");
+        long caseId = candidateCase.getId();
+        RecruitmentEformService.DeclarationLink link = eform.createDeclarationLink(caseId, actor);
+
+        assertThatThrownBy(() -> eform.submitForm(link.token(), submission(memberPesel, "Felicja")))
+            .isInstanceOf(RuleViolationException.class).extracting("code").isEqualTo("DECLARATION_BLOCKED");
+
+        List<java.util.Map<String, Object>> events = blockEvents(caseId);
+        assertThat(events).hasSize(1);
+        String payload = events.get(0).get("payload").toString();
+        assertThat(payload).contains("EXISTING_MEMBER", "EFORM")
+            .doesNotContain(memberPesel)
+            .doesNotContainPattern("[0-9]");
+        assertThat(events.get(0).get("created_by_user_id")).isNull();
+        assertThat(auditCount("recruitment :: declaration-blocked")).isEqualTo(1);
+
+        // the refusal rolled the submission back: no formal data, no session change
+        TRecruitmentCase stored = caseRepository.findById(caseId).orElseThrow();
+        assertThat(stored.getCandidateFormalFirstName()).isNull();
+        assertThat(stored.getCandidateFormalIdentifier()).isNull();
+
+        // a retry within 24 hours does not flood the timeline
+        assertThatThrownBy(() -> eform.submitForm(link.token(), submission(memberPesel, "Felicja")))
+            .isInstanceOf(RuleViolationException.class).extracting("code").isEqualTo("DECLARATION_BLOCKED");
+        assertThat(blockEvents(caseId)).hasSize(1);
+        assertThat(auditCount("recruitment :: declaration-blocked")).isEqualTo(1);
+    }
+
+    @Test
+    void banAndDuplicateRefusalsEachLeaveTheirOwnBlockEvent() {
+        long actor = districtActor();
+
+        String banPesel = SyntheticPesel.of(LocalDate.of(2007, 4, 1), 61);
+        TRecruitmentCase bannedCase = awaitingCase("blokada-zakaz@example.org");
+        jdbc.update("INSERT INTO admission_bans (formal_identifier, decision_signature,"
+            + " effective_from, effective_until, reason, note) VALUES (?, 'ZO/MZ/BAN/26',"
+            + " CURRENT_DATE - 30, CURRENT_DATE + 300, 'arta 9 ust. 5 — uchwała ZK', 'arta 9 ust. 5')", banPesel);
+        RecruitmentEformService.DeclarationLink bannedLink = eform.createDeclarationLink(bannedCase.getId(), actor);
+
+        assertThatThrownBy(() -> eform.submitForm(bannedLink.token(), submission(banPesel, "Felicja")))
+            .isInstanceOf(RuleViolationException.class).extracting("code").isEqualTo("DECLARATION_BLOCKED");
+
+        List<java.util.Map<String, Object>> banEvents = blockEvents(bannedCase.getId());
+        assertThat(banEvents).hasSize(1);
+        assertThat(banEvents.get(0).get("payload").toString()).contains("ADMISSION_BAN", "EFORM")
+            .doesNotContain(banPesel);
+
+        String dupPesel = SyntheticPesel.of(LocalDate.of(2007, 4, 1), 62);
+        TRecruitmentCase firstCase = awaitingCase("blokada-pierwsza@example.org");
+        eform.submitForm(eform.createDeclarationLink(firstCase.getId(), actor).token(),
+            submission(dupPesel, "Felicja"));
+
+        TRecruitmentCase secondCase = awaitingCase("blokada-druga@example.org");
+        RecruitmentEformService.DeclarationLink secondLink = eform.createDeclarationLink(secondCase.getId(), actor);
+        assertThatThrownBy(() -> eform.submitForm(secondLink.token(), submission(dupPesel, "Feliks")))
+            .isInstanceOf(RuleViolationException.class).extracting("code").isEqualTo("DECLARATION_BLOCKED");
+
+        List<java.util.Map<String, Object>> dupEvents = blockEvents(secondCase.getId());
+        assertThat(dupEvents).hasSize(1);
+        assertThat(dupEvents.get(0).get("payload").toString()).contains("DUPLICATE_OPEN_CASE", "EFORM")
+            .doesNotContain(dupPesel);
+        assertThat(blockEvents(firstCase.getId())).isEmpty();
+    }
+
+    private List<java.util.Map<String, Object>> blockEvents(long caseId) {
+        return jdbc.queryForList("SELECT payload::text AS payload, created_by_user_id"
+            + " FROM recruitment_case_events WHERE case_id = ? AND event_type = 'DECLARATION_BLOCKED' ORDER BY id",
+            caseId);
+    }
+
+    @Test
     void signedDeclarationClosesTheLoopIntoTheStatutoryWorkflow() throws Exception {
         String pesel = submissionPesel();
         long actor = districtActor();
@@ -804,6 +882,13 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
 
         assertThat(caseRepository.findById(candidateCase.getId()).orElseThrow().getStatus())
             .isEqualTo(RecruitmentCaseStatus.AWAITING_DECLARATION);
+
+        // the refused paper scan leaves a block event too, attributed to the board member who uploaded it
+        List<java.util.Map<String, Object>> events = blockEvents(candidateCase.getId());
+        assertThat(events).hasSize(1);
+        assertThat(events.get(0).get("payload").toString()).contains("EXISTING_MEMBER", "SCAN")
+            .doesNotContainPattern("[0-9]");
+        assertThat(((Number) events.get(0).get("created_by_user_id")).longValue()).isEqualTo(actor);
     }
 
     @Test
@@ -931,6 +1016,32 @@ class RecruitmentEformServiceTest extends DomainTestSupport {
         assertThatThrownBy(() -> eform.correctCandidateData(caseId, actor,
             correction("Inna", "Formalna", null, null, null, null, "Powód")))
             .isInstanceOf(ConflictException.class).extracting("code").isEqualTo("CASE_NOT_OPEN");
+    }
+
+    @Test
+    void correctionRefusedForAnExistingMemberLeavesACorrectionEventWithTheActorAndNoChange() {
+        long actor = districtActor();
+        TRecruitmentCase candidateCase = caseWithFormalData(actor, "korekta-blokada@example.org");
+        long caseId = candidateCase.getId();
+        String memberPesel = SyntheticPesel.of(LocalDate.of(2007, 4, 1), 52);
+        TMember existingMember = newMember("Marcin", "Juzkorekta", "mazowieckie");
+        jdbc.update("UPDATE members SET formal_identifier = ? WHERE id = ?", memberPesel, existingMember.getId());
+
+        assertThatThrownBy(() -> eform.correctCandidateData(caseId, actor,
+            correction("Inna", "Formalna", null, null, null, memberPesel, "Literówka w numerze")))
+            .isInstanceOf(RuleViolationException.class).extracting("code").isEqualTo("DECLARATION_BLOCKED");
+
+        TRecruitmentCase stored = caseRepository.findById(caseId).orElseThrow();
+        assertThat(stored.getCandidateFormalFirstName()).isEqualTo("Felicja");
+        assertThat(stored.getCandidateFormalIdentifier()).isEqualTo(submissionPesel());
+
+        List<java.util.Map<String, Object>> events = blockEvents(caseId);
+        assertThat(events).hasSize(1);
+        assertThat(events.get(0).get("payload").toString()).contains("EXISTING_MEMBER", "CORRECTION")
+            .doesNotContain(memberPesel, "Literówka");
+        assertThat(events.get(0).get("created_by_user_id")).isNotNull();
+        assertThat(auditPayloads("recruitment :: declaration-blocked")).contains("EXISTING_MEMBER")
+            .doesNotContain(memberPesel);
     }
 
     @Test
